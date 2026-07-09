@@ -8,7 +8,7 @@ export const Route = createFileRoute("/_authenticated/export")({
   component: ExportPage,
 });
 
-const TABLES = ["feeds", "pens", "rounds", "observations", "evap_controls", "pen_daily"] as const;
+const TABLES = ["feeds", "pens", "rounds", "observations", "evap_controls"] as const;
 
 function ExportPage() {
   const [busy, setBusy] = useState<string | null>(null);

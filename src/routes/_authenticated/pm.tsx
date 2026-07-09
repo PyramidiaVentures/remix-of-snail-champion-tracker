@@ -17,7 +17,7 @@ const PM_STEPS = [
   "Weigh a generous portion of each feed — enough that there WILL be leftovers tomorrow.",
   "Enter grams given for each pen × feed.",
   "Weigh a matching-size control portion of each feed; enter control given.",
-  "Place feed dishes in each pen, rotating each feed's position from yesterday.",
+  "Place feed in each pen, rotating each feed's position from yesterday.",
   "Put control portions in the snail-free control cage beside the pens.",
   "Top up calcium and water dishes (never weighed, always present).",
   "Take the PM photo with the paper tag (feed + pen + date) in frame.",

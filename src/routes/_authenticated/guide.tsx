@@ -35,7 +35,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
         <li>Weigh a generous portion of each feed — enough that there WILL be leftovers tomorrow.</li>
         <li>Enter grams given for each pen × feed.</li>
         <li>Weigh a matching-size control portion of each feed; enter control given.</li>
-        <li>Place feed dishes in each pen, rotating each feed's position from yesterday.</li>
+        <li>Place feed in each pen, rotating each feed's position from yesterday.</li>
         <li>Put control portions in the snail-free control cage beside the pens.</li>
         <li>Top up calcium and water dishes (never weighed, always present).</li>
         <li>Take the PM photo with the paper tag (feed + pen + date) in frame.</li>
@@ -49,9 +49,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
         <li>Take the AM photo first — leftovers untouched, tag in frame.</li>
         <li>Weigh leftover of each pen × feed; enter it.</li>
         <li>Weigh leftover of each control; enter it.</li>
-        <li>Record snail activity and deaths count per pen.</li>
         <li>Remove and bin ALL old feed; wipe dishes clean.</li>
-        <li>(Optional) temp_c and humidity_pct per pen.</li>
       </ol>
     ),
   },
@@ -64,11 +62,10 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     body: (
       <ul className="list-disc pl-5 space-y-1">
         <li>Feed eaten to zero → increase its portion next feeding; note it (measurement was capped).</li>
-        <li>Snail dies or is missing → record in deaths_count, remove it.</li>
+        <li>Snail dies or is missing → remove it from the pen.</li>
         <li>Missed a feeding or check → log the gap; never backfill numbers from memory.</li>
         <li>Leaves wilted before feeding → discard, cut fresh.</li>
         <li>Spill/contamination in a dish → void that dish for the day in notes.</li>
-        <li>Snails mostly sealed/inactive → record it; that pen likely didn't feed that night.</li>
       </ul>
     ),
   },
