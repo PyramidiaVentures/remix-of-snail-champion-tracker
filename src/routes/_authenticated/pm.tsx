@@ -5,7 +5,7 @@ import { useState } from "react";
 import { today } from "@/lib/date";
 import { Checklist } from "@/components/Checklist";
 import { NumberField } from "@/components/NumberField";
-import { PhotoCapture } from "@/components/PhotoCapture";
+import { SessionPhotoSlot } from "@/components/SessionPhotoSlot";
 import { BookOpen, Save, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/pm")({
@@ -20,9 +20,12 @@ const PM_STEPS = [
   "Place feed in each pen, rotating each feed's position from yesterday.",
   "Put control portions in the snail-free control cage beside the pens.",
   "Top up calcium and water dishes (never weighed, always present).",
-  "Take the PM photo with the paper tag (feed + pen + date) in frame.",
+  "Upload one PM photo per pen (all its feeds together, tag in frame) plus one control-cage photo.",
 ];
 const PM_PHOTO_STEP_INDEX = 7;
+
+type PenRow = { id: string; label: string; age_group: string };
+type FeedRow = { id: string; name: string };
 
 function PmPage() {
   const [date, setDate] = useState(today());
@@ -39,28 +42,29 @@ function PmPage() {
       return (await supabase.from("feeds").select("*").in("id", ids)).data ?? [];
     },
   });
-
-  const obs = useQuery({
-    queryKey: ["obs-day", round.data?.id, date],
+  const photos = useQuery({
+    queryKey: ["session-photos", round.data?.id, date],
     enabled: !!round.data,
-    queryFn: async () => (await supabase.from("observations").select("*").eq("round_id", round.data!.id).eq("obs_date", date)).data ?? [],
+    queryFn: async () => (await supabase.from("session_photos").select("*").eq("round_id", round.data!.id).eq("obs_date", date)).data ?? [],
   });
 
-  const totalCells = (pens.data?.length ?? 0) * (feeds.data?.length ?? 0);
-  const photosDone = (obs.data ?? []).filter((o) => o.photo_pm_url).length;
-  const photosRemaining = Math.max(0, totalCells - photosDone);
-  const allPhotos = totalCells > 0 && photosRemaining === 0;
+  const requiredSlots = (pens.data?.length ?? 0) + 1; // pens + control
+  const photosDone =
+    (pens.data ?? []).filter((p) => photos.data?.some((r) => r.pen_id === p.id && r.photo_pm_url)).length +
+    (photos.data?.some((r) => r.pen_id === null && r.photo_pm_url) ? 1 : 0);
+  const photosRemaining = Math.max(0, requiredSlots - photosDone);
+  const allPhotos = requiredSlots > 0 && photosRemaining === 0;
 
   const overrides = PM_STEPS.map((_, i) =>
     i === PM_PHOTO_STEP_INDEX
       ? {
           forced: allPhotos,
           locked: true,
-          subtitle: totalCells === 0
-            ? "Set up pens & feeds first."
+          subtitle: !pens.data?.length
+            ? "Set up pens first."
             : allPhotos
-              ? `All ${totalCells} photos attached.`
-              : `${photosRemaining} of ${totalCells} photos still needed.`,
+              ? `All ${requiredSlots} photos uploaded.`
+              : `${photosRemaining} of ${requiredSlots} photos still needed.`,
         }
       : undefined,
   );
@@ -91,6 +95,7 @@ function PmPage() {
 
       {round.data && feeds.data && pens.data && (
         <>
+          <PmPhotoSlots roundId={round.data.id} date={date} pens={pens.data} />
           <PmGivenGrid roundId={round.data.id} date={date} pens={pens.data} feeds={feeds.data} />
           <PmEvapControls roundId={round.data.id} date={date} feeds={feeds.data} />
         </>
@@ -108,7 +113,38 @@ function StatusPill({ state }: { state: SaveState }) {
   return <span className="inline-flex items-center gap-1 text-[10px] text-destructive"><AlertTriangle className="h-3 w-3" />failed — retry</span>;
 }
 
-function PmGivenGrid({ roundId, date, pens, feeds }: { roundId: string; date: string; pens: { id: string; label: string; age_group: string }[]; feeds: { id: string; name: string }[] }) {
+function PmPhotoSlots({ roundId, date, pens }: { roundId: string; date: string; pens: PenRow[] }) {
+  const qc = useQueryClient();
+  const photos = useQuery({
+    queryKey: ["session-photos", roundId, date],
+    queryFn: async () => (await supabase.from("session_photos").select("*").eq("round_id", roundId).eq("obs_date", date)).data ?? [],
+  });
+  const urlFor = (pen_id: string | null) =>
+    photos.data?.find((r) => (pen_id === null ? r.pen_id === null : r.pen_id === pen_id))?.photo_pm_url ?? null;
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
+      <h2 className="font-semibold">PM photos (one per pen + control)</h2>
+      <p className="text-xs text-muted-foreground">Take the photos on your phone first (so you can share them via WhatsApp too), then upload each from your camera roll.</p>
+      {pens.map((pen) => (
+        <SessionPhotoSlot key={pen.id}
+          round_id={roundId} pen_id={pen.id} obs_date={date} kind="pm"
+          label={`${pen.label} (${pen.age_group}) — all feeds`}
+          existingUrl={urlFor(pen.id)}
+          onSaved={() => qc.invalidateQueries({ queryKey: ["session-photos", roundId, date] })}
+        />
+      ))}
+      <SessionPhotoSlot
+        round_id={roundId} pen_id={null} obs_date={date} kind="pm"
+        label="Control cage (snail-free)"
+        existingUrl={urlFor(null)}
+        onSaved={() => qc.invalidateQueries({ queryKey: ["session-photos", roundId, date] })}
+      />
+    </section>
+  );
+}
+
+function PmGivenGrid({ roundId, date, pens, feeds }: { roundId: string; date: string; pens: PenRow[]; feeds: FeedRow[] }) {
   const qc = useQueryClient();
   const existing = useQuery({
     queryKey: ["obs-day", roundId, date],
@@ -143,7 +179,7 @@ function PmGivenGrid({ roundId, date, pens, feeds }: { roundId: string; date: st
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-4">
-      <h2 className="font-semibold">Grams given &amp; photos</h2>
+      <h2 className="font-semibold">Grams given</h2>
       {pens.map((pen) => (
         <div key={pen.id} className="space-y-2">
           <div className="text-sm font-semibold">{pen.label} <span className="text-xs text-muted-foreground ml-1">{pen.age_group}</span></div>
@@ -166,23 +202,18 @@ function PmGivenGrid({ roundId, date, pens, feeds }: { roundId: string; date: st
                       if (v !== "") void saveNumber(pen.id, feed.id, Number(v));
                     }}
                   />
-                  <PhotoCapture
-                    round_id={roundId} pen_id={pen.id} feed_id={feed.id} obs_date={date} kind="pm"
-                    existingPath={row?.photo_pm_url ?? null}
-                    onSaved={() => qc.invalidateQueries({ queryKey: ["obs-day", roundId, date] })}
-                  />
                 </div>
               );
             })}
           </div>
         </div>
       ))}
-      <p className="text-xs text-muted-foreground flex items-center gap-1"><Save className="h-3 w-3" /> Numbers save on blur; photos save on capture. They save independently.</p>
+      <p className="text-xs text-muted-foreground flex items-center gap-1"><Save className="h-3 w-3" /> Numbers save on blur; photos save on upload. They save independently.</p>
     </section>
   );
 }
 
-function PmEvapControls({ roundId, date, feeds }: { roundId: string; date: string; feeds: { id: string; name: string }[] }) {
+function PmEvapControls({ roundId, date, feeds }: { roundId: string; date: string; feeds: FeedRow[] }) {
   const qc = useQueryClient();
   const existing = useQuery({
     queryKey: ["evap-day", roundId, date],
