@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { Checklist } from "@/components/Checklist";
 import { NumberField } from "@/components/NumberField";
-import { PhotoCapture } from "@/components/PhotoCapture";
+import { SessionPhotoSlot } from "@/components/SessionPhotoSlot";
 import { computeIntake, type EvapRow, type ObservationRow } from "@/lib/scoring";
 import { BookOpen, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 
@@ -13,12 +13,15 @@ export const Route = createFileRoute("/_authenticated/am")({
 });
 
 const AM_STEPS = [
-  "Take the AM photo first — leftovers untouched, tag in frame.",
+  "Upload the AM photos (one per pen + one control) — leftovers untouched, tag in frame.",
   "Weigh leftover of each pen × feed; enter it.",
   "Weigh leftover of each control; enter it.",
   "Remove and bin ALL old feed; wipe dishes clean.",
 ];
 const AM_PHOTO_STEP_INDEX = 0;
+
+type PenRow = { id: string; label: string; age_group: string };
+type FeedRow = { id: string; name: string };
 
 function yesterday(): string {
   const d = new Date();
@@ -51,23 +54,30 @@ function AmPage() {
     enabled: !!round.data,
     queryFn: async () => (await supabase.from("observations").select("*").eq("round_id", round.data!.id).eq("obs_date", date)).data ?? [],
   });
+  const photos = useQuery({
+    queryKey: ["session-photos", round.data?.id, date],
+    enabled: !!round.data,
+    queryFn: async () => (await supabase.from("session_photos").select("*").eq("round_id", round.data!.id).eq("obs_date", date)).data ?? [],
+  });
 
   const anyPmForDate = (obs.data ?? []).some((o) => o.weight_given_g != null);
-  const totalCells = (pens.data?.length ?? 0) * (feeds.data?.length ?? 0);
-  const photosDone = (obs.data ?? []).filter((o) => o.photo_am_url).length;
-  const photosRemaining = Math.max(0, totalCells - photosDone);
-  const allPhotos = totalCells > 0 && photosRemaining === 0;
+  const requiredSlots = (pens.data?.length ?? 0) + 1;
+  const photosDone =
+    (pens.data ?? []).filter((p) => photos.data?.some((r) => r.pen_id === p.id && r.photo_am_url)).length +
+    (photos.data?.some((r) => r.pen_id === null && r.photo_am_url) ? 1 : 0);
+  const photosRemaining = Math.max(0, requiredSlots - photosDone);
+  const allPhotos = requiredSlots > 0 && photosRemaining === 0;
 
   const overrides = AM_STEPS.map((_, i) =>
     i === AM_PHOTO_STEP_INDEX
       ? {
           forced: allPhotos,
           locked: true,
-          subtitle: totalCells === 0
-            ? "Set up pens & feeds first."
+          subtitle: !pens.data?.length
+            ? "Set up pens first."
             : allPhotos
-              ? `All ${totalCells} AM photos attached.`
-              : `${photosRemaining} of ${totalCells} AM photos still needed — take them BEFORE weighing.`,
+              ? `All ${requiredSlots} AM photos uploaded.`
+              : `${photosRemaining} of ${requiredSlots} AM photos still needed — take them BEFORE weighing.`,
         }
       : undefined,
   );
@@ -110,6 +120,7 @@ function AmPage() {
 
       {round.data && feeds.data && pens.data && (
         <>
+          <AmPhotoSlots roundId={round.data.id} date={date} pens={pens.data} />
           <AmLeftoverGrid roundId={round.data.id} date={date} pens={pens.data} feeds={feeds.data} />
           <AmEvapLeftovers roundId={round.data.id} date={date} feeds={feeds.data} />
         </>
@@ -126,7 +137,38 @@ function StatusPill({ state }: { state: SaveState }) {
   return <span className="inline-flex items-center gap-1 text-[10px] text-destructive"><AlertTriangle className="h-3 w-3" />failed — retry</span>;
 }
 
-function AmLeftoverGrid({ roundId, date, pens, feeds }: { roundId: string; date: string; pens: { id: string; label: string; age_group: string }[]; feeds: { id: string; name: string }[] }) {
+function AmPhotoSlots({ roundId, date, pens }: { roundId: string; date: string; pens: PenRow[] }) {
+  const qc = useQueryClient();
+  const photos = useQuery({
+    queryKey: ["session-photos", roundId, date],
+    queryFn: async () => (await supabase.from("session_photos").select("*").eq("round_id", roundId).eq("obs_date", date)).data ?? [],
+  });
+  const urlFor = (pen_id: string | null) =>
+    photos.data?.find((r) => (pen_id === null ? r.pen_id === null : r.pen_id === pen_id))?.photo_am_url ?? null;
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
+      <h2 className="font-semibold">AM photos (one per pen + control)</h2>
+      <p className="text-xs text-muted-foreground">Reminder: take the photos before weighing so leftovers stay untouched. Upload from your camera roll.</p>
+      {pens.map((pen) => (
+        <SessionPhotoSlot key={pen.id}
+          round_id={roundId} pen_id={pen.id} obs_date={date} kind="am"
+          label={`${pen.label} (${pen.age_group}) — leftovers`}
+          existingUrl={urlFor(pen.id)}
+          onSaved={() => qc.invalidateQueries({ queryKey: ["session-photos", roundId, date] })}
+        />
+      ))}
+      <SessionPhotoSlot
+        round_id={roundId} pen_id={null} obs_date={date} kind="am"
+        label="Control cage (snail-free)"
+        existingUrl={urlFor(null)}
+        onSaved={() => qc.invalidateQueries({ queryKey: ["session-photos", roundId, date] })}
+      />
+    </section>
+  );
+}
+
+function AmLeftoverGrid({ roundId, date, pens, feeds }: { roundId: string; date: string; pens: PenRow[]; feeds: FeedRow[] }) {
   const qc = useQueryClient();
   const obs = useQuery({
     queryKey: ["obs-day", roundId, date],
@@ -157,8 +199,7 @@ function AmLeftoverGrid({ roundId, date, pens, feeds }: { roundId: string; date:
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-4">
-      <h2 className="font-semibold">Photo + grams leftover</h2>
-      <p className="text-xs text-muted-foreground">Take the AM photo BEFORE weighing — leftovers must be untouched.</p>
+      <h2 className="font-semibold">Grams leftover</h2>
       {pens.map((pen) => (
         <div key={pen.id} className="space-y-2">
           <div className="text-sm font-semibold">{pen.label} <span className="text-xs text-muted-foreground ml-1">{pen.age_group}</span></div>
@@ -183,12 +224,6 @@ function AmLeftoverGrid({ roundId, date, pens, feeds }: { roundId: string; date:
                   </div>
                   <StatusPill state={status[key] ?? (leftover != null ? "saved" : "idle")} />
                 </div>
-
-                <PhotoCapture
-                  round_id={roundId} pen_id={pen.id} feed_id={feed.id} obs_date={date} kind="am"
-                  existingPath={row?.photo_am_url ?? null}
-                  onSaved={() => qc.invalidateQueries({ queryKey: ["obs-day", roundId, date] })}
-                />
 
                 <div className="flex items-center gap-2">
                   <input
@@ -217,7 +252,7 @@ function AmLeftoverGrid({ roundId, date, pens, feeds }: { roundId: string; date:
   );
 }
 
-function AmEvapLeftovers({ roundId, date, feeds }: { roundId: string; date: string; feeds: { id: string; name: string }[] }) {
+function AmEvapLeftovers({ roundId, date, feeds }: { roundId: string; date: string; feeds: FeedRow[] }) {
   const qc = useQueryClient();
   const evaps = useQuery({
     queryKey: ["evap-day", roundId, date],

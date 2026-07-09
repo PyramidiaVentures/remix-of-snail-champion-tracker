@@ -3,15 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 export const PHOTO_BUCKET = "field-photos";
 export type PhotoKind = "am" | "pm";
 
-/** Path convention: {round_id}/{pen_id}/{feed_id}/{obs_date}-{am|pm}.jpg */
+/** Path convention: {round_id}/{pen_id|control}/{obs_date}-{am|pm}.jpg */
 export function photoPath(args: {
   round_id: string;
-  pen_id: string;
-  feed_id: string;
+  pen_id: string | null;
   obs_date: string;
   kind: PhotoKind;
 }): string {
-  return `${args.round_id}/${args.pen_id}/${args.feed_id}/${args.obs_date}-${args.kind}.jpg`;
+  const penSeg = args.pen_id ?? "control";
+  return `${args.round_id}/${penSeg}/${args.obs_date}-${args.kind}.jpg`;
 }
 
 /** Downscale + JPEG-compress a file client-side before upload. */
@@ -32,7 +32,6 @@ async function compressImage(file: File, maxDim = 1600, quality = 0.8): Promise<
     if (!ctx) return file;
     ctx.drawImage(bitmap, 0, 0, w, h);
     bitmap.close?.();
-
     if ("convertToBlob" in canvas) {
       return await (canvas as OffscreenCanvas).convertToBlob({ type: "image/jpeg", quality });
     }
@@ -44,50 +43,76 @@ async function compressImage(file: File, maxDim = 1600, quality = 0.8): Promise<
       );
     });
   } catch {
-    // Fall back to the raw file if resize fails — better to upload something.
     return file;
   }
 }
 
-export interface UploadArgs {
+export interface SessionUploadArgs {
   round_id: string;
-  pen_id: string;
-  feed_id: string;
+  pen_id: string | null;
   obs_date: string;
   kind: PhotoKind;
   file: File;
 }
 
-/** Uploads (replacing any existing file at the path) and writes the storage
- *  path onto the matching observations row. Returns the storage path. */
-export async function uploadFieldPhoto(args: UploadArgs): Promise<string> {
+/** Returns the permanent public URL of a stored object. */
+export function publicPhotoUrl(path: string): string {
+  return supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+/** Uploads a session photo (per pen or control) and upserts session_photos.
+ *  Returns the public URL stored on the row. */
+export async function uploadSessionPhoto(args: SessionUploadArgs): Promise<string> {
   const path = photoPath(args);
   const blob = await compressImage(args.file);
-
   const { error: upErr } = await supabase.storage
     .from(PHOTO_BUCKET)
     .upload(path, blob, { contentType: "image/jpeg", upsert: true, cacheControl: "3600" });
   if (upErr) throw upErr;
+  const url = publicPhotoUrl(path);
 
   const column = args.kind === "am" ? "photo_am_url" : "photo_pm_url";
-  const patch = {
-    round_id: args.round_id,
-    pen_id: args.pen_id,
-    feed_id: args.feed_id,
-    obs_date: args.obs_date,
-    [column]: path,
-  } as never;
-  const { error: dbErr } = await supabase
-    .from("observations")
-    .upsert(patch, { onConflict: "round_id,pen_id,feed_id,obs_date" });
-  if (dbErr) throw dbErr;
-  return path;
+  // We need to upsert honoring the partial unique indexes:
+  //   - pen row: (round_id, pen_id, obs_date)
+  //   - control row (pen_id NULL): (round_id, obs_date)
+  // PostgREST upsert with onConflict can only target one index, so do it manually.
+  const existing = await supabase
+    .from("session_photos")
+    .select("id")
+    .eq("round_id", args.round_id)
+    .eq("obs_date", args.obs_date)
+    .is("pen_id", args.pen_id === null ? null : (undefined as never))
+    .maybeSingle();
+
+  // Second query for the pen_id = value case (chained .is() above only handles NULL).
+  let existingId: string | null = null;
+  if (args.pen_id === null) {
+    existingId = existing.data?.id ?? null;
+  } else {
+    const q = await supabase
+      .from("session_photos")
+      .select("id")
+      .eq("round_id", args.round_id)
+      .eq("pen_id", args.pen_id)
+      .eq("obs_date", args.obs_date)
+      .maybeSingle();
+    existingId = q.data?.id ?? null;
+  }
+
+  if (existingId) {
+    const patch = { [column]: url } as never;
+    const { error } = await supabase.from("session_photos").update(patch).eq("id", existingId);
+    if (error) throw error;
+  } else {
+    const insertRow = {
+      round_id: args.round_id,
+      pen_id: args.pen_id,
+      obs_date: args.obs_date,
+      [column]: url,
+    } as never;
+    const { error } = await supabase.from("session_photos").insert(insertRow);
+    if (error) throw error;
+  }
+  return url;
 }
 
-
-/** Generate a short-lived signed URL for viewing. */
-export async function signedPhotoUrl(path: string, expiresIn = 3600): Promise<string | null> {
-  const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(path, expiresIn);
-  if (error) return null;
-  return data?.signedUrl ?? null;
-}

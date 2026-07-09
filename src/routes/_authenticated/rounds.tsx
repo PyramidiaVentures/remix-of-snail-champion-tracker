@@ -137,6 +137,11 @@ function ActiveRoundCard({ roundId }: { roundId: string }) {
     queryKey: ["evaps", roundId],
     queryFn: async () => (await supabase.from("evap_controls").select("*").eq("round_id", roundId)).data ?? [],
   });
+  const sessionPhotos = useQuery({
+    queryKey: ["session-photos-round", roundId],
+    queryFn: async () => (await supabase.from("session_photos").select("*").eq("round_id", roundId)).data ?? [],
+  });
+
 
   const result = useMemo(() => {
     if (!round.data || !pens.data || !obs.data || !evaps.data) return null;
@@ -175,9 +180,27 @@ function ActiveRoundCard({ roundId }: { roundId: string }) {
 
   if (!round.data) return null;
 
-  const missingPmPhotos = (obs.data ?? []).filter((o) => o.weight_given_g != null && !o.photo_pm_url).length;
-  const missingAmPhotos = (obs.data ?? []).filter((o) => o.weight_leftover_g != null && !o.photo_am_url).length;
+  const dates = Array.from(new Set([
+    ...(obs.data ?? []).map((o) => o.obs_date),
+  ]));
+  const requiredSlotsPerDate = (pens.data?.length ?? 0) + 1;
+  let missingPmPhotos = 0;
+  let missingAmPhotos = 0;
+  for (const d of dates) {
+    const rows = (sessionPhotos.data ?? []).filter((r) => r.obs_date === d);
+    const pmDone =
+      (pens.data ?? []).filter((p) => rows.some((r) => r.pen_id === p.id && r.photo_pm_url)).length +
+      (rows.some((r) => r.pen_id === null && r.photo_pm_url) ? 1 : 0);
+    const amDone =
+      (pens.data ?? []).filter((p) => rows.some((r) => r.pen_id === p.id && r.photo_am_url)).length +
+      (rows.some((r) => r.pen_id === null && r.photo_am_url) ? 1 : 0);
+    missingPmPhotos += Math.max(0, requiredSlotsPerDate - pmDone);
+    missingAmPhotos += Math.max(0, requiredSlotsPerDate - amDone);
+  }
+
+
   const totalMissing = missingPmPhotos + missingAmPhotos;
+
 
 
   return (
