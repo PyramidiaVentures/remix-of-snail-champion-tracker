@@ -1,8 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect, useState } from "react";
-import { today } from "@/lib/date";
+import { useMemo, useState } from "react";
 import { Checklist } from "@/components/Checklist";
 import { NumberField } from "@/components/NumberField";
 import { PhotoCapture } from "@/components/PhotoCapture";
@@ -17,11 +16,18 @@ const AM_STEPS = [
   "Take the AM photo first — leftovers untouched, tag in frame.",
   "Weigh leftover of each pen × feed; enter it.",
   "Weigh leftover of each control; enter it.",
-  "Record snail activity and deaths count per pen.",
   "Remove and bin ALL old feed; wipe dishes clean.",
-  "(Optional) temperature and humidity per pen.",
 ];
 const AM_PHOTO_STEP_INDEX = 0;
+
+function yesterday(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 function AmPage() {
   const round = useQuery({
@@ -29,38 +35,9 @@ function AmPage() {
     queryFn: async () => (await supabase.from("rounds").select("*").eq("status", "active").maybeSingle()).data,
   });
 
-  const openPm = useQuery({
-    queryKey: ["open-pm-date", round.data?.id],
-    enabled: !!round.data,
-    queryFn: async () => {
-      const [{ data: obs }, { data: evaps }] = await Promise.all([
-        supabase.from("observations").select("obs_date")
-          .eq("round_id", round.data!.id)
-          .not("weight_given_g", "is", null)
-          .is("weight_leftover_g", null)
-          .order("obs_date", { ascending: false })
-          .limit(1),
-        supabase.from("evap_controls").select("obs_date")
-          .eq("round_id", round.data!.id)
-          .not("control_given_g", "is", null)
-          .is("control_leftover_g", null)
-          .order("obs_date", { ascending: false })
-          .limit(1),
-      ]);
-      const candidates = [obs?.[0]?.obs_date, evaps?.[0]?.obs_date].filter(Boolean) as string[];
-      if (!candidates.length) return null;
-      return candidates.sort().reverse()[0];
-    },
-  });
-
-  const [date, setDate] = useState<string | null>(null);
-  const [manualOverride, setManualOverride] = useState(false);
-
-  useEffect(() => {
-    if (manualOverride) return;
-    if (openPm.data === undefined) return;
-    setDate(openPm.data ?? today());
-  }, [openPm.data, manualOverride]);
+  const defaultDate = useMemo(() => yesterday(), []);
+  const [date, setDate] = useState<string>(defaultDate);
+  const isDefault = date === defaultDate;
 
   const pens = useQuery({ queryKey: ["pens"], queryFn: async () => (await supabase.from("pens").select("*").order("age_group")).data ?? [] });
   const feeds = useQuery({
@@ -71,10 +48,11 @@ function AmPage() {
 
   const obs = useQuery({
     queryKey: ["obs-day", round.data?.id, date],
-    enabled: !!round.data && !!date,
-    queryFn: async () => (await supabase.from("observations").select("*").eq("round_id", round.data!.id).eq("obs_date", date!)).data ?? [],
+    enabled: !!round.data,
+    queryFn: async () => (await supabase.from("observations").select("*").eq("round_id", round.data!.id).eq("obs_date", date)).data ?? [],
   });
 
+  const anyPmForDate = (obs.data ?? []).some((o) => o.weight_given_g != null);
   const totalCells = (pens.data?.length ?? 0) * (feeds.data?.length ?? 0);
   const photosDone = (obs.data ?? []).filter((o) => o.photo_am_url).length;
   const photosRemaining = Math.max(0, totalCells - photosDone);
@@ -94,8 +72,6 @@ function AmPage() {
       : undefined,
   );
 
-  const resolvedFromPm = !manualOverride && !!openPm.data && date === openPm.data;
-
   return (
     <div className="space-y-4">
       <header className="flex items-start justify-between">
@@ -106,29 +82,25 @@ function AmPage() {
         <Link to="/guide" className="text-primary flex items-center gap-1 text-sm"><BookOpen className="h-4 w-4" />Guide</Link>
       </header>
 
-      {date && (
-        <div className={`rounded-lg border p-3 text-sm ${resolvedFromPm ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
-          {resolvedFromPm ? (
-            <><span className="font-semibold">Completing PM from {date}</span>
-              <div className="text-xs text-muted-foreground mt-0.5">Auto-detected the most recent PM feeding awaiting its AM check.</div></>
-          ) : openPm.data === null && !manualOverride ? (
-            <><span className="font-semibold">No open PM entry found.</span>
-              <div className="text-xs text-muted-foreground mt-0.5">Defaulting to today ({date}). Log a PM first, or pick a date below.</div></>
-          ) : (
-            <><span className="font-semibold">Manual date: {date}</span>
-              <button type="button" className="ml-2 text-xs text-primary underline"
-                onClick={() => setManualOverride(false)}>reset to auto</button></>
-          )}
+      <div className={`rounded-lg border p-3 text-sm ${isDefault ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
+        <span className="font-semibold">Completing PM from {date}</span>
+        <div className="text-xs text-muted-foreground mt-0.5">
+          {isDefault
+            ? "Defaults to yesterday. Use the date picker below to catch up on a missed day."
+            : <>Manual date. <button type="button" className="text-primary underline" onClick={() => setDate(defaultDate)}>reset to yesterday</button></>}
         </div>
-      )}
+        {round.data && obs.data && !anyPmForDate && (
+          <div className="mt-2 text-xs text-amber-700">No PM entry found for {date}. Pick a different date if catching up.</div>
+        )}
+      </div>
 
       <label className="block">
         <span className="text-sm font-medium">Date (override)</span>
-        <input type="date" value={date ?? ""} onChange={(e) => { setManualOverride(true); setDate(e.target.value); }}
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
           className="mt-1 rounded-lg border border-input bg-card px-3 py-2" />
       </label>
 
-      {date && <Checklist storageKey={`am-checklist-${date}`} title="AM steps" items={AM_STEPS} overrides={overrides} />}
+      <Checklist storageKey={`am-checklist-${date}`} title="AM steps" items={AM_STEPS} overrides={overrides} />
 
       {!round.data && (
         <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
@@ -136,11 +108,10 @@ function AmPage() {
         </div>
       )}
 
-      {round.data && feeds.data && pens.data && date && (
+      {round.data && feeds.data && pens.data && (
         <>
           <AmLeftoverGrid roundId={round.data.id} date={date} pens={pens.data} feeds={feeds.data} />
           <AmEvapLeftovers roundId={round.data.id} date={date} feeds={feeds.data} />
-          <PenDailyGrid date={date} pens={pens.data} />
         </>
       )}
     </div>
@@ -252,18 +223,13 @@ function AmEvapLeftovers({ roundId, date, feeds }: { roundId: string; date: stri
     queryKey: ["evap-day", roundId, date],
     queryFn: async () => (await supabase.from("evap_controls").select("*").eq("round_id", roundId).eq("obs_date", date)).data ?? [],
   });
-  const save = useMutation({
-    mutationFn: async (input: { feed_id: string; control_leftover_g: number }) => {
-      const { error } = await supabase.from("evap_controls").upsert({
-        round_id: roundId,
-        feed_id: input.feed_id,
-        obs_date: date,
-        control_leftover_g: input.control_leftover_g,
-      }, { onConflict: "round_id,feed_id,obs_date" });
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["evap-day", roundId, date] }),
-  });
+  const save = async (feed_id: string, control_leftover_g: number) => {
+    const { error } = await supabase.from("evap_controls").upsert({
+      round_id: roundId, feed_id, obs_date: date, control_leftover_g,
+    }, { onConflict: "round_id,feed_id,obs_date" });
+    if (error) throw error;
+    qc.invalidateQueries({ queryKey: ["evap-day", roundId, date] });
+  };
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
@@ -279,77 +245,9 @@ function AmEvapLeftovers({ roundId, date, feeds }: { roundId: string; date: stri
             defaultValue={row?.control_leftover_g ?? ""}
             onBlur={(e) => {
               const v = e.currentTarget.value;
-              if (v !== "") save.mutate({ feed_id: f.id, control_leftover_g: Number(v) });
+              if (v !== "") void save(f.id, Number(v));
             }}
           />
-        );
-      })}
-    </section>
-  );
-}
-
-function PenDailyGrid({ date, pens }: { date: string; pens: { id: string; label: string }[] }) {
-  const qc = useQueryClient();
-  const data = useQuery({
-    queryKey: ["pen-daily", date],
-    queryFn: async () => (await supabase.from("pen_daily").select("*").eq("obs_date", date)).data ?? [],
-  });
-  const upsert = useMutation({
-    mutationFn: async (input: { pen_id: string; patch: Record<string, unknown> }) => {
-      const existing = data.data?.find((d) => d.pen_id === input.pen_id);
-      const patch = input.patch as never;
-      if (existing) {
-        const { error } = await supabase.from("pen_daily").update(patch).eq("id", existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("pen_daily").insert({ pen_id: input.pen_id, obs_date: date, ...(input.patch as Record<string, never>) });
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["pen-daily", date] }),
-  });
-
-  return (
-    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
-      <h2 className="font-semibold">Pen readings</h2>
-      {pens.map((pen) => {
-        const row = data.data?.find((d) => d.pen_id === pen.id);
-        return (
-          <div key={pen.id} className="rounded-lg border border-border p-3 space-y-2">
-            <div className="text-sm font-semibold">{pen.label}</div>
-            <div>
-              <div className="text-xs text-muted-foreground mb-1">Snail activity</div>
-              <div className="grid grid-cols-3 gap-1">
-                {(["active", "mixed", "mostly_sealed"] as const).map((a) => (
-                  <button key={a} type="button"
-                    onClick={() => upsert.mutate({ pen_id: pen.id, patch: { snail_activity: a } })}
-                    className={`rounded-md py-2 text-xs font-medium ${row?.snail_activity === a ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>
-                    {a === "mostly_sealed" ? "mostly sealed" : a}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <label className="text-xs">
-                <span className="text-muted-foreground">Deaths</span>
-                <input type="number" min={0} defaultValue={row?.deaths_count ?? 0}
-                  onBlur={(e) => upsert.mutate({ pen_id: pen.id, patch: { deaths_count: Number(e.target.value) } })}
-                  className="mt-0.5 w-full rounded border border-input bg-background px-2 py-1.5 text-base" />
-              </label>
-              <label className="text-xs">
-                <span className="text-muted-foreground">Temp °C</span>
-                <input type="number" step="0.1" defaultValue={row?.temp_c ?? ""}
-                  onBlur={(e) => { const v = e.target.value; if (v !== "") upsert.mutate({ pen_id: pen.id, patch: { temp_c: Number(v) } }); }}
-                  className="mt-0.5 w-full rounded border border-input bg-background px-2 py-1.5 text-base" />
-              </label>
-              <label className="text-xs">
-                <span className="text-muted-foreground">Humidity %</span>
-                <input type="number" step="1" defaultValue={row?.humidity_pct ?? ""}
-                  onBlur={(e) => { const v = e.target.value; if (v !== "") upsert.mutate({ pen_id: pen.id, patch: { humidity_pct: Number(v) } }); }}
-                  className="mt-0.5 w-full rounded border border-input bg-background px-2 py-1.5 text-base" />
-              </label>
-            </div>
-          </div>
         );
       })}
     </section>
