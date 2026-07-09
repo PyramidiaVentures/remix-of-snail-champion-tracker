@@ -5,8 +5,9 @@ import { useEffect, useState } from "react";
 import { today } from "@/lib/date";
 import { Checklist } from "@/components/Checklist";
 import { NumberField } from "@/components/NumberField";
+import { PhotoCapture } from "@/components/PhotoCapture";
 import { computeIntake, type EvapRow, type ObservationRow } from "@/lib/scoring";
-import { BookOpen, AlertTriangle } from "lucide-react";
+import { BookOpen, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/am")({
   component: AmPage,
@@ -20,6 +21,7 @@ const AM_STEPS = [
   "Remove and bin ALL old feed; wipe dishes clean.",
   "(Optional) temperature and humidity per pen.",
 ];
+const AM_PHOTO_STEP_INDEX = 0;
 
 function AmPage() {
   const round = useQuery({
@@ -27,7 +29,6 @@ function AmPage() {
     queryFn: async () => (await supabase.from("rounds").select("*").eq("status", "active").maybeSingle()).data,
   });
 
-  // Find the most recent open PM (given filled, leftover null) for this round.
   const openPm = useQuery({
     queryKey: ["open-pm-date", round.data?.id],
     enabled: !!round.data,
@@ -48,7 +49,6 @@ function AmPage() {
       ]);
       const candidates = [obs?.[0]?.obs_date, evaps?.[0]?.obs_date].filter(Boolean) as string[];
       if (!candidates.length) return null;
-      // Most recent open PM date
       return candidates.sort().reverse()[0];
     },
   });
@@ -58,7 +58,7 @@ function AmPage() {
 
   useEffect(() => {
     if (manualOverride) return;
-    if (openPm.data === undefined) return; // still loading
+    if (openPm.data === undefined) return;
     setDate(openPm.data ?? today());
   }, [openPm.data, manualOverride]);
 
@@ -68,6 +68,31 @@ function AmPage() {
     enabled: !!round.data,
     queryFn: async () => (await supabase.from("feeds").select("*").in("id", round.data!.feed_ids)).data ?? [],
   });
+
+  const obs = useQuery({
+    queryKey: ["obs-day", round.data?.id, date],
+    enabled: !!round.data && !!date,
+    queryFn: async () => (await supabase.from("observations").select("*").eq("round_id", round.data!.id).eq("obs_date", date!)).data ?? [],
+  });
+
+  const totalCells = (pens.data?.length ?? 0) * (feeds.data?.length ?? 0);
+  const photosDone = (obs.data ?? []).filter((o) => o.photo_am_url).length;
+  const photosRemaining = Math.max(0, totalCells - photosDone);
+  const allPhotos = totalCells > 0 && photosRemaining === 0;
+
+  const overrides = AM_STEPS.map((_, i) =>
+    i === AM_PHOTO_STEP_INDEX
+      ? {
+          forced: allPhotos,
+          locked: true,
+          subtitle: totalCells === 0
+            ? "Set up pens & feeds first."
+            : allPhotos
+              ? `All ${totalCells} AM photos attached.`
+              : `${photosRemaining} of ${totalCells} AM photos still needed — take them BEFORE weighing.`,
+        }
+      : undefined,
+  );
 
   const resolvedFromPm = !manualOverride && !!openPm.data && date === openPm.data;
 
@@ -103,7 +128,7 @@ function AmPage() {
           className="mt-1 rounded-lg border border-input bg-card px-3 py-2" />
       </label>
 
-      {date && <Checklist storageKey={`am-checklist-${date}`} title="AM steps" items={AM_STEPS} />}
+      {date && <Checklist storageKey={`am-checklist-${date}`} title="AM steps" items={AM_STEPS} overrides={overrides} />}
 
       {!round.data && (
         <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
@@ -122,6 +147,14 @@ function AmPage() {
   );
 }
 
+type SaveState = "idle" | "saving" | "saved" | "failed";
+function StatusPill({ state }: { state: SaveState }) {
+  if (state === "idle") return null;
+  if (state === "saving") return <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />saving</span>;
+  if (state === "saved") return <span className="inline-flex items-center gap-1 text-[10px] text-primary"><CheckCircle2 className="h-3 w-3" />saved</span>;
+  return <span className="inline-flex items-center gap-1 text-[10px] text-destructive"><AlertTriangle className="h-3 w-3" />failed — retry</span>;
+}
+
 function AmLeftoverGrid({ roundId, date, pens, feeds }: { roundId: string; date: string; pens: { id: string; label: string; age_group: string }[]; feeds: { id: string; name: string }[] }) {
   const qc = useQueryClient();
   const obs = useQuery({
@@ -133,59 +166,76 @@ function AmLeftoverGrid({ roundId, date, pens, feeds }: { roundId: string; date:
     queryFn: async () => (await supabase.from("evap_controls").select("*").eq("round_id", roundId).eq("obs_date", date)).data ?? [],
   });
 
-  const save = useMutation({
-    mutationFn: async (input: { pen_id: string; feed_id: string; weight_leftover_g: number }) => {
+  const [status, setStatus] = useState<Record<string, SaveState>>({});
+  const setKey = (k: string, v: SaveState) => setStatus((s) => ({ ...s, [k]: v }));
+
+  const saveLeftover = async (pen_id: string, feed_id: string, weight_leftover_g: number) => {
+    const key = `${pen_id}:${feed_id}`;
+    setKey(key, "saving");
+    try {
       const { error } = await supabase.from("observations").upsert({
-        round_id: roundId,
-        pen_id: input.pen_id,
-        feed_id: input.feed_id,
-        obs_date: date,
-        weight_leftover_g: input.weight_leftover_g,
+        round_id: roundId, pen_id, feed_id, obs_date: date, weight_leftover_g,
       }, { onConflict: "round_id,pen_id,feed_id,obs_date" });
       if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["obs-day", roundId, date] }),
-  });
+      setKey(key, "saved");
+      qc.invalidateQueries({ queryKey: ["obs-day", roundId, date] });
+    } catch {
+      setKey(key, "failed");
+    }
+  };
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-4">
-      <h2 className="font-semibold">Grams leftover</h2>
+      <h2 className="font-semibold">Photo + grams leftover</h2>
+      <p className="text-xs text-muted-foreground">Take the AM photo BEFORE weighing — leftovers must be untouched.</p>
       {pens.map((pen) => (
         <div key={pen.id} className="space-y-2">
           <div className="text-sm font-semibold">{pen.label} <span className="text-xs text-muted-foreground ml-1">{pen.age_group}</span></div>
           {feeds.map((feed) => {
-            const row = obs.data?.find((o) => o.pen_id === pen.id && o.feed_id === feed.id) as ObservationRow | undefined;
+            const row = obs.data?.find((o) => o.pen_id === pen.id && o.feed_id === feed.id);
             const evap = evaps.data?.find((e) => e.feed_id === feed.id) as EvapRow | undefined;
             const given = row?.weight_given_g;
             const leftover = row?.weight_leftover_g;
-            const intake = row ? computeIntake(row, evap) : null;
+            const intake = row ? computeIntake(row as ObservationRow, evap) : null;
+
             const warn = leftover != null && given != null && leftover > given;
             const noPm = given == null;
+            const key = `${pen.id}:${feed.id}`;
             return (
-              <div key={feed.id} className={`rounded-lg border p-3 ${warn ? "border-destructive/40 bg-destructive/5" : "border-border bg-card"}`}>
-                <div className="flex items-baseline justify-between mb-1">
+              <div key={feed.id} className={`rounded-lg border p-3 space-y-2 ${warn ? "border-destructive/40 bg-destructive/5" : "border-border bg-card"}`}>
+                <div className="flex items-baseline justify-between">
                   <div>
                     <div className="text-sm font-medium">{feed.name}</div>
                     <div className="text-xs text-muted-foreground">
                       {noPm ? <span className="text-amber-600">No PM entry for this date yet</span> : `Given: ${given} g`}
                     </div>
                   </div>
+                  <StatusPill state={status[key] ?? (leftover != null ? "saved" : "idle")} />
+                </div>
+
+                <PhotoCapture
+                  round_id={roundId} pen_id={pen.id} feed_id={feed.id} obs_date={date} kind="am"
+                  existingPath={row?.photo_am_url ?? null}
+                  onSaved={() => qc.invalidateQueries({ queryKey: ["obs-day", roundId, date] })}
+                />
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" inputMode="decimal" step="0.1"
+                    defaultValue={leftover ?? ""}
+                    key={`${date}-${pen.id}-${feed.id}-${leftover ?? "empty"}`}
+                    onBlur={(e) => {
+                      const v = e.currentTarget.value;
+                      if (v !== "") void saveLeftover(pen.id, feed.id, Number(v));
+                    }}
+                    placeholder="leftover (g)"
+                    className="num-input flex-1"
+                  />
                   {intake != null && <div className="text-right">
                     <div className="text-lg font-bold tabular-nums text-primary">{intake.toFixed(1)}</div>
-                    <div className="text-[10px] text-muted-foreground">g intake (evap-corrected)</div>
+                    <div className="text-[10px] text-muted-foreground">g intake</div>
                   </div>}
                 </div>
-                <input
-                  type="number" inputMode="decimal" step="0.1"
-                  defaultValue={leftover ?? ""}
-                  key={`${date}-${pen.id}-${feed.id}-${leftover ?? "empty"}`}
-                  onBlur={(e) => {
-                    const v = e.currentTarget.value;
-                    if (v !== "") save.mutate({ pen_id: pen.id, feed_id: feed.id, weight_leftover_g: Number(v) });
-                  }}
-                  placeholder="leftover (g)"
-                  className="num-input"
-                />
                 {warn && <p className="mt-1 text-xs text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Leftover &gt; given — please check the weighing.</p>}
               </div>
             );

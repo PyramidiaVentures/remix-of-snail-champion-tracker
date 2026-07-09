@@ -175,6 +175,11 @@ function ActiveRoundCard({ roundId }: { roundId: string }) {
 
   if (!round.data) return null;
 
+  const missingPmPhotos = (obs.data ?? []).filter((o) => o.weight_given_g != null && !o.photo_pm_url).length;
+  const missingAmPhotos = (obs.data ?? []).filter((o) => o.weight_leftover_g != null && !o.photo_am_url).length;
+  const totalMissing = missingPmPhotos + missingAmPhotos;
+
+
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
@@ -230,10 +235,18 @@ function ActiveRoundCard({ roundId }: { roundId: string }) {
         </ul>
       </div>
 
+      {totalMissing > 0 && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs text-amber-700">
+          <div className="font-semibold">Data completeness note (non-blocking)</div>
+          <div>Missing photos in this round: {missingPmPhotos} PM, {missingAmPhotos} AM. You can still close the round.</div>
+        </div>
+      )}
+
       <button onClick={() => promote.mutate()} disabled={!result?.winnerFeedId}
         className="w-full rounded-lg bg-primary py-3 text-primary-foreground font-semibold disabled:opacity-50">
         Promote to champion &amp; close round
       </button>
+
     </section>
   );
 }
