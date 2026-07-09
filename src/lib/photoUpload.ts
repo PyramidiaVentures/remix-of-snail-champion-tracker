@@ -21,13 +21,18 @@ async function compressImage(file: File, maxDim = 1600, quality = 0.8): Promise<
     const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
     const w = Math.max(1, Math.round(bitmap.width * scale));
     const h = Math.max(1, Math.round(bitmap.height * scale));
-    const canvas = typeof OffscreenCanvas !== "undefined"
-      ? new OffscreenCanvas(w, h)
-      : Object.assign(document.createElement("canvas"), { width: w, height: h });
-    // @ts-expect-error - both canvas types support 2d
-    const ctx = canvas.getContext("2d");
+    const canvas: OffscreenCanvas | HTMLCanvasElement =
+      typeof OffscreenCanvas !== "undefined"
+        ? new OffscreenCanvas(w, h)
+        : Object.assign(document.createElement("canvas"), { width: w, height: h });
+    const ctx = (canvas as HTMLCanvasElement).getContext("2d") as
+      | CanvasRenderingContext2D
+      | OffscreenCanvasRenderingContext2D
+      | null;
+    if (!ctx) return file;
     ctx.drawImage(bitmap, 0, 0, w, h);
     bitmap.close?.();
+
     if ("convertToBlob" in canvas) {
       return await (canvas as OffscreenCanvas).convertToBlob({ type: "image/jpeg", quality });
     }
@@ -65,19 +70,20 @@ export async function uploadFieldPhoto(args: UploadArgs): Promise<string> {
   if (upErr) throw upErr;
 
   const column = args.kind === "am" ? "photo_am_url" : "photo_pm_url";
-  const { error: dbErr } = await supabase.from("observations").upsert(
-    {
-      round_id: args.round_id,
-      pen_id: args.pen_id,
-      feed_id: args.feed_id,
-      obs_date: args.obs_date,
-      [column]: path,
-    },
-    { onConflict: "round_id,pen_id,feed_id,obs_date" },
-  );
+  const patch = {
+    round_id: args.round_id,
+    pen_id: args.pen_id,
+    feed_id: args.feed_id,
+    obs_date: args.obs_date,
+    [column]: path,
+  } as never;
+  const { error: dbErr } = await supabase
+    .from("observations")
+    .upsert(patch, { onConflict: "round_id,pen_id,feed_id,obs_date" });
   if (dbErr) throw dbErr;
   return path;
 }
+
 
 /** Generate a short-lived signed URL for viewing. */
 export async function signedPhotoUrl(path: string, expiresIn = 3600): Promise<string | null> {
