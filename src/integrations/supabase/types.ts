@@ -162,50 +162,6 @@ export type Database = {
           },
         ]
       }
-      pen_daily: {
-        Row: {
-          created_at: string
-          deaths_count: number
-          humidity_pct: number | null
-          id: string
-          obs_date: string
-          pen_id: string
-          snail_activity: Database["public"]["Enums"]["snail_activity"] | null
-          temp_c: number | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          deaths_count?: number
-          humidity_pct?: number | null
-          id?: string
-          obs_date: string
-          pen_id: string
-          snail_activity?: Database["public"]["Enums"]["snail_activity"] | null
-          temp_c?: number | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          deaths_count?: number
-          humidity_pct?: number | null
-          id?: string
-          obs_date?: string
-          pen_id?: string
-          snail_activity?: Database["public"]["Enums"]["snail_activity"] | null
-          temp_c?: number | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pen_daily_pen_id_fkey"
-            columns: ["pen_id"]
-            isOneToOne: false
-            referencedRelation: "pens"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       pens: {
         Row: {
           age_group: Database["public"]["Enums"]["age_group"]
