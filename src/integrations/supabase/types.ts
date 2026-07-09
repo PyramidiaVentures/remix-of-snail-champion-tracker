@@ -101,8 +101,6 @@ export type Database = {
           notes: string | null
           obs_date: string
           pen_id: string
-          photo_am_url: string | null
-          photo_pm_url: string | null
           round_id: string
           updated_at: string
           weight_given_g: number | null
@@ -116,8 +114,6 @@ export type Database = {
           notes?: string | null
           obs_date: string
           pen_id: string
-          photo_am_url?: string | null
-          photo_pm_url?: string | null
           round_id: string
           updated_at?: string
           weight_given_g?: number | null
@@ -131,8 +127,6 @@ export type Database = {
           notes?: string | null
           obs_date?: string
           pen_id?: string
-          photo_am_url?: string | null
-          photo_pm_url?: string | null
           round_id?: string
           updated_at?: string
           weight_given_g?: number | null
@@ -232,6 +226,54 @@ export type Database = {
             columns: ["champion_feed_id"]
             isOneToOne: false
             referencedRelation: "feeds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_photos: {
+        Row: {
+          created_at: string
+          id: string
+          obs_date: string
+          pen_id: string | null
+          photo_am_url: string | null
+          photo_pm_url: string | null
+          round_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          obs_date: string
+          pen_id?: string | null
+          photo_am_url?: string | null
+          photo_pm_url?: string | null
+          round_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          obs_date?: string
+          pen_id?: string | null
+          photo_am_url?: string | null
+          photo_pm_url?: string | null
+          round_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_photos_pen_id_fkey"
+            columns: ["pen_id"]
+            isOneToOne: false
+            referencedRelation: "pens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_photos_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "rounds"
             referencedColumns: ["id"]
           },
         ]
