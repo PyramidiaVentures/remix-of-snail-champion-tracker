@@ -235,10 +235,18 @@ function ActiveRoundCard({ roundId }: { roundId: string }) {
         </ul>
       </div>
 
+      {totalMissing > 0 && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs text-amber-700">
+          <div className="font-semibold">Data completeness note (non-blocking)</div>
+          <div>Missing photos in this round: {missingPmPhotos} PM, {missingAmPhotos} AM. You can still close the round.</div>
+        </div>
+      )}
+
       <button onClick={() => promote.mutate()} disabled={!result?.winnerFeedId}
         className="w-full rounded-lg bg-primary py-3 text-primary-foreground font-semibold disabled:opacity-50">
         Promote to champion &amp; close round
       </button>
+
     </section>
   );
 }
