@@ -175,6 +175,11 @@ function ActiveRoundCard({ roundId }: { roundId: string }) {
 
   if (!round.data) return null;
 
+  const missingPmPhotos = (obs.data ?? []).filter((o) => o.weight_given_g != null && !o.photo_pm_url).length;
+  const missingAmPhotos = (obs.data ?? []).filter((o) => o.weight_leftover_g != null && !o.photo_am_url).length;
+  const totalMissing = missingPmPhotos + missingAmPhotos;
+
+
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
