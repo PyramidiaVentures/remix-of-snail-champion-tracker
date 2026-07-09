@@ -192,11 +192,12 @@ function AmLeftoverGrid({ roundId, date, pens, feeds }: { roundId: string; date:
         <div key={pen.id} className="space-y-2">
           <div className="text-sm font-semibold">{pen.label} <span className="text-xs text-muted-foreground ml-1">{pen.age_group}</span></div>
           {feeds.map((feed) => {
-            const row = obs.data?.find((o) => o.pen_id === pen.id && o.feed_id === feed.id) as ObservationRow | undefined;
+            const row = obs.data?.find((o) => o.pen_id === pen.id && o.feed_id === feed.id);
             const evap = evaps.data?.find((e) => e.feed_id === feed.id) as EvapRow | undefined;
             const given = row?.weight_given_g;
             const leftover = row?.weight_leftover_g;
-            const intake = row ? computeIntake(row, evap) : null;
+            const intake = row ? computeIntake(row as ObservationRow, evap) : null;
+
             const warn = leftover != null && given != null && leftover > given;
             const noPm = given == null;
             const key = `${pen.id}:${feed.id}`;
