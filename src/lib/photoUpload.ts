@@ -100,19 +100,19 @@ export async function uploadSessionPhoto(args: SessionUploadArgs): Promise<strin
   }
 
   if (existingId) {
-    const { error } = await supabase
-      .from("session_photos")
-      .update({ [column]: url })
-      .eq("id", existingId);
+    const patch = { [column]: url } as never;
+    const { error } = await supabase.from("session_photos").update(patch).eq("id", existingId);
     if (error) throw error;
   } else {
-    const { error } = await supabase.from("session_photos").insert({
+    const insertRow = {
       round_id: args.round_id,
       pen_id: args.pen_id,
       obs_date: args.obs_date,
       [column]: url,
-    });
+    } as never;
+    const { error } = await supabase.from("session_photos").insert(insertRow);
     if (error) throw error;
   }
   return url;
 }
+
