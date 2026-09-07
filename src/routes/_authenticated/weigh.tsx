@@ -262,8 +262,7 @@ function PenCard({
   const [liveCount, setLiveCount] = useState<string>(row?.live_count != null ? String(row.live_count) : "");
   const [method, setMethod] = useState<BiomassMethod>(row?.method ?? "whole_pen");
   const [subsample, setSubsample] = useState<string>(row?.subsample_count != null ? String(row.subsample_count) : "");
-  const [tare, setTare] = useState<string>(row?.tare_g != null ? String(row.tare_g) : "");
-  const [gross, setGross] = useState<string>(row?.gross_g != null ? String(row.gross_g) : "");
+  const [biomass, setBiomass] = useState<string>(row?.net_biomass_g != null ? String(row.net_biomass_g) : "");
 
   const uploads = useUploads();
   const key = weighPhotoKey(trialId, pen.id, date);
