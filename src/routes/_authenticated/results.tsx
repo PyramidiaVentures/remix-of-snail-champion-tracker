@@ -172,6 +172,14 @@ function ResultsPage() {
     if (next.has(name)) next.delete(name); else next.add(name);
     setSearch({ hs: Array.from(next).join(",") });
   };
+  const setPens = (ids: string[]) => {
+    if (ids.length === 0) return setSearch({ pen: "none" });
+    if (ids.length === assignedPens.length) return setSearch({ pen: "" });
+    setSearch({ pen: ids.join(",") });
+  };
+  const addPen = (id: string) => assignedPens.map((p) => p.id).filter((x) => selectedPenIds.has(x) || x === id);
+  const removePen = (id: string) => assignedPens.map((p) => p.id).filter((x) => selectedPenIds.has(x) && x !== id);
+
 
   return (
     <div className="space-y-4">
