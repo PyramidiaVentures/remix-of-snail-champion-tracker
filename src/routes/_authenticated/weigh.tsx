@@ -132,7 +132,7 @@ function WeighPage() {
     if (uploads.get(weighPhotoKey(trialId ?? "", penId, date))?.status === "uploading") return "uploading";
     const missing = missingFor(penId);
     if (missing.length === 0) return "complete";
-    return missing.length === 4 ? "empty" : "partial";
+    return missing.length === 3 ? "empty" : "partial";
   };
 
   const photosDone = trialPens.filter((p) => photoDone(p.id)).length;
