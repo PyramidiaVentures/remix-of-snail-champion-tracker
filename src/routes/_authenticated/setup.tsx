@@ -269,17 +269,9 @@ function FeedsSection() {
             ) : (
               <div className="flex items-start gap-2">
                 <div className="flex-1 space-y-1">
-                  <div className="font-medium flex items-center gap-2 flex-wrap">
-                    {f.name}
-                    <StatusBadge status={f.status} />
-                  </div>
+                  <div className="font-medium">{f.name}</div>
                   <div className="text-xs text-muted-foreground">
-                    {f.feed_type ? labelFor(FEED_TYPE_OPTIONS, f.feed_type) : "No type"}
-                    {" · "}
-                    {f.source || "—"}
-                    {" · "}
-                    {labelFor(AVAILABILITY_OPTIONS, f.availability)}
-                    {f.cost_per_kg != null && ` · ${f.cost_per_kg}/kg`}
+                    {f.cost_per_kg != null ? `${f.cost_per_kg}/kg` : "No cost recorded"}
                     {f.dm_percent != null && ` · DM ${f.dm_percent}% (${labelFor(DM_SOURCE_OPTIONS, f.dm_source)})`}
                   </div>
                   {f.notes && <div className="text-xs text-muted-foreground italic">{f.notes}</div>}
