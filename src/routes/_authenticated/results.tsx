@@ -225,11 +225,40 @@ function ResultsPage() {
 
         <button
           type="button"
-          onClick={() => navigate({ search: { pen: search.pen, from: "", to: "", hide: "", hs: "" }, replace: true })}
+          onClick={() => navigate({ search: { pen: "", from: "", to: "", hide: "", hs: "" }, replace: true })}
           className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium"
         >
           Reset view
         </button>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs uppercase text-muted-foreground">Pens</span>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setSearch({ pen: "" })}
+                className="rounded-lg border border-border px-2 py-1 text-xs font-medium">Select all</button>
+              <button type="button" onClick={() => setSearch({ pen: "none" })}
+                className="rounded-lg border border-border px-2 py-1 text-xs font-medium">Clear all</button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {assignedPens.map((p) => {
+              const on = selectedPenIds.has(p.id);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setPens(on ? removePen(p.id) : addPen(p.id))}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+                    on ? "border-primary bg-primary/10 text-primary" : "border-border"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="flex gap-2">
           {(["treatment", "pen"] as View[]).map((v) => (
@@ -241,10 +270,11 @@ function ResultsPage() {
                 view === v ? "border-primary bg-primary/10 text-primary" : "border-border"
               }`}
             >
-              {v === "treatment" ? "Treatment means" : "Individual pens"}
+              {v === "treatment" ? "Group by treatment" : "Group by pen"}
             </button>
           ))}
         </div>
+
 
         <label
           className={`flex items-center gap-3 text-sm ${metrics?.dmAvailable ? "" : "opacity-50"}`}
