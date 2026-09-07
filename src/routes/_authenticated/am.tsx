@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { upsertRow, OBSERVATIONS_TRIAL_KEY, WELFARE_CHECKS_KEY } from "@/lib/upsertRow";
+import { upsertRow, writeWithRetry, OBSERVATIONS_TRIAL_KEY, WELFARE_CHECKS_KEY } from "@/lib/upsertRow";
 import { useMemo, useState } from "react";
 import { Checklist } from "@/components/Checklist";
 import { NumberField } from "@/components/NumberField";
@@ -377,19 +377,19 @@ function PenCard({
     if (!Number.isFinite(count) || count <= 0) return;
     setEventState("saving");
     try {
-      const { error } = await supabase.from("population_events").insert({
-        trial_id: trialId,
-        pen_id: pen.id,
-        event_date: date,
-        event_type: eventType,
-        count,
-      } as never);
-      if (error) throw error;
+      await writeWithRetry("population_events", () =>
+        supabase.from("population_events").insert({
+          trial_id: trialId,
+          pen_id: pen.id,
+          event_date: date,
+          event_type: eventType,
+          count,
+        } as never),
+      );
       setEventState("saved");
       setEventCount("1");
       onSaved();
-    } catch (err) {
-      console.error("[save failed] population_events", err);
+    } catch {
       setEventState("failed");
     }
   };

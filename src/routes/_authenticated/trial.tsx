@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { Plus, Trash2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { today } from "@/lib/date";
+import { liveCount } from "@/lib/liveCount";
 
 export const Route = createFileRoute("/_authenticated/trial")({
   component: TrialPage,
@@ -21,7 +22,14 @@ type Trial = {
   notes: string | null;
 };
 type Feed = { id: string; name: string };
-type Pen = { id: string; label: string; snail_count: number; area_m2: number | null };
+type Pen = {
+  id: string;
+  label: string;
+  initial_snail_count: number;
+  area_m2: number | null;
+  /** Derived from population events; see @/lib/liveCount */
+  live_count: number;
+};
 type Treatment = { id: string; trial_id: string; feed_id: string; label: string };
 type Assignment = { id: string; trial_id: string; pen_id: string; treatment_id: string; start_date: string };
 type BiomassRow = { pen_id: string; event_date: string; live_count: number; net_biomass_g: number };
@@ -49,7 +57,16 @@ function TrialPage() {
   const pens = useQuery({
     queryKey: ["pens"],
     queryFn: async () =>
-      ((await supabase.from("pens").select("id,label,snail_count,area_m2").order("label")).data ?? []) as Pen[],
+      (await supabase.from("pens").select("id,label,initial_snail_count,area_m2").order("label")).data ?? [],
+  });
+  const popEvents = useQuery({
+    queryKey: ["population-events", current?.id],
+    enabled: !!current,
+    queryFn: async () =>
+      (await supabase
+        .from("population_events")
+        .select("pen_id,event_date,event_type,count")
+        .eq("trial_id", current!.id)).data ?? [],
   });
   const biomass = useQuery({
     queryKey: ["biomass_events", current?.id],
@@ -82,7 +99,10 @@ function TrialPage() {
     qc.invalidateQueries({ queryKey: ["pen_assignments"] });
   };
 
-  const penList = pens.data ?? [];
+  const penList: Pen[] = (pens.data ?? []).map((p) => ({
+    ...p,
+    live_count: liveCount(p, popEvents.data ?? [], today()),
+  }));
   const tList = treatments.data ?? [];
   const aList = assignments.data ?? [];
 
@@ -409,7 +429,7 @@ function StepThree({
               <div className="flex-1">
                 <div className="font-medium">{p.label}</div>
                 <div className="text-xs text-muted-foreground">
-                  {p.snail_count} snails
+                  {p.live_count} snails
                 </div>
               </div>
               <select
@@ -572,11 +592,11 @@ function DesignIntegrityPanel({
       : [];
 
   const assignedPens = pens.filter((p) => assignmentByPen.get(p.id));
-  const totalSnails = assignedPens.reduce((s, p) => s + (p.snail_count ?? 0), 0);
+  const totalSnails = assignedPens.reduce((s, p) => s + (p.live_count ?? 0), 0);
   const withArea = assignedPens.filter((p) => p.area_m2 && p.area_m2 > 0);
   const meanDensity =
     withArea.length > 0
-      ? withArea.reduce((s, p) => s + p.snail_count / (p.area_m2 as number), 0) / withArea.length
+      ? withArea.reduce((s, p) => s + p.live_count / (p.area_m2 as number), 0) / withArea.length
       : null;
 
   const thin = perTreatment.filter(({ pens: ps }) => ps.length < 3);

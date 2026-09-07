@@ -17,6 +17,7 @@ import { Route as AuthenticatedTrialRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
 import { Route as AuthenticatedRoundsRouteImport } from './routes/_authenticated/rounds'
 import { Route as AuthenticatedResultsRouteImport } from './routes/_authenticated/results'
+import { Route as AuthenticatedPopulationRouteImport } from './routes/_authenticated/population'
 import { Route as AuthenticatedPmRouteImport } from './routes/_authenticated/pm'
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
 import { Route as AuthenticatedGuideRouteImport } from './routes/_authenticated/guide'
@@ -62,6 +63,11 @@ const AuthenticatedResultsRoute = AuthenticatedResultsRouteImport.update({
   path: '/results',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPopulationRoute = AuthenticatedPopulationRouteImport.update({
+  id: '/population',
+  path: '/population',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedPmRoute = AuthenticatedPmRouteImport.update({
   id: '/pm',
   path: '/pm',
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/guide': typeof AuthenticatedGuideRoute
   '/home': typeof AuthenticatedHomeRoute
   '/pm': typeof AuthenticatedPmRoute
+  '/population': typeof AuthenticatedPopulationRoute
   '/results': typeof AuthenticatedResultsRoute
   '/rounds': typeof AuthenticatedRoundsRoute
   '/setup': typeof AuthenticatedSetupRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/guide': typeof AuthenticatedGuideRoute
   '/home': typeof AuthenticatedHomeRoute
   '/pm': typeof AuthenticatedPmRoute
+  '/population': typeof AuthenticatedPopulationRoute
   '/results': typeof AuthenticatedResultsRoute
   '/rounds': typeof AuthenticatedRoundsRoute
   '/setup': typeof AuthenticatedSetupRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/_authenticated/guide': typeof AuthenticatedGuideRoute
   '/_authenticated/home': typeof AuthenticatedHomeRoute
   '/_authenticated/pm': typeof AuthenticatedPmRoute
+  '/_authenticated/population': typeof AuthenticatedPopulationRoute
   '/_authenticated/results': typeof AuthenticatedResultsRoute
   '/_authenticated/rounds': typeof AuthenticatedRoundsRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
@@ -142,6 +151,7 @@ export interface FileRouteTypes {
     | '/guide'
     | '/home'
     | '/pm'
+    | '/population'
     | '/results'
     | '/rounds'
     | '/setup'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/guide'
     | '/home'
     | '/pm'
+    | '/population'
     | '/results'
     | '/rounds'
     | '/setup'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/_authenticated/guide'
     | '/_authenticated/home'
     | '/_authenticated/pm'
+    | '/_authenticated/population'
     | '/_authenticated/results'
     | '/_authenticated/rounds'
     | '/_authenticated/setup'
@@ -242,6 +254,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedResultsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/population': {
+      id: '/_authenticated/population'
+      path: '/population'
+      fullPath: '/population'
+      preLoaderRoute: typeof AuthenticatedPopulationRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/pm': {
       id: '/_authenticated/pm'
       path: '/pm'
@@ -286,6 +305,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedGuideRoute: typeof AuthenticatedGuideRoute
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
   AuthenticatedPmRoute: typeof AuthenticatedPmRoute
+  AuthenticatedPopulationRoute: typeof AuthenticatedPopulationRoute
   AuthenticatedResultsRoute: typeof AuthenticatedResultsRoute
   AuthenticatedRoundsRoute: typeof AuthenticatedRoundsRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
@@ -299,6 +319,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedGuideRoute: AuthenticatedGuideRoute,
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
   AuthenticatedPmRoute: AuthenticatedPmRoute,
+  AuthenticatedPopulationRoute: AuthenticatedPopulationRoute,
   AuthenticatedResultsRoute: AuthenticatedResultsRoute,
   AuthenticatedRoundsRoute: AuthenticatedRoundsRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,

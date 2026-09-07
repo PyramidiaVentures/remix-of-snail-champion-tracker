@@ -1,0 +1,1 @@
+ALTER TABLE public.pens RENAME COLUMN snail_count TO initial_snail_count;
