@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_authenticated/results")({
 function ResultsPage() {
   const rounds = useQuery({ queryKey: ["rounds"], queryFn: async () => (await supabase.from("rounds").select("*").order("round_number")).data ?? [] });
   const feeds = useQuery({ queryKey: ["feeds"], queryFn: async () => (await supabase.from("feeds").select("*")).data ?? [] });
-  const pens = useQuery({ queryKey: ["pens"], queryFn: async () => (await supabase.from("pens").select("*").order("age_group")).data ?? [] });
+  const pens = useQuery({ queryKey: ["pens"], queryFn: async () => (await supabase.from("pens").select("*").order("label")).data ?? [] });
   const obs = useQuery({ queryKey: ["all-obs"], queryFn: async () => (await supabase.from("observations").select("*")).data ?? [] });
   const evaps = useQuery({ queryKey: ["all-evaps"], queryFn: async () => (await supabase.from("evap_controls").select("*")).data ?? [] });
 
@@ -103,7 +103,7 @@ function ResultsPage() {
                   <span className="font-medium text-foreground">{feedName(fid)}:</span>
                   {(pens.data ?? []).map((p) => {
                     const r = activeResult?.perFeed[fid]?.pen_ratios[p.id];
-                    return <span key={p.id}>{p.label}({p.age_group}): {r != null && !isNaN(r) ? r.toFixed(2) : "—"}</span>;
+                    return <span key={p.id}>{p.label}: {r != null && !isNaN(r) ? r.toFixed(2) : "—"}</span>;
                   })}
                 </div>
               ))}

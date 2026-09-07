@@ -20,7 +20,7 @@ const AM_STEPS = [
 ];
 const AM_PHOTO_STEP_INDEX = 0;
 
-type PenRow = { id: string; label: string; age_group: string };
+type PenRow = { id: string; label: string };
 type FeedRow = { id: string; name: string };
 
 function yesterday(): string {
@@ -42,7 +42,7 @@ function AmPage() {
   const [date, setDate] = useState<string>(defaultDate);
   const isDefault = date === defaultDate;
 
-  const pens = useQuery({ queryKey: ["pens"], queryFn: async () => (await supabase.from("pens").select("*").order("age_group")).data ?? [] });
+  const pens = useQuery({ queryKey: ["pens"], queryFn: async () => (await supabase.from("pens").select("*").order("label")).data ?? [] });
   const feeds = useQuery({
     queryKey: ["round-feeds", round.data?.id],
     enabled: !!round.data,
@@ -153,7 +153,7 @@ function AmPhotoSlots({ roundId, date, pens }: { roundId: string; date: string; 
       {pens.map((pen) => (
         <SessionPhotoSlot key={pen.id}
           round_id={roundId} pen_id={pen.id} obs_date={date} kind="am"
-          label={`${pen.label} (${pen.age_group}) — leftovers`}
+          label={`${pen.label} — leftovers`}
           existingUrl={urlFor(pen.id)}
           onSaved={() => qc.invalidateQueries({ queryKey: ["session-photos", roundId, date] })}
         />
@@ -202,7 +202,7 @@ function AmLeftoverGrid({ roundId, date, pens, feeds }: { roundId: string; date:
       <h2 className="font-semibold">Grams leftover</h2>
       {pens.map((pen) => (
         <div key={pen.id} className="space-y-2">
-          <div className="text-sm font-semibold">{pen.label} <span className="text-xs text-muted-foreground ml-1">{pen.age_group}</span></div>
+          <div className="text-sm font-semibold">{pen.label}</div>
           {feeds.map((feed) => {
             const row = obs.data?.find((o) => o.pen_id === pen.id && o.feed_id === feed.id);
             const evap = evaps.data?.find((e) => e.feed_id === feed.id) as EvapRow | undefined;
