@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { Home, ClipboardList, Moon, Sun, BarChart3, BookOpen, Download, Settings, LogOut, Trophy, FlaskConical } from "lucide-react";
+import { Home, ClipboardList, Moon, Sun, BarChart3, BookOpen, Download, Settings, LogOut, Trophy, FlaskConical, Scale } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -17,6 +17,7 @@ const nav = [
   { to: "/home", label: "Home", icon: Home },
   { to: "/pm", label: "PM Feed", icon: Moon },
   { to: "/am", label: "AM Check", icon: Sun },
+  { to: "/weigh", label: "Weigh", icon: Scale },
   { to: "/trial", label: "Trial", icon: FlaskConical },
   { to: "/rounds", label: "Rounds", icon: Trophy },
   { to: "/results", label: "Results", icon: BarChart3 },
