@@ -18,7 +18,7 @@ export type Database = {
         Row: {
           created_at: string
           event_date: string
-          gross_g: number
+          gross_g: number | null
           id: string
           live_count: number
           method: Database["public"]["Enums"]["biomass_method"]
@@ -28,14 +28,14 @@ export type Database = {
           photo_url: string | null
           recorded_by: string | null
           subsample_count: number | null
-          tare_g: number
+          tare_g: number | null
           trial_id: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           event_date: string
-          gross_g: number
+          gross_g?: number | null
           id?: string
           live_count: number
           method?: Database["public"]["Enums"]["biomass_method"]
@@ -45,14 +45,14 @@ export type Database = {
           photo_url?: string | null
           recorded_by?: string | null
           subsample_count?: number | null
-          tare_g: number
+          tare_g?: number | null
           trial_id: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           event_date?: string
-          gross_g?: number
+          gross_g?: number | null
           id?: string
           live_count?: number
           method?: Database["public"]["Enums"]["biomass_method"]
@@ -62,7 +62,7 @@ export type Database = {
           photo_url?: string | null
           recorded_by?: string | null
           subsample_count?: number | null
-          tare_g?: number
+          tare_g?: number | null
           trial_id?: string
           updated_at?: string
         }

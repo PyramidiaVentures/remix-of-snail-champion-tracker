@@ -22,9 +22,9 @@ type BiomassRow = Database["public"]["Tables"]["biomass_events"]["Row"];
 type BiomassMethod = Database["public"]["Enums"]["biomass_method"];
 
 const WEIGH_STEPS = [
-  "Weigh and record the empty container (tare) for each pen.",
+  "Place the empty container on the scale and zero it, so the scale reads only the snails.",
   "Count every live snail in the pen and enter the count.",
-  "Weigh all snails together and enter the gross weight.",
+  "Weigh all the snails together and enter the weight the scale shows.",
   "Photograph the scale display with the pen tag in frame.",
   "Return the snails to the pen and confirm the count matches.",
   "Log any snail found dead during handling as a mortality event.",
@@ -123,8 +123,7 @@ function WeighPage() {
     const row = rowFor(penId);
     const missing: string[] = [];
     if (row?.live_count == null) missing.push("live count");
-    if (row?.tare_g == null) missing.push("tare");
-    if (row?.gross_g == null) missing.push("gross weight");
+    if (row?.net_biomass_g == null) missing.push("snail weight");
     if (!photoDone(penId)) missing.push("scale photo");
     return missing;
   };
@@ -133,7 +132,7 @@ function WeighPage() {
     if (uploads.get(weighPhotoKey(trialId ?? "", penId, date))?.status === "uploading") return "uploading";
     const missing = missingFor(penId);
     if (missing.length === 0) return "complete";
-    return missing.length === 4 ? "empty" : "partial";
+    return missing.length === 3 ? "empty" : "partial";
   };
 
   const photosDone = trialPens.filter((p) => photoDone(p.id)).length;
@@ -263,8 +262,7 @@ function PenCard({
   const [liveCount, setLiveCount] = useState<string>(row?.live_count != null ? String(row.live_count) : "");
   const [method, setMethod] = useState<BiomassMethod>(row?.method ?? "whole_pen");
   const [subsample, setSubsample] = useState<string>(row?.subsample_count != null ? String(row.subsample_count) : "");
-  const [tare, setTare] = useState<string>(row?.tare_g != null ? String(row.tare_g) : "");
-  const [gross, setGross] = useState<string>(row?.gross_g != null ? String(row.gross_g) : "");
+  const [biomass, setBiomass] = useState<string>(row?.net_biomass_g != null ? String(row.net_biomass_g) : "");
 
   const uploads = useUploads();
   const key = weighPhotoKey(trialId, pen.id, date);
@@ -273,10 +271,7 @@ function PenCard({
 
   const num = (s: string) => (s.trim() === "" ? null : Number(s));
   const liveN = num(liveCount);
-  const tareN = num(tare);
-  const grossN = num(gross);
-
-  const net = grossN != null && tareN != null ? grossN - tareN : null;
+  const net = num(biomass);
   const mean = net != null && liveN ? net / liveN : null;
 
   const prevMean =
@@ -289,17 +284,16 @@ function PenCard({
       : null;
 
   const save = async (
-    override?: Partial<{ live_count: number | null; method: BiomassMethod; subsample_count: number | null; tare_g: number | null; gross_g: number | null; photo_url: string }>,
+    override?: Partial<{ live_count: number | null; method: BiomassMethod; subsample_count: number | null; net_biomass_g: number | null; photo_url: string }>,
   ) => {
     const live = override?.live_count !== undefined ? override.live_count : liveN;
-    const t = override?.tare_g !== undefined ? override.tare_g : tareN;
-    const g = override?.gross_g !== undefined ? override.gross_g : grossN;
+    const n = override?.net_biomass_g !== undefined ? override.net_biomass_g : net;
     const m = override?.method ?? method;
     const sub = override?.subsample_count !== undefined ? override.subsample_count : num(subsample);
     const url = override?.photo_url ?? photoUrl ?? null;
 
-    if (live == null || t == null || g == null) return; // not enough yet to create the record
-    if (g <= t) { setBlocked(true); setState("idle"); return; }
+    if (live == null || n == null) return; // not enough yet to create the record
+    if (n <= 0) { setBlocked(true); setState("idle"); return; }
     setBlocked(false);
     setState("saving");
     try {
@@ -312,9 +306,7 @@ function PenCard({
           live_count: live,
           method: m,
           subsample_count: m === "subsample" ? sub : null,
-          tare_g: t,
-          gross_g: g,
-          net_biomass_g: g - t,
+          net_biomass_g: n,
           ...(url ? { photo_url: url } : {}),
         },
         BIOMASS_EVENTS_KEY,
@@ -386,32 +378,21 @@ function PenCard({
       </div>
 
       <NumberField
-        label="Tare" suffix="g"
-        key={`${pen.id}-${date}-tare`}
-        defaultValue={tare}
-        onChange={(e) => setTare(e.currentTarget.value)}
-        onBlur={() => void save()}
-      />
-
-      <NumberField
-        label="Gross weight" suffix="g"
-        key={`${pen.id}-${date}-gross`}
-        defaultValue={gross}
-        onChange={(e) => setGross(e.currentTarget.value)}
+        label="Snail weight (g)" suffix="g"
+        hint="Zero the scale with the empty container on it, then weigh the snails."
+        key={`${pen.id}-${date}-net`}
+        defaultValue={biomass}
+        onChange={(e) => setBiomass(e.currentTarget.value)}
         onBlur={() => void save()}
       />
 
       {blocked && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">
-          Gross weight is not greater than tare. Check the entry.
+          Biomass must be greater than zero. Check that the scale was zeroed with the empty container on it.
         </div>
       )}
 
       <div className="rounded-lg border border-border p-3 text-sm space-y-1">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Net biomass</span>
-          <span className="font-semibold">{net != null ? `${fmt(net)} g` : "—"}</span>
-        </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Mean weight per snail</span>
           <span className="font-semibold">{mean != null ? `${fmt(mean, 2)} g` : "—"}</span>
