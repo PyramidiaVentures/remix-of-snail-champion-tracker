@@ -409,7 +409,7 @@ function StepThree({
               <div className="flex-1">
                 <div className="font-medium">{p.label}</div>
                 <div className="text-xs text-muted-foreground">
-                  {p.age_group} · {p.snail_count} snails
+                  {p.snail_count} snails
                 </div>
               </div>
               <select
