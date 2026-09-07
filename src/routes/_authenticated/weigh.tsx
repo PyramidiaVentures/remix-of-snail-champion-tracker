@@ -62,7 +62,7 @@ function WeighPage() {
 
   const pens = useQuery({
     queryKey: ["pens"],
-    queryFn: async () => (await supabase.from("pens").select("id,label,snail_count").order("label")).data ?? [],
+    queryFn: async () => (await supabase.from("pens").select("id,label,initial_snail_count").order("label")).data ?? [],
   });
 
   const assignments = useQuery({
