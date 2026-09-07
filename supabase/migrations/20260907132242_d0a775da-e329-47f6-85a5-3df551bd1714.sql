@@ -1,0 +1,1 @@
+drop index if exists public.trials_one_active_idx;
