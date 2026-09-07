@@ -218,7 +218,7 @@ function AmPage() {
   };
 
   /** Rewrite the session reading on every welfare row already saved for this date. */
-  const applySessionValue = async (patch: Record<string, number | null>) => {
+  const applySessionValue = async (patch: { temp_c?: number | null; humidity_pct?: number | null }) => {
     if (!trialId) return;
     await supabase.from("welfare_checks").update(patch).eq("trial_id", trialId).eq("obs_date", date);
     refresh();
