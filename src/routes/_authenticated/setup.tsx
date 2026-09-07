@@ -347,45 +347,6 @@ function FeedForm({ values, onChange, error }: FeedFormProps) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="block text-xs">
-          <span className="block mb-1 text-muted-foreground">Feed type</span>
-          <select
-            value={values.feed_type}
-            onChange={(e) => update("feed_type", e.target.value as FeedType | "")}
-            className="inp"
-          >
-            <option value="">Select type</option>
-            {FEED_TYPE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block text-xs">
-          <span className="block mb-1 text-muted-foreground">Availability</span>
-          <select
-            value={values.availability}
-            onChange={(e) => update("availability", e.target.value as FeedAvailability)}
-            className="inp"
-          >
-            {AVAILABILITY_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <label className="block text-xs">
-          <span className="block mb-1 text-muted-foreground">Source</span>
-          <input
-            value={values.source}
-            onChange={(e) => update("source", e.target.value)}
-            placeholder="Farm plot 2"
-            className="inp"
-          />
-        </label>
-
-        <label className="block text-xs">
           <span className="block mb-1 text-muted-foreground">Cost per kg (reference only)</span>
           <input
             type="number"
@@ -399,9 +360,7 @@ function FeedForm({ values, onChange, error }: FeedFormProps) {
             Not used in any calculation. Cost analysis is done externally from the export.
           </span>
         </label>
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="block text-xs">
           <span className="block mb-1 text-muted-foreground">Dry matter %</span>
           <input
@@ -417,37 +376,22 @@ function FeedForm({ values, onChange, error }: FeedFormProps) {
             Optional. Can be added at any time, including after the trial ends — all figures recompute automatically.
           </span>
         </label>
-
-        <label className="block text-xs">
-          <span className="block mb-1 text-muted-foreground">Dry matter source</span>
-          <select
-            value={values.dm_source}
-            onChange={(e) => update("dm_source", e.target.value as DmSource | "")}
-            disabled={!dmEnabled}
-            className="inp disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <option value="">{dmEnabled ? "Select source" : "Enter DM % first"}</option>
-            {DM_SOURCE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </label>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <label className="block text-xs">
-          <span className="block mb-1 text-muted-foreground">Status</span>
-          <select
-            value={values.status}
-            onChange={(e) => update("status", e.target.value as LibraryStatus)}
-            className="inp"
-          >
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <label className="block text-xs">
+        <span className="block mb-1 text-muted-foreground">Dry matter source</span>
+        <select
+          value={values.dm_source}
+          onChange={(e) => update("dm_source", e.target.value as DmSource | "")}
+          disabled={!dmEnabled}
+          className="inp disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <option value="">{dmEnabled ? "Select source" : "Enter DM % first"}</option>
+          {DM_SOURCE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </label>
 
       <label className="block text-xs">
         <span className="block mb-1 text-muted-foreground">Notes</span>
@@ -457,17 +401,10 @@ function FeedForm({ values, onChange, error }: FeedFormProps) {
           rows={2}
           className="inp resize-none"
         />
+        <span className="mt-1 block text-[10px] text-muted-foreground">
+          For a blended feed, record the component ratio here.
+        </span>
       </label>
     </div>
   );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    pending: "bg-muted text-muted-foreground",
-    active: "bg-accent text-accent-foreground",
-    champion: "bg-primary text-primary-foreground",
-    eliminated: "bg-destructive/10 text-destructive",
-  };
-  return <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase ${map[status] ?? "bg-muted"}`}>{status}</span>;
 }
