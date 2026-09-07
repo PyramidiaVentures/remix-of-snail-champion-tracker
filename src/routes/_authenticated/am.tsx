@@ -10,7 +10,7 @@ import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { useUploads } from "@/lib/photoUploads.store";
 import { liveCount } from "@/lib/liveCount";
 import type { Database } from "@/integrations/supabase/types";
-import { BookOpen, AlertTriangle, CheckCircle2, Loader2, Save, Plus } from "lucide-react";
+import { BookOpen, AlertTriangle, CheckCircle2, Loader2, Save, Plus, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/am")({
   component: AmPage,
@@ -66,6 +66,13 @@ const AM_STEPS = [
   "Empty and clean any dish whose remaining feed fails the discard criteria.",
 ];
 const AM_PHOTO_STEP_INDEX = 0;
+
+const EVENT_LABEL: Record<string, string> = {
+  mortality: "Death",
+  escape: "Escape",
+  removal: "Removal",
+  addition: "Addition",
+};
 
 type SaveState = "idle" | "saving" | "saved" | "failed";
 
@@ -416,6 +423,19 @@ function PenCard({
       );
       setEventState("saved");
       setEventCount("1");
+      onSaved();
+    } catch {
+      setEventState("failed");
+    }
+  };
+
+  const removeEvent = async (id: string) => {
+    setEventState("saving");
+    try {
+      await writeWithRetry("population_events", () =>
+        supabase.from("population_events").delete().eq("id", id),
+      );
+      setEventState("saved");
       onSaved();
     } catch {
       setEventState("failed");
