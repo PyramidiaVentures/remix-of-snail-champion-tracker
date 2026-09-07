@@ -269,9 +269,20 @@ function ResultsPage() {
           }}
         />
       )}
-      {metrics && (
-        <Charts metrics={metrics} view={view} hiddenSeries={hiddenSeries} onToggleSeries={toggleSeries} />
+      {metrics && rangeStart && rangeEnd && (
+        <Charts
+          metrics={metrics}
+          view={view}
+          domain={[rangeStart, rangeEnd]}
+          observations={scopedObservations}
+          startDate={trial.data?.start_date ?? rangeStart}
+          acclimationDays={trial.data?.acclimation_days ?? 0}
+          includeAcclimation={includeAcclimation}
+          hiddenSeries={hiddenSeries}
+          onToggleSeries={toggleSeries}
+        />
       )}
+
       {metrics && <SummaryTable metrics={metrics} />}
     </div>
   );
