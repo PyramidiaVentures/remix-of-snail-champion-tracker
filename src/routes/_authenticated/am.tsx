@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { upsertRow, OBSERVATIONS_ROUND_KEY, EVAP_CONTROLS_KEY } from "@/lib/upsertRow";
 import { useMemo, useState } from "react";
 import { Checklist } from "@/components/Checklist";
 import { NumberField } from "@/components/NumberField";
@@ -186,10 +187,11 @@ function AmLeftoverGrid({ roundId, date, pens, feeds }: { roundId: string; date:
     const key = `${pen_id}:${feed_id}`;
     setKey(key, "saving");
     try {
-      const { error } = await supabase.from("observations").upsert({
-        round_id: roundId, pen_id, feed_id, obs_date: date, weight_leftover_g,
-      }, { onConflict: "round_id,pen_id,feed_id,obs_date" });
-      if (error) throw error;
+      await upsertRow(
+        "observations",
+        { round_id: roundId, pen_id, feed_id, obs_date: date, weight_leftover_g },
+        OBSERVATIONS_ROUND_KEY,
+      );
       setKey(key, "saved");
       qc.invalidateQueries({ queryKey: ["obs-day", roundId, date] });
     } catch {
@@ -259,10 +261,11 @@ function AmEvapLeftovers({ roundId, date, feeds }: { roundId: string; date: stri
     queryFn: async () => (await supabase.from("evap_controls").select("*").eq("round_id", roundId).eq("obs_date", date)).data ?? [],
   });
   const save = async (feed_id: string, control_leftover_g: number) => {
-    const { error } = await supabase.from("evap_controls").upsert({
-      round_id: roundId, feed_id, obs_date: date, control_leftover_g,
-    }, { onConflict: "round_id,feed_id,obs_date" });
-    if (error) throw error;
+    await upsertRow(
+      "evap_controls",
+      { round_id: roundId, feed_id, obs_date: date, control_leftover_g },
+      EVAP_CONTROLS_KEY,
+    );
     qc.invalidateQueries({ queryKey: ["evap-day", roundId, date] });
   };
 

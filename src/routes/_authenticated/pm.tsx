@@ -8,6 +8,7 @@ import { NumberField } from "@/components/NumberField";
 import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { useUploads } from "@/lib/photoUploads.store";
+import { upsertRow, OBSERVATIONS_TRIAL_KEY } from "@/lib/upsertRow";
 import type { Database } from "@/integrations/supabase/types";
 import { BookOpen, Save, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 
@@ -278,32 +279,18 @@ function PenCard({
   const saveField = async (patch: Partial<ObsRow>, setState: (s: SaveState) => void) => {
     setState("saving");
     try {
-      const { data: existing } = await supabase
-        .from("observations")
-        .select("id")
-        .eq("trial_id", trial.id)
-        .eq("pen_id", pen.id)
-        .eq("feed_id", feed.feed_id)
-        .eq("obs_date", date)
-        .maybeSingle();
-
-      if (existing?.id) {
-        const { error } = await supabase
-          .from("observations")
-          .update({ ...patch, is_acclimation: isAcclimation } as never)
-          .eq("id", existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("observations").insert({
+      await upsertRow(
+        "observations",
+        {
           trial_id: trial.id,
           pen_id: pen.id,
           feed_id: feed.feed_id,
           obs_date: date,
           is_acclimation: isAcclimation,
           ...patch,
-        } as never);
-        if (error) throw error;
-      }
+        },
+        OBSERVATIONS_TRIAL_KEY,
+      );
       setState("saved");
       onSaved();
     } catch {
