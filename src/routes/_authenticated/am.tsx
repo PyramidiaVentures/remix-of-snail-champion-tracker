@@ -527,6 +527,26 @@ function PenCard({
             <Plus className="h-4 w-4" />Add
           </button>
         </div>
+
+        {penEvents.length > 0 && (
+          <ul className="space-y-1">
+            {penEvents.map((e) => (
+              <li key={e.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
+                <span>{EVENT_LABEL[e.event_type] ?? e.event_type} · {e.count}</span>
+                <button
+                  type="button"
+                  aria-label="Remove event"
+                  onClick={() => void removeEvent(e.id)}
+                  className="text-destructive p-1"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="text-sm font-medium">Live count: {liveCountValue}</div>
       </div>
 
       <div className="space-y-1">
