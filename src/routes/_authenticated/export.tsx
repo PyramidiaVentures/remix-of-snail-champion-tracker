@@ -212,21 +212,7 @@ async function buildRows(name: ExportName): Promise<Row[]> {
         const treatment = trialTreatments.find((t) => t.id === treatmentId);
         const penObs = trialObs.filter((o) => o.pen_id === pen.penId);
         for (const iv of pen.intervals) {
-          const inRange = penObs.filter(
-            (o) => o.obs_date > iv.from && o.obs_date <= iv.to && dateIncluded(o.obs_date),
-          );
-          const byDate = new Map<string, string | null>();
-          for (const o of inRange) if (o.dish_action != null) byDate.set(o.obs_date, o.dish_action);
-          const runs = carryOverRuns(Array.from(byDate, ([date, action]) => ({ date, action })));
-          const spoiled = Array.from(byDate.values()).filter((a) => a === "emptied_spoiled").length;
-
-          const fedDates = new Set(inRange.filter((o) => o.offered_g != null).map((o) => o.obs_date));
-          let missing = 0;
-          for (let d = addDays(iv.from, 1); d <= iv.to; d = addDays(d, 1)) {
-            if (!dateIncluded(d)) continue;
-            if (!fedDates.has(d)) missing += 1;
-          }
-
+          const extras = intervalExtras(iv, penObs, dateIncluded);
           const usable = iv.gain_g != null && iv.gain_g > 0;
           rows.push({
             pen_label: pen.label,
