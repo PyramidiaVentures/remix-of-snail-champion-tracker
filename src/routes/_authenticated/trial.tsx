@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { Plus, Trash2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { today } from "@/lib/date";
+import { liveCount } from "@/lib/liveCount";
 
 export const Route = createFileRoute("/_authenticated/trial")({
   component: TrialPage,
@@ -98,7 +99,10 @@ function TrialPage() {
     qc.invalidateQueries({ queryKey: ["pen_assignments"] });
   };
 
-  const penList = pens.data ?? [];
+  const penList: Pen[] = (pens.data ?? []).map((p) => ({
+    ...p,
+    live_count: liveCount(p, popEvents.data ?? [], today()),
+  }));
   const tList = treatments.data ?? [];
   const aList = assignments.data ?? [];
 
