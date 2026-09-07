@@ -98,65 +98,26 @@ function PensSection() {
   );
 }
 
-const FEED_TYPE_OPTIONS: { value: FeedType; label: string }[] = [
-  { value: "fresh_leaf", label: "Fresh leaf" },
-  { value: "compounded", label: "Compounded" },
-  { value: "animal_protein", label: "Animal protein" },
-  { value: "mixed", label: "Mixed" },
-  { value: "other", label: "Other" },
-];
-
 const DM_SOURCE_OPTIONS: { value: DmSource; label: string }[] = [
   { value: "literature", label: "Literature" },
   { value: "supplier", label: "Supplier" },
   { value: "measured", label: "Measured" },
 ];
 
-const AVAILABILITY_OPTIONS: { value: FeedAvailability; label: string }[] = [
-  { value: "year_round", label: "Year round" },
-  { value: "seasonal", label: "Seasonal" },
-];
-
-// Library status is edited as Active/Inactive. Inactive maps to "pending" in the
-// underlying feed_status enum; Active maps to "active". Champion/eliminated are
-// round-derived states and are preserved if the user does not edit them.
-type LibraryStatus = "active" | "inactive";
-
-const STATUS_OPTIONS: { value: LibraryStatus; label: string }[] = [
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-];
-
-function toLibraryStatus(status: FeedStatus): LibraryStatus {
-  return status === "active" ? "active" : "inactive";
-}
-
-function toFeedStatus(status: LibraryStatus): FeedStatus {
-  return status === "active" ? "active" : "pending";
-}
-
 interface FeedFormValues {
   name: string;
-  feed_type: FeedType | "";
-  source: string;
   cost_per_kg: string;
   dm_percent: string;
   dm_source: DmSource | "";
-  availability: FeedAvailability;
-  status: LibraryStatus;
   notes: string;
 }
 
 function emptyFeedForm(): FeedFormValues {
   return {
     name: "",
-    feed_type: "",
-    source: "",
     cost_per_kg: "",
     dm_percent: "",
     dm_source: "",
-    availability: "year_round",
-    status: "active",
     notes: "",
   };
 }
@@ -164,13 +125,9 @@ function emptyFeedForm(): FeedFormValues {
 function feedToFormValues(feed: TablesRow<"feeds">): FeedFormValues {
   return {
     name: feed.name,
-    feed_type: feed.feed_type ?? "",
-    source: feed.source ?? "",
     cost_per_kg: feed.cost_per_kg?.toString() ?? "",
     dm_percent: feed.dm_percent?.toString() ?? "",
     dm_source: feed.dm_source ?? "",
-    availability: feed.availability,
-    status: toLibraryStatus(feed.status),
     notes: feed.notes ?? "",
   };
 }
@@ -193,13 +150,9 @@ function formToFeedInsert(values: FeedFormValues): Database["public"]["Tables"][
   const dmPercent = values.dm_percent.trim() ? Number(values.dm_percent) : null;
   return {
     name: values.name.trim(),
-    feed_type: values.feed_type || null,
-    source: values.source.trim() || null,
     cost_per_kg: values.cost_per_kg.trim() ? Number(values.cost_per_kg) : null,
     dm_percent: dmPercent,
     dm_source: dmPercent ? (values.dm_source as DmSource) : null,
-    availability: values.availability,
-    status: toFeedStatus(values.status),
     notes: values.notes.trim() || null,
   };
 }
