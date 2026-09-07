@@ -162,8 +162,8 @@ export function intervalExtras(
 
   return {
     missingFeedingDays: missing,
-    meanCarryOverDays: runs.length ? runs.reduce((a, b) => a + b, 0) / runs.length : null,
-    maxCarryOverDays: runs.length ? Math.max(...runs) : null,
+    meanCarryOverDays: byDate.size ? (runs.length ? runs.reduce((a, b) => a + b, 0) / runs.length : 0) : null,
+    maxCarryOverDays: byDate.size ? (runs.length ? Math.max(...runs) : 0) : null,
     spoilageRate: byDate.size ? (spoiled / byDate.size) * 100 : null,
   };
 }
@@ -323,8 +323,8 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
       meanSgr: meanOf(intervals.map((i) => i.sgr)),
       survival,
       meanFeedingRate: meanOf(intervals.map((i) => i.feedingRate)),
-      meanCarryOverDays: runs.length ? runs.reduce((a, b) => a + b, 0) / runs.length : null,
-      maxCarryOverDays: runs.length ? Math.max(...runs) : null,
+      meanCarryOverDays: byDate.size ? (runs.length ? runs.reduce((a, b) => a + b, 0) / runs.length : 0) : null,
+      maxCarryOverDays: byDate.size ? (runs.length ? Math.max(...runs) : 0) : null,
       spoilageRate: byDate.size ? (spoiled / byDate.size) * 100 : null,
       weightSeries,
       offeredSeries,
@@ -351,4 +351,10 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
   });
 
   return { pens: penMetrics, treatments: treatmentMetrics, dmAvailable, dmBasis };
+}
+
+/** Round a value for display/export only. Never round inside calculations. */
+export function roundOut(v: number | null | undefined, dp: number): number | null {
+  if (v == null || typeof v !== "number" || !Number.isFinite(v)) return null;
+  return Number(v.toFixed(dp));
 }

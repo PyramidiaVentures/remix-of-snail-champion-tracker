@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { computeMetrics, daysBetween, intervalExtras } from "@/lib/metrics";
+import { computeMetrics, daysBetween, intervalExtras, roundOut } from "@/lib/metrics";
+
+const out = (v: number | null | undefined, dp: number): number | "" => roundOut(v, dp) ?? "";
 import { liveCount } from "@/lib/liveCount";
 import { readIncludeAcclimation } from "@/lib/acclimation";
 import { today } from "@/lib/date";
@@ -221,23 +223,23 @@ async function buildRows(name: ExportName): Promise<Row[]> {
             interval_start: iv.from,
             interval_end: iv.to,
             days: daysBetween(iv.from, iv.to),
-            cum_offered_g: iv.offered_g,
-            cum_offered_dm_g: iv.offeredDm_g ?? "",
-            mean_weight_start_g: Number.isFinite(iv.meanWeight1) ? iv.meanWeight1 : "",
-            mean_weight_end_g: Number.isFinite(iv.meanWeight2) ? iv.meanWeight2 : "",
+            cum_offered_g: out(iv.offered_g, 1),
+            cum_offered_dm_g: out(iv.offeredDm_g, 1),
+            mean_weight_start_g: out(iv.meanWeight1, 2),
+            mean_weight_end_g: out(iv.meanWeight2, 2),
             live_count_start:
               trialBiomass.find((b) => b.pen_id === pen.penId && b.event_date === iv.from)?.live_count ?? "",
 
             live_count_end: iv.survivingCount,
-            gain_g: iv.gain_g ?? "",
-            offered_per_kg_gain_fresh: usable ? iv.offered_g / iv.gain_g! : "",
-            offered_per_kg_gain_dm: usable && iv.offeredDm_g != null ? iv.offeredDm_g / iv.gain_g! : "",
-            sgr_percent_per_day: iv.sgr ?? "",
-            survival_percent: iv.survival ?? "",
-            feeding_rate_percent_bw_day: iv.feedingRate ?? "",
-            mean_carry_over_days: extras.meanCarryOverDays ?? "",
-            max_carry_over_days: extras.maxCarryOverDays ?? "",
-            spoilage_rate_percent: extras.spoilageRate ?? "",
+            gain_g: out(iv.gain_g, 1),
+            offered_per_kg_gain_fresh: usable ? out(iv.offered_g / iv.gain_g!, 2) : "",
+            offered_per_kg_gain_dm: usable && iv.offeredDm_g != null ? out(iv.offeredDm_g / iv.gain_g!, 2) : "",
+            sgr_percent_per_day: out(iv.sgr, 2),
+            survival_percent: out(iv.survival, 1),
+            feeding_rate_percent_bw_day: out(iv.feedingRate, 1),
+            mean_carry_over_days: out(extras.meanCarryOverDays, 1),
+            max_carry_over_days: out(extras.maxCarryOverDays, 0),
+            spoilage_rate_percent: out(extras.spoilageRate, 1),
             missing_feeding_days: extras.missingFeedingDays,
           });
         }
