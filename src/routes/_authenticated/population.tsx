@@ -187,12 +187,23 @@ function Line({ label, value, strong }: { label: string; value: string; strong?:
   );
 }
 
+interface MismatchRow {
+  penId: string;
+  label: string;
+  date: string;
+  derived: number;
+  weighed: number;
+  diff: number;
+}
+
 function Reconciliation({
-  pens, events, biomass,
+  trialId, pens, events, biomass, onSaved,
 }: {
+  trialId: string;
   pens: { id: string; label: string; initial_snail_count: number }[];
   events: PopRow[];
   biomass: { pen_id: string; event_date: string; live_count: number }[];
+  onSaved: () => void;
 }) {
   const rows = pens
     .map((p) => {
@@ -203,9 +214,11 @@ function Reconciliation({
       if (!last) return null;
       const derived = liveCount(p, events, last.event_date);
       const diff = last.live_count - derived;
-      return diff === 0 ? null : { label: p.label, date: last.event_date, derived, weighed: last.live_count, diff };
+      return diff === 0
+        ? null
+        : { penId: p.id, label: p.label, date: last.event_date, derived, weighed: last.live_count, diff };
     })
-    .filter(Boolean) as { label: string; date: string; derived: number; weighed: number; diff: number }[];
+    .filter(Boolean) as MismatchRow[];
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-2">
@@ -218,14 +231,7 @@ function Reconciliation({
         <>
           <ul className="space-y-2">
             {rows.map((r) => (
-              <li key={r.label} className="rounded-lg border border-amber-500/50 bg-amber-500/5 p-3 text-sm">
-                <div className="flex items-center gap-2 font-medium text-amber-700">
-                  <AlertTriangle className="h-4 w-4" />{r.label} — {r.diff > 0 ? "+" : ""}{r.diff}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Derived {r.derived} vs {r.weighed} counted at the weighing on {r.date}.
-                </div>
-              </li>
+              <ReconcileRow key={r.penId} row={r} trialId={trialId} onSaved={onSaved} />
             ))}
           </ul>
           <p className="text-xs text-muted-foreground">
@@ -234,6 +240,94 @@ function Reconciliation({
         </>
       )}
     </section>
+  );
+}
+
+function ReconcileRow({
+  row, trialId, onSaved,
+}: {
+  row: MismatchRow;
+  trialId: string;
+  onSaved: () => void;
+}) {
+  const isAddition = row.diff > 0;
+  const eventType: EventType = isAddition ? "addition" : "mortality";
+  const count = Math.abs(row.diff);
+  const defaultNotes = `Logged at reconciliation against the weighing on ${row.date}. Actual date unknown.`;
+
+  const [open, setOpen] = useState(false);
+  const [notes, setNotes] = useState(defaultNotes);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const confirm = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await writeWithRetry("population_events", () =>
+        supabase.from("population_events").insert({
+          trial_id: trialId,
+          pen_id: row.penId,
+          event_date: row.date,
+          event_type: eventType,
+          count,
+          cause: "unknown",
+          notes: notes.trim() || null,
+        } as never),
+      );
+      setOpen(false);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed — try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <li className="rounded-lg border border-amber-500/50 bg-amber-500/5 p-3 text-sm space-y-2">
+      <div className="flex items-start gap-2">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 font-medium text-amber-700">
+            <AlertTriangle className="h-4 w-4" />{row.label} — {row.diff > 0 ? "+" : ""}{row.diff}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Derived {row.derived} vs {row.weighed} counted at the weighing on {row.date}.
+          </div>
+        </div>
+        {!open && (
+          <button type="button" onClick={() => { setNotes(defaultNotes); setOpen(true); }}
+            className="rounded-md border border-amber-500/60 bg-card px-3 py-2 text-xs font-medium text-amber-700">
+            Reconcile
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+          <div className="text-xs">
+            This will create <span className="font-semibold">1 {labelOf(EVENT_TYPES, eventType).toLowerCase()} event</span> for{" "}
+            <span className="font-semibold">{row.label}</span>: count <span className="font-semibold">{count}</span>,
+            dated <span className="font-semibold">{row.date}</span>, cause <span className="font-semibold">unknown</span>.
+          </div>
+          <label className="block text-xs">
+            <span className="block mb-1 text-muted-foreground">Notes</span>
+            <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className="inp resize-none" />
+          </label>
+          {error && <div className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div>}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => void confirm()} disabled={busy}
+              className="flex-1 rounded-md bg-primary py-2 text-primary-foreground text-sm font-medium disabled:opacity-50">
+              <Check className="h-4 w-4 inline mr-1" /> Confirm and log
+            </button>
+            <button type="button" onClick={() => setOpen(false)}
+              className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </li>
   );
 }
 
