@@ -45,8 +45,9 @@ function StatusPill({ state }: { state: SaveState }) {
 }
 
 function addDays(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() + days);
+  // UTC arithmetic: local-midnight parsing would shift the result a day in non-UTC zones.
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
