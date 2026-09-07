@@ -310,25 +310,25 @@ export type Database = {
           area_m2: number | null
           created_at: string
           id: string
+          initial_snail_count: number
           label: string
           notes: string | null
-          snail_count: number
         }
         Insert: {
           area_m2?: number | null
           created_at?: string
           id?: string
+          initial_snail_count?: number
           label: string
           notes?: string | null
-          snail_count?: number
         }
         Update: {
           area_m2?: number | null
           created_at?: string
           id?: string
+          initial_snail_count?: number
           label?: string
           notes?: string | null
-          snail_count?: number
         }
         Relationships: []
       }
