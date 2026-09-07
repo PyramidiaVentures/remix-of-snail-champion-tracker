@@ -655,7 +655,7 @@ export type Database = {
       biomass_method: "whole_pen" | "subsample"
       dish_action: "emptied_refilled" | "topped_up" | "emptied_spoiled"
       dm_source: "literature" | "supplier" | "measured"
-      feed_status: "pending" | "active" | "champion" | "eliminated"
+      feed_status: "active" | "inactive"
       health_flag:
         | "shell_damage"
         | "lethargy"
@@ -811,7 +811,7 @@ export const Constants = {
       biomass_method: ["whole_pen", "subsample"],
       dish_action: ["emptied_refilled", "topped_up", "emptied_spoiled"],
       dm_source: ["literature", "supplier", "measured"],
-      feed_status: ["pending", "active", "champion", "eliminated"],
+      feed_status: ["active", "inactive"],
       health_flag: [
         "shell_damage",
         "lethargy",
