@@ -8,8 +8,9 @@ import { NumberField } from "@/components/NumberField";
 import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { useUploads } from "@/lib/photoUploads.store";
+import { liveCount } from "@/lib/liveCount";
 import type { Database } from "@/integrations/supabase/types";
-import { BookOpen, AlertTriangle, CheckCircle2, Loader2, Save, Plus } from "lucide-react";
+import { BookOpen, AlertTriangle, CheckCircle2, Loader2, Save, Plus, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/am")({
   component: AmPage,
@@ -66,6 +67,13 @@ const AM_STEPS = [
 ];
 const AM_PHOTO_STEP_INDEX = 0;
 
+const EVENT_LABEL: Record<string, string> = {
+  mortality: "Death",
+  escape: "Escape",
+  removal: "Removal",
+  addition: "Addition",
+};
+
 type SaveState = "idle" | "saving" | "saved" | "failed";
 
 function StatusPill({ state }: { state: SaveState }) {
@@ -96,7 +104,18 @@ function AmPage() {
 
   const pens = useQuery({
     queryKey: ["pens"],
-    queryFn: async () => (await supabase.from("pens").select("id,label").order("label")).data ?? [],
+    queryFn: async () => (await supabase.from("pens").select("id,label,initial_snail_count").order("label")).data ?? [],
+  });
+
+  const popEvents = useQuery({
+    queryKey: ["pop-events", trialId],
+    enabled: !!trialId,
+    queryFn: async () =>
+      (await supabase
+        .from("population_events")
+        .select("id,pen_id,event_date,event_type,count")
+        .eq("trial_id", trialId!)
+        .order("created_at")).data ?? [],
   });
 
   const assignments = useQuery({
@@ -198,7 +217,18 @@ function AmPage() {
     void qc.invalidateQueries({ queryKey: ["trial-obs", trialId, date] });
     void qc.invalidateQueries({ queryKey: ["welfare", trialId, date] });
     void qc.invalidateQueries({ queryKey: ["trial-photos", trialId, date] });
+    void qc.invalidateQueries({ queryKey: ["pop-events", trialId] });
   };
+
+  const eventsForPenDate = (penId: string) =>
+    (popEvents.data ?? []).filter((e) => e.pen_id === penId && e.event_date === date);
+
+  const liveCountFor = (penId: string) =>
+    liveCount(
+      (pens.data ?? []).find((p) => p.id === penId),
+      popEvents.data ?? [],
+      date,
+    );
 
   return (
     <div className="space-y-4">
@@ -272,6 +302,8 @@ function AmPage() {
                 photoUrl={photoUrlFor(pen.id)}
                 sessionTemp={sessionTemp}
                 sessionHumidity={sessionHumidity}
+                penEvents={eventsForPenDate(pen.id)}
+                liveCountValue={liveCountFor(pen.id)}
                 onSaved={refresh}
               />
             )}
@@ -308,7 +340,8 @@ function OptionRow<T extends string>({
 }
 
 function PenCard({
-  trialId, pen, feedId, date, obsRow, welfareRow, photoUrl, sessionTemp, sessionHumidity, onSaved,
+  trialId, pen, feedId, date, obsRow, welfareRow, photoUrl, sessionTemp, sessionHumidity,
+  penEvents, liveCountValue, onSaved,
 }: {
   trialId: string;
   pen: StepperPen;
@@ -319,6 +352,8 @@ function PenCard({
   photoUrl: string | null;
   sessionTemp: number | null;
   sessionHumidity: number | null;
+  penEvents: { id: string; event_type: PopulationEventType; count: number }[];
+  liveCountValue: number;
   onSaved: () => void;
 }) {
   const [refusalState, setRefusalState] = useState<SaveState>("idle");
@@ -388,6 +423,19 @@ function PenCard({
       );
       setEventState("saved");
       setEventCount("1");
+      onSaved();
+    } catch {
+      setEventState("failed");
+    }
+  };
+
+  const removeEvent = async (id: string) => {
+    setEventState("saving");
+    try {
+      await writeWithRetry("population_events", () =>
+        supabase.from("population_events").delete().eq("id", id),
+      );
+      setEventState("saved");
       onSaved();
     } catch {
       setEventState("failed");
@@ -499,6 +547,26 @@ function PenCard({
             <Plus className="h-4 w-4" />Add
           </button>
         </div>
+
+        {penEvents.length > 0 && (
+          <ul className="space-y-1">
+            {penEvents.map((e) => (
+              <li key={e.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
+                <span>{EVENT_LABEL[e.event_type] ?? e.event_type} · {e.count}</span>
+                <button
+                  type="button"
+                  aria-label="Remove event"
+                  onClick={() => void removeEvent(e.id)}
+                  className="text-destructive p-1"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="text-sm font-medium">Live count: {liveCountValue}</div>
       </div>
 
       <div className="space-y-1">
