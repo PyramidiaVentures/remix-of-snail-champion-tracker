@@ -87,6 +87,22 @@ function ResultsPage() {
     queryFn: async () => (await supabase.from("biomass_events").select("pen_id,event_date,net_biomass_g,live_count").eq("trial_id", trialId!)).data ?? [],
   });
 
+  const assignedPens = useMemo(
+    () =>
+      (pens.data ?? [])
+        .filter((p) => (assignments.data ?? []).some((a) => a.pen_id === p.id))
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })),
+    [pens.data, assignments.data],
+  );
+
+  // "" = all pens, "none" = none, otherwise a comma-separated list of pen ids.
+  const selectedPenIds = useMemo(() => {
+    if (search.pen === "none") return new Set<string>();
+    if (!search.pen) return new Set(assignedPens.map((p) => p.id));
+    const want = listToSet(search.pen);
+    return new Set(assignedPens.filter((p) => want.has(p.id)).map((p) => p.id));
+  }, [search.pen, assignedPens]);
+
   // Weighing dates kept by the range filter. Because a range is contiguous,
   // keeping only the weighings inside it means every interval that survives has
   // BOTH of its weighing dates inside the range.
@@ -107,33 +123,35 @@ function ResultsPage() {
 
   // Feed offered is only ever summed across the same days the intervals cover.
   const scopedBiomass = useMemo(
-    () => (biomass.data ?? []).filter((b) => keptDates.includes(b.event_date)),
-    [biomass.data, keptDates],
+    () => (biomass.data ?? []).filter((b) => keptDates.includes(b.event_date) && selectedPenIds.has(b.pen_id)),
+    [biomass.data, keptDates, selectedPenIds],
   );
   const scopedObservations = useMemo(
     () =>
       rangeStart && rangeEnd
-        ? (observations.data ?? []).filter((o) => o.obs_date > rangeStart && o.obs_date <= rangeEnd)
+        ? (observations.data ?? []).filter(
+            (o) => o.obs_date > rangeStart && o.obs_date <= rangeEnd && selectedPenIds.has(o.pen_id),
+          )
         : [],
-    [observations.data, rangeStart, rangeEnd],
+    [observations.data, rangeStart, rangeEnd, selectedPenIds],
   );
 
   const metrics: TrialMetrics | null = useMemo(() => {
     if (!trial.data || !pens.data || !feeds.data || !treatments.data || !assignments.data || !observations.data || !biomass.data) return null;
-    if (selectedIntervals.length === 0) return null;
-    const assignedPens = pens.data.filter((p) => assignments.data!.some((a) => a.pen_id === p.id));
+    if (selectedIntervals.length === 0 || selectedPenIds.size === 0) return null;
     return computeMetrics({
       trial: { id: trial.data.id, start_date: trial.data.start_date, acclimation_days: trial.data.acclimation_days },
-      pens: assignedPens,
+      pens: assignedPens.filter((p) => selectedPenIds.has(p.id)),
       feeds: feeds.data,
       treatments: treatments.data,
-      assignments: assignments.data,
+      assignments: assignments.data.filter((a) => selectedPenIds.has(a.pen_id)),
       observations: scopedObservations,
       biomass: scopedBiomass,
       includeAcclimation,
       dryMatter,
     });
-  }, [trial.data, pens.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, scopedObservations, scopedBiomass, selectedIntervals.length, includeAcclimation, dryMatter]);
+  }, [trial.data, pens.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, assignedPens, selectedPenIds, scopedObservations, scopedBiomass, selectedIntervals.length, includeAcclimation, dryMatter]);
+
 
   if (!trial.isLoading && !trial.data) {
     return (
