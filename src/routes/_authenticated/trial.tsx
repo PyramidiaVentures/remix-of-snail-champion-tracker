@@ -48,7 +48,19 @@ function TrialPage() {
   const pens = useQuery({
     queryKey: ["pens"],
     queryFn: async () =>
-      ((await supabase.from("pens").select("id,label,age_group,snail_count,area_m2").order("label")).data ?? []) as Pen[],
+      ((await supabase.from("pens").select("id,label,snail_count,area_m2").order("label")).data ?? []) as Pen[],
+  });
+  const biomass = useQuery({
+    queryKey: ["biomass_events", current?.id],
+    enabled: !!current,
+    queryFn: async () =>
+      ((
+        await supabase
+          .from("biomass_events")
+          .select("pen_id,event_date,live_count,net_biomass_g")
+          .eq("trial_id", current!.id)
+          .order("event_date")
+      ).data ?? []) as BiomassRow[],
   });
   const treatments = useQuery({
     queryKey: ["treatments", current?.id],
