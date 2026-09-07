@@ -128,6 +128,46 @@ export function carryOverRuns(actionsByDate: { date: string; action: string | nu
   return runs;
 }
 
+export interface IntervalExtras {
+  missingFeedingDays: number;
+  meanCarryOverDays: number | null;
+  maxCarryOverDays: number | null;
+  spoilageRate: number | null;
+}
+
+/**
+ * Dish and feeding-day figures for one weighing interval.
+ * Shared by the Results pen detail table and the interval_summary export so
+ * the two can never drift apart.
+ */
+export function intervalExtras(
+  interval: { from: string; to: string },
+  penObservations: { obs_date: string; offered_g: number | null; dish_action: string | null }[],
+  dateIncluded: (d: string) => boolean,
+): IntervalExtras {
+  const inRange = penObservations.filter(
+    (o) => o.obs_date > interval.from && o.obs_date <= interval.to && dateIncluded(o.obs_date),
+  );
+  const byDate = new Map<string, string | null>();
+  for (const o of inRange) if (o.dish_action != null) byDate.set(o.obs_date, o.dish_action);
+  const runs = carryOverRuns(Array.from(byDate, ([date, action]) => ({ date, action })));
+  const spoiled = Array.from(byDate.values()).filter((a) => a === "emptied_spoiled").length;
+
+  const fedDates = new Set(inRange.filter((o) => o.offered_g != null).map((o) => o.obs_date));
+  let missing = 0;
+  for (let d = addDays(interval.from, 1); d <= interval.to; d = addDays(d, 1)) {
+    if (!dateIncluded(d)) continue;
+    if (!fedDates.has(d)) missing += 1;
+  }
+
+  return {
+    missingFeedingDays: missing,
+    meanCarryOverDays: runs.length ? runs.reduce((a, b) => a + b, 0) / runs.length : null,
+    maxCarryOverDays: runs.length ? Math.max(...runs) : null,
+    spoilageRate: byDate.size ? (spoiled / byDate.size) * 100 : null,
+  };
+}
+
 export function computeMetrics(input: MetricsInput): TrialMetrics {
   const {
     trial, pens, feeds, treatments, assignments,
