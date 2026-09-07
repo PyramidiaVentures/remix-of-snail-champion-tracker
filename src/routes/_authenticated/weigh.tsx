@@ -271,10 +271,7 @@ function PenCard({
 
   const num = (s: string) => (s.trim() === "" ? null : Number(s));
   const liveN = num(liveCount);
-  const tareN = num(tare);
-  const grossN = num(gross);
-
-  const net = grossN != null && tareN != null ? grossN - tareN : null;
+  const net = num(biomass);
   const mean = net != null && liveN ? net / liveN : null;
 
   const prevMean =
