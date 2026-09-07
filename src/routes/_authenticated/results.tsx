@@ -140,7 +140,7 @@ function ResultsPage() {
                   <div className="font-medium">{row.feed}</div>
                   <div className="text-xs text-muted-foreground">
                     Round {row.round}{row.feedObj?.cost_per_kg != null ? ` · ${row.feedObj.cost_per_kg}/kg` : ""}
-                    {row.feedObj?.availability && ` · ${row.feedObj.availability === "year_round" ? "year-round" : "seasonal"}`}
+                    
                   </div>
                 </div>
               </div>
