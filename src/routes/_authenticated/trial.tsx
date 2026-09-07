@@ -21,7 +21,14 @@ type Trial = {
   notes: string | null;
 };
 type Feed = { id: string; name: string };
-type Pen = { id: string; label: string; snail_count: number; area_m2: number | null };
+type Pen = {
+  id: string;
+  label: string;
+  initial_snail_count: number;
+  area_m2: number | null;
+  /** Derived from population events; see @/lib/liveCount */
+  live_count: number;
+};
 type Treatment = { id: string; trial_id: string; feed_id: string; label: string };
 type Assignment = { id: string; trial_id: string; pen_id: string; treatment_id: string; start_date: string };
 type BiomassRow = { pen_id: string; event_date: string; live_count: number; net_biomass_g: number };
@@ -49,7 +56,16 @@ function TrialPage() {
   const pens = useQuery({
     queryKey: ["pens"],
     queryFn: async () =>
-      ((await supabase.from("pens").select("id,label,snail_count,area_m2").order("label")).data ?? []) as Pen[],
+      (await supabase.from("pens").select("id,label,initial_snail_count,area_m2").order("label")).data ?? [],
+  });
+  const popEvents = useQuery({
+    queryKey: ["population-events", current?.id],
+    enabled: !!current,
+    queryFn: async () =>
+      (await supabase
+        .from("population_events")
+        .select("pen_id,event_date,event_type,count")
+        .eq("trial_id", current!.id)).data ?? [],
   });
   const biomass = useQuery({
     queryKey: ["biomass_events", current?.id],
