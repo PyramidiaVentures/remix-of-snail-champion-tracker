@@ -159,7 +159,12 @@ function TrialPage() {
         </>
       )}
 
-      <DesignIntegrityPanel pens={penList} treatments={tList} assignmentByPen={assignmentByPen} />
+      <DesignIntegrityPanel
+        pens={penList}
+        treatments={tList}
+        assignmentByPen={assignmentByPen}
+        baselineByPen={baselineByPen}
+      />
 
       {!activeTrial && (
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
