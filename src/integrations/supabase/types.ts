@@ -133,42 +133,33 @@ export type Database = {
       }
       feeds: {
         Row: {
-          availability: Database["public"]["Enums"]["feed_availability"]
           cost_per_kg: number | null
           created_at: string
           dm_percent: number | null
           dm_source: Database["public"]["Enums"]["dm_source"] | null
-          feed_type: Database["public"]["Enums"]["feed_type"] | null
           id: string
           name: string
           notes: string | null
-          source: string | null
           status: Database["public"]["Enums"]["feed_status"]
         }
         Insert: {
-          availability?: Database["public"]["Enums"]["feed_availability"]
           cost_per_kg?: number | null
           created_at?: string
           dm_percent?: number | null
           dm_source?: Database["public"]["Enums"]["dm_source"] | null
-          feed_type?: Database["public"]["Enums"]["feed_type"] | null
           id?: string
           name: string
           notes?: string | null
-          source?: string | null
           status?: Database["public"]["Enums"]["feed_status"]
         }
         Update: {
-          availability?: Database["public"]["Enums"]["feed_availability"]
           cost_per_kg?: number | null
           created_at?: string
           dm_percent?: number | null
           dm_source?: Database["public"]["Enums"]["dm_source"] | null
-          feed_type?: Database["public"]["Enums"]["feed_type"] | null
           id?: string
           name?: string
           notes?: string | null
-          source?: string | null
           status?: Database["public"]["Enums"]["feed_status"]
         }
         Relationships: []
@@ -672,14 +663,7 @@ export type Database = {
       dish_action: "emptied_refilled" | "topped_up" | "emptied_spoiled"
       dish_condition: "clean" | "soiled" | "mouldy"
       dm_source: "literature" | "supplier" | "measured"
-      feed_availability: "year_round" | "seasonal"
       feed_status: "pending" | "active" | "champion" | "eliminated"
-      feed_type:
-        | "fresh_leaf"
-        | "compounded"
-        | "animal_protein"
-        | "mixed"
-        | "other"
       health_flag:
         | "shell_damage"
         | "lethargy"
@@ -837,15 +821,7 @@ export const Constants = {
       dish_action: ["emptied_refilled", "topped_up", "emptied_spoiled"],
       dish_condition: ["clean", "soiled", "mouldy"],
       dm_source: ["literature", "supplier", "measured"],
-      feed_availability: ["year_round", "seasonal"],
       feed_status: ["pending", "active", "champion", "eliminated"],
-      feed_type: [
-        "fresh_leaf",
-        "compounded",
-        "animal_protein",
-        "mixed",
-        "other",
-      ],
       health_flag: [
         "shell_damage",
         "lethargy",
