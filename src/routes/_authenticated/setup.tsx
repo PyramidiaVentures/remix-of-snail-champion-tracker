@@ -28,15 +28,14 @@ function PensSection() {
   const qc = useQueryClient();
   const pens = useQuery({
     queryKey: ["pens"],
-    queryFn: async () => (await supabase.from("pens").select("*").order("age_group")).data ?? [],
+    queryFn: async () => (await supabase.from("pens").select("*").order("label")).data ?? [],
   });
   const [label, setLabel] = useState("");
-  const [age, setAge] = useState<AgeGroup>("Juveniles");
   const [count, setCount] = useState(0);
 
   const add = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("pens").insert({ label, age_group: age, snail_count: count });
+      const { error } = await supabase.from("pens").insert({ label, snail_count: count });
       if (error) throw error;
     },
     onSuccess: () => { setLabel(""); setCount(0); qc.invalidateQueries({ queryKey: ["pens"] }); },
@@ -62,7 +61,6 @@ function PensSection() {
           <li key={p.id} className="flex items-center gap-2 rounded-lg border border-border p-2">
             <div className="flex-1">
               <div className="font-medium">{p.label}</div>
-              <div className="text-xs text-muted-foreground">{p.age_group}</div>
             </div>
             <input type="number" defaultValue={p.snail_count} min={0}
               onBlur={(e) => update.mutate({ id: p.id, snail_count: Number(e.target.value) })}
@@ -73,17 +71,11 @@ function PensSection() {
         ))}
         {pens.data?.length === 0 && <li className="text-sm text-muted-foreground">No pens yet.</li>}
       </ul>
-      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-end">
+      <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
         <label className="text-xs col-span-full sm:col-span-1">
           <span className="block mb-1 text-muted-foreground">Label</span>
           <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Pen A"
             className="w-full rounded-md border border-input bg-background px-3 py-2" />
-        </label>
-        <label className="text-xs">
-          <span className="block mb-1 text-muted-foreground">Age</span>
-          <select value={age} onChange={(e) => setAge(e.target.value as AgeGroup)} className="rounded-md border border-input bg-background px-3 py-2">
-            <option>Juveniles</option><option>Growers</option><option>Adults</option>
-          </select>
         </label>
         <label className="text-xs">
           <span className="block mb-1 text-muted-foreground">Snails</span>
