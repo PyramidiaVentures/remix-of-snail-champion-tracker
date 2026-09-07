@@ -378,32 +378,21 @@ function PenCard({
       </div>
 
       <NumberField
-        label="Tare" suffix="g"
-        key={`${pen.id}-${date}-tare`}
-        defaultValue={tare}
-        onChange={(e) => setTare(e.currentTarget.value)}
-        onBlur={() => void save()}
-      />
-
-      <NumberField
-        label="Gross weight" suffix="g"
-        key={`${pen.id}-${date}-gross`}
-        defaultValue={gross}
-        onChange={(e) => setGross(e.currentTarget.value)}
+        label="Snail weight (g)" suffix="g"
+        hint="Zero the scale with the empty container on it, then weigh the snails."
+        key={`${pen.id}-${date}-net`}
+        defaultValue={biomass}
+        onChange={(e) => setBiomass(e.currentTarget.value)}
         onBlur={() => void save()}
       />
 
       {blocked && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">
-          Gross weight is not greater than tare. Check the entry.
+          Biomass must be greater than zero. Check that the scale was zeroed with the empty container on it.
         </div>
       )}
 
       <div className="rounded-lg border border-border p-3 text-sm space-y-1">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Net biomass</span>
-          <span className="font-semibold">{net != null ? `${fmt(net)} g` : "—"}</span>
-        </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Mean weight per snail</span>
           <span className="font-semibold">{mean != null ? `${fmt(mean, 2)} g` : "—"}</span>
