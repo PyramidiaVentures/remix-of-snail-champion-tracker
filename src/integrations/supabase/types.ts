@@ -307,7 +307,6 @@ export type Database = {
       }
       pens: {
         Row: {
-          age_group: Database["public"]["Enums"]["age_group"]
           area_m2: number | null
           created_at: string
           id: string
@@ -316,7 +315,6 @@ export type Database = {
           snail_count: number
         }
         Insert: {
-          age_group: Database["public"]["Enums"]["age_group"]
           area_m2?: number | null
           created_at?: string
           id?: string
@@ -325,7 +323,6 @@ export type Database = {
           snail_count?: number
         }
         Update: {
-          age_group?: Database["public"]["Enums"]["age_group"]
           area_m2?: number | null
           created_at?: string
           id?: string
@@ -658,7 +655,6 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      age_group: "Juveniles" | "Growers" | "Adults"
       biomass_method: "whole_pen" | "subsample"
       dish_action: "emptied_refilled" | "topped_up" | "emptied_spoiled"
       dish_condition: "clean" | "soiled" | "mouldy"
@@ -816,7 +812,6 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      age_group: ["Juveniles", "Growers", "Adults"],
       biomass_method: ["whole_pen", "subsample"],
       dish_action: ["emptied_refilled", "topped_up", "emptied_spoiled"],
       dish_condition: ["clean", "soiled", "mouldy"],
