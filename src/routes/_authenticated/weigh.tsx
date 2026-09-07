@@ -284,17 +284,16 @@ function PenCard({
       : null;
 
   const save = async (
-    override?: Partial<{ live_count: number | null; method: BiomassMethod; subsample_count: number | null; tare_g: number | null; gross_g: number | null; photo_url: string }>,
+    override?: Partial<{ live_count: number | null; method: BiomassMethod; subsample_count: number | null; net_biomass_g: number | null; photo_url: string }>,
   ) => {
     const live = override?.live_count !== undefined ? override.live_count : liveN;
-    const t = override?.tare_g !== undefined ? override.tare_g : tareN;
-    const g = override?.gross_g !== undefined ? override.gross_g : grossN;
+    const n = override?.net_biomass_g !== undefined ? override.net_biomass_g : net;
     const m = override?.method ?? method;
     const sub = override?.subsample_count !== undefined ? override.subsample_count : num(subsample);
     const url = override?.photo_url ?? photoUrl ?? null;
 
-    if (live == null || t == null || g == null) return; // not enough yet to create the record
-    if (g <= t) { setBlocked(true); setState("idle"); return; }
+    if (live == null || n == null) return; // not enough yet to create the record
+    if (n <= 0) { setBlocked(true); setState("idle"); return; }
     setBlocked(false);
     setState("saving");
     try {
