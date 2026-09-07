@@ -239,9 +239,9 @@ async function buildRows(name: ExportName): Promise<Row[]> {
             cum_offered_dm_g: iv.offeredDm_g ?? "",
             mean_weight_start_g: Number.isFinite(iv.meanWeight1) ? iv.meanWeight1 : "",
             mean_weight_end_g: Number.isFinite(iv.meanWeight2) ? iv.meanWeight2 : "",
-            live_count_start: iv.survival != null && iv.survival > 0
-              ? Math.round(iv.survivingCount / (iv.survival / 100))
-              : "",
+            live_count_start:
+              trialBiomass.find((b) => b.pen_id === pen.penId && b.event_date === iv.from)?.live_count ?? "",
+
             live_count_end: iv.survivingCount,
             gain_g: iv.gain_g ?? "",
             offered_per_kg_gain_fresh: usable ? iv.offered_g / iv.gain_g! : "",
