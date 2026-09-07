@@ -22,9 +22,9 @@ type BiomassRow = Database["public"]["Tables"]["biomass_events"]["Row"];
 type BiomassMethod = Database["public"]["Enums"]["biomass_method"];
 
 const WEIGH_STEPS = [
-  "Weigh and record the empty container (tare) for each pen.",
+  "Place the empty container on the scale and zero it, so the scale reads only the snails.",
   "Count every live snail in the pen and enter the count.",
-  "Weigh all snails together and enter the gross weight.",
+  "Weigh all the snails together and enter the weight the scale shows.",
   "Photograph the scale display with the pen tag in frame.",
   "Return the snails to the pen and confirm the count matches.",
   "Log any snail found dead during handling as a mortality event.",
@@ -123,8 +123,7 @@ function WeighPage() {
     const row = rowFor(penId);
     const missing: string[] = [];
     if (row?.live_count == null) missing.push("live count");
-    if (row?.tare_g == null) missing.push("tare");
-    if (row?.gross_g == null) missing.push("gross weight");
+    if (row?.net_biomass_g == null) missing.push("snail weight");
     if (!photoDone(penId)) missing.push("scale photo");
     return missing;
   };
