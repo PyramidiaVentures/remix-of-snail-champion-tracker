@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { Home, ClipboardList, Moon, Sun, BarChart3, BookOpen, Download, Settings, LogOut, Trophy, FlaskConical, Scale, Users } from "lucide-react";
+import { Home, ClipboardList, Moon, Sun, BarChart3, BookOpen, Download, Settings, LogOut, FlaskConical, Scale, Users } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -20,7 +20,6 @@ const nav = [
   { to: "/weigh", label: "Weigh", icon: Scale },
   { to: "/trial", label: "Trial", icon: FlaskConical },
   { to: "/population", label: "Population", icon: Users },
-  { to: "/rounds", label: "Rounds", icon: Trophy },
   { to: "/results", label: "Results", icon: BarChart3 },
   { to: "/setup", label: "Setup", icon: Settings },
   { to: "/guide", label: "Guide", icon: BookOpen },
@@ -48,7 +47,7 @@ function AuthedLayout() {
         <div className="mx-auto max-w-2xl px-4 py-3 flex items-center justify-between">
           <Link to="/home" className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">S</div>
-            <span className="font-semibold">SNOVA</span>
+            <span className="font-semibold">SNOVA Growth Tracker</span>
           </Link>
           <nav className="hidden sm:flex items-center gap-1 text-sm">
             {nav.map((n) => (

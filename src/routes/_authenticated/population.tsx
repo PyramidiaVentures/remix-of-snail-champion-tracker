@@ -13,9 +13,9 @@ export const Route = createFileRoute("/_authenticated/population")({
   component: PopulationPage,
   head: () => ({
     meta: [
-      { title: "Population — SNOVA Feed Tracker" },
+      { title: "Population — SNOVA Growth Tracker" },
       { name: "description", content: "Log deaths, escapes, removals and additions per pen, and reconcile the derived live count against the last weighing." },
-      { property: "og:title", content: "Population — SNOVA Feed Tracker" },
+      { property: "og:title", content: "Population — SNOVA Growth Tracker" },
       { property: "og:description", content: "Track every pen's population events and survival to date." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

@@ -48,7 +48,7 @@ function AuthPage() {
           <div className="h-14 w-14 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
             <Leaf className="h-7 w-7" />
           </div>
-          <h1 className="mt-3 text-2xl font-bold">SNOVA Feed Tracker</h1>
+          <h1 className="mt-3 text-2xl font-bold">SNOVA Growth Tracker</h1>
           <p className="text-sm text-muted-foreground">Snail feed palatability field study</p>
         </div>
         <form onSubmit={submit} className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
