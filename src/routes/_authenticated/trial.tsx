@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { readIncludeAcclimation, writeIncludeAcclimation } from "@/lib/acclimation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
@@ -471,7 +472,7 @@ function ActiveTrialPanel({
   onClose: () => void;
   closing: boolean;
 }) {
-  const [includeAcclimation, setIncludeAcclimation] = useState(false);
+  const [includeAcclimation, setIncludeAcclimation] = useState(readIncludeAcclimation);
   const day = Math.floor((Date.parse(today()) - Date.parse(trial.start_date)) / 86400000) + 1;
 
   const obs = useQuery({
@@ -529,7 +530,7 @@ function ActiveTrialPanel({
           <input
             type="checkbox"
             checked={includeAcclimation}
-            onChange={(e) => setIncludeAcclimation(e.target.checked)}
+            onChange={(e) => { setIncludeAcclimation(e.target.checked); writeIncludeAcclimation(e.target.checked); }}
             className="h-4 w-4"
           />
           <span>
