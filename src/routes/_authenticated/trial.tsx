@@ -21,7 +21,7 @@ type Trial = {
   notes: string | null;
 };
 type Feed = { id: string; name: string };
-type Pen = { id: string; label: string; age_group: string; snail_count: number; area_m2: number | null };
+type Pen = { id: string; label: string; snail_count: number; area_m2: number | null };
 type Treatment = { id: string; trial_id: string; feed_id: string; label: string };
 type Assignment = { id: string; trial_id: string; pen_id: string; treatment_id: string; start_date: string };
 
