@@ -10,10 +10,7 @@ export const Route = createFileRoute("/_authenticated/setup")({
 });
 
 type AgeGroup = "Juveniles" | "Growers" | "Adults";
-type FeedType = Database["public"]["Enums"]["feed_type"];
 type DmSource = Database["public"]["Enums"]["dm_source"];
-type FeedAvailability = Database["public"]["Enums"]["feed_availability"];
-type FeedStatus = Database["public"]["Enums"]["feed_status"];
 
 function SetupPage() {
   return (
