@@ -92,6 +92,16 @@ function TrialPage() {
     return m;
   }, [aList]);
 
+  const baselineByPen = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const b of biomass.data ?? []) {
+      if (m.has(b.pen_id)) continue; // rows ordered by date; first is baseline
+      if (!b.live_count || b.live_count <= 0) continue;
+      m.set(b.pen_id, Number(b.net_biomass_g) / b.live_count);
+    }
+    return m;
+  }, [biomass.data]);
+
   const unassigned = penList.filter((p) => !assignmentByPen.get(p.id)).length;
   const canStart = !activeTrial && !!setupTrial && tList.length >= 2 && penList.length > 0 && unassigned === 0;
 
