@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Moon, Sun, Trophy, BarChart3, Settings, BookOpen, Download, FlaskConical, Scale } from "lucide-react";
+import { Moon, Sun, Trophy, BarChart3, Settings, BookOpen, Download, FlaskConical, Scale, Users } from "lucide-react";
 import { today } from "@/lib/date";
 
 export const Route = createFileRoute("/_authenticated/home")({
@@ -55,6 +55,7 @@ function HomePage() {
         <BigTile to="/am" title="AM Check" subtitle="~9:00 AM" icon={<Sun className="h-6 w-6" />} tone="leaf" />
         <BigTile to="/weigh" title="Weigh Day" subtitle="Biomass & growth" icon={<Scale className="h-6 w-6" />} tone="card" />
         <BigTile to="/trial" title="Trial" subtitle="Design & status" icon={<FlaskConical className="h-6 w-6" />} tone="card" />
+        <BigTile to="/population" title="Population" subtitle="Deaths & survival" icon={<Users className="h-6 w-6" />} tone="card" />
         <BigTile to="/results" title="Results" subtitle="Leaderboard & charts" icon={<BarChart3 className="h-6 w-6" />} tone="card" />
         <BigTile to="/rounds" title="Rounds" subtitle="Start / close" icon={<Trophy className="h-6 w-6" />} tone="card" />
         <BigTile to="/setup" title="Setup" subtitle="Pens & feeds" icon={<Settings className="h-6 w-6" />} tone="card" />
