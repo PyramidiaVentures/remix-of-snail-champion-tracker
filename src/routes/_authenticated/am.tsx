@@ -333,7 +333,8 @@ function OptionRow<T extends string>({
 }
 
 function PenCard({
-  trialId, pen, feedId, date, obsRow, welfareRow, photoUrl, sessionTemp, sessionHumidity, onSaved,
+  trialId, pen, feedId, date, obsRow, welfareRow, photoUrl, sessionTemp, sessionHumidity,
+  penEvents, liveCountValue, onSaved,
 }: {
   trialId: string;
   pen: StepperPen;
@@ -344,6 +345,8 @@ function PenCard({
   photoUrl: string | null;
   sessionTemp: number | null;
   sessionHumidity: number | null;
+  penEvents: { id: string; event_type: PopulationEventType; count: number }[];
+  liveCountValue: number;
   onSaved: () => void;
 }) {
   const [refusalState, setRefusalState] = useState<SaveState>("idle");
