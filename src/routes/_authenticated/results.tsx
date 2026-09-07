@@ -8,7 +8,7 @@ import {
 } from "@/lib/metrics";
 import { readIncludeAcclimation } from "@/lib/acclimation";
 import {
-  BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend,
+  XAxis, YAxis, ResponsiveContainer, Tooltip, Legend,
   LineChart, Line, CartesianGrid,
 } from "recharts";
 
