@@ -12,9 +12,9 @@ export const Route = createFileRoute("/_authenticated/export")({
   component: ExportPage,
   head: () => ({
     meta: [
-      { title: "Data Export — SNOVA Feed Tracker" },
+      { title: "Data Export — SNOVA Growth Tracker" },
       { name: "description", content: "Download every trial table as CSV, including the computed interval summary used for analysis and costing." },
-      { property: "og:title", content: "Data Export — SNOVA Feed Tracker" },
+      { property: "og:title", content: "Data Export — SNOVA Growth Tracker" },
       { property: "og:description", content: "Download every trial table as CSV, including the computed interval summary." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

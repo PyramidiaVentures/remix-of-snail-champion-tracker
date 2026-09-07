@@ -6,9 +6,9 @@ export const Route = createFileRoute("/_authenticated/guide")({
   component: GuidePage,
   head: () => ({
     meta: [
-      { title: "Field Guide — SNOVA Feed Tracker" },
+      { title: "Field Guide — SNOVA Growth Tracker" },
       { name: "description", content: "The standing operating procedure for the snail feeding trial: evening feeding, morning check, weighing day, dish discard criteria and troubleshooting." },
-      { property: "og:title", content: "Field Guide — SNOVA Feed Tracker" },
+      { property: "og:title", content: "Field Guide — SNOVA Growth Tracker" },
       { property: "og:description", content: "Evening feeding, morning check, weighing day, discard criteria and troubleshooting." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

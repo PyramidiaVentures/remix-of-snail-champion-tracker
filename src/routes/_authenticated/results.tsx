@@ -13,9 +13,9 @@ export const Route = createFileRoute("/_authenticated/results")({
   component: ResultsPage,
   head: () => ({
     meta: [
-      { title: "Trial Results — SNOVA Feed Tracker" },
+      { title: "Trial Results — SNOVA Growth Tracker" },
       { name: "description", content: "Growth, survival and feed-offered figures for the active snail feeding trial, computed live from recorded weighings and feeding records." },
-      { property: "og:title", content: "Trial Results — SNOVA Feed Tracker" },
+      { property: "og:title", content: "Trial Results — SNOVA Growth Tracker" },
       { property: "og:description", content: "Growth, survival and feed-offered figures for the active snail feeding trial." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

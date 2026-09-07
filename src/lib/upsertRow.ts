@@ -64,8 +64,6 @@ export async function writeWithRetry(label: string, fn: () => PromiseLike<{ erro
 }
 
 export const OBSERVATIONS_TRIAL_KEY = "trial_id,pen_id,feed_id,obs_date";
-export const OBSERVATIONS_ROUND_KEY = "round_id,pen_id,feed_id,obs_date";
-export const EVAP_CONTROLS_KEY = "round_id,feed_id,obs_date";
 export const WELFARE_CHECKS_KEY = "trial_id,pen_id,obs_date";
 export const BIOMASS_EVENTS_KEY = "trial_id,pen_id,event_date";
 export const SESSION_PHOTOS_TRIAL_KEY = "trial_id,pen_id,obs_date";
