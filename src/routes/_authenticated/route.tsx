@@ -17,6 +17,7 @@ const nav = [
   { to: "/home", label: "Home", icon: Home },
   { to: "/pm", label: "PM Feed", icon: Moon },
   { to: "/am", label: "AM Check", icon: Sun },
+  { to: "/trial", label: "Trial", icon: FlaskConical },
   { to: "/rounds", label: "Rounds", icon: Trophy },
   { to: "/results", label: "Results", icon: BarChart3 },
   { to: "/setup", label: "Setup", icon: Settings },
