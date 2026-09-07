@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedWeighRouteImport } from './routes/_authenticated/weigh'
 import { Route as AuthenticatedTrialRouteImport } from './routes/_authenticated/trial'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
 import { Route as AuthenticatedRoundsRouteImport } from './routes/_authenticated/rounds'
@@ -35,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedWeighRoute = AuthenticatedWeighRouteImport.update({
+  id: '/weigh',
+  path: '/weigh',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedTrialRoute = AuthenticatedTrialRouteImport.update({
   id: '/trial',
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/rounds': typeof AuthenticatedRoundsRoute
   '/setup': typeof AuthenticatedSetupRoute
   '/trial': typeof AuthenticatedTrialRoute
+  '/weigh': typeof AuthenticatedWeighRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/rounds': typeof AuthenticatedRoundsRoute
   '/setup': typeof AuthenticatedSetupRoute
   '/trial': typeof AuthenticatedTrialRoute
+  '/weigh': typeof AuthenticatedWeighRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/_authenticated/rounds': typeof AuthenticatedRoundsRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
   '/_authenticated/trial': typeof AuthenticatedTrialRoute
+  '/_authenticated/weigh': typeof AuthenticatedWeighRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -137,6 +146,7 @@ export interface FileRouteTypes {
     | '/rounds'
     | '/setup'
     | '/trial'
+    | '/weigh'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/rounds'
     | '/setup'
     | '/trial'
+    | '/weigh'
   id:
     | '__root__'
     | '/'
@@ -164,6 +175,7 @@ export interface FileRouteTypes {
     | '/_authenticated/rounds'
     | '/_authenticated/setup'
     | '/_authenticated/trial'
+    | '/_authenticated/weigh'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -194,6 +206,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/weigh': {
+      id: '/_authenticated/weigh'
+      path: '/weigh'
+      fullPath: '/weigh'
+      preLoaderRoute: typeof AuthenticatedWeighRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/trial': {
       id: '/_authenticated/trial'
@@ -271,6 +290,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRoundsRoute: typeof AuthenticatedRoundsRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
   AuthenticatedTrialRoute: typeof AuthenticatedTrialRoute
+  AuthenticatedWeighRoute: typeof AuthenticatedWeighRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -283,6 +303,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedRoundsRoute: AuthenticatedRoundsRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,
   AuthenticatedTrialRoute: AuthenticatedTrialRoute,
+  AuthenticatedWeighRoute: AuthenticatedWeighRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
