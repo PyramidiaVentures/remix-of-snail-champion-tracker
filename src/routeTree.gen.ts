@@ -15,7 +15,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedWeighRouteImport } from './routes/_authenticated/weigh'
 import { Route as AuthenticatedTrialRouteImport } from './routes/_authenticated/trial'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
-import { Route as AuthenticatedRoundsRouteImport } from './routes/_authenticated/rounds'
 import { Route as AuthenticatedResultsRouteImport } from './routes/_authenticated/results'
 import { Route as AuthenticatedPopulationRouteImport } from './routes/_authenticated/population'
 import { Route as AuthenticatedPmRouteImport } from './routes/_authenticated/pm'
@@ -51,11 +50,6 @@ const AuthenticatedTrialRoute = AuthenticatedTrialRouteImport.update({
 const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
   id: '/setup',
   path: '/setup',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedRoundsRoute = AuthenticatedRoundsRouteImport.update({
-  id: '/rounds',
-  path: '/rounds',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedResultsRoute = AuthenticatedResultsRouteImport.update({
@@ -104,7 +98,6 @@ export interface FileRoutesByFullPath {
   '/pm': typeof AuthenticatedPmRoute
   '/population': typeof AuthenticatedPopulationRoute
   '/results': typeof AuthenticatedResultsRoute
-  '/rounds': typeof AuthenticatedRoundsRoute
   '/setup': typeof AuthenticatedSetupRoute
   '/trial': typeof AuthenticatedTrialRoute
   '/weigh': typeof AuthenticatedWeighRoute
@@ -119,7 +112,6 @@ export interface FileRoutesByTo {
   '/pm': typeof AuthenticatedPmRoute
   '/population': typeof AuthenticatedPopulationRoute
   '/results': typeof AuthenticatedResultsRoute
-  '/rounds': typeof AuthenticatedRoundsRoute
   '/setup': typeof AuthenticatedSetupRoute
   '/trial': typeof AuthenticatedTrialRoute
   '/weigh': typeof AuthenticatedWeighRoute
@@ -136,7 +128,6 @@ export interface FileRoutesById {
   '/_authenticated/pm': typeof AuthenticatedPmRoute
   '/_authenticated/population': typeof AuthenticatedPopulationRoute
   '/_authenticated/results': typeof AuthenticatedResultsRoute
-  '/_authenticated/rounds': typeof AuthenticatedRoundsRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
   '/_authenticated/trial': typeof AuthenticatedTrialRoute
   '/_authenticated/weigh': typeof AuthenticatedWeighRoute
@@ -153,7 +144,6 @@ export interface FileRouteTypes {
     | '/pm'
     | '/population'
     | '/results'
-    | '/rounds'
     | '/setup'
     | '/trial'
     | '/weigh'
@@ -168,7 +158,6 @@ export interface FileRouteTypes {
     | '/pm'
     | '/population'
     | '/results'
-    | '/rounds'
     | '/setup'
     | '/trial'
     | '/weigh'
@@ -184,7 +173,6 @@ export interface FileRouteTypes {
     | '/_authenticated/pm'
     | '/_authenticated/population'
     | '/_authenticated/results'
-    | '/_authenticated/rounds'
     | '/_authenticated/setup'
     | '/_authenticated/trial'
     | '/_authenticated/weigh'
@@ -238,13 +226,6 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof AuthenticatedSetupRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/rounds': {
-      id: '/_authenticated/rounds'
-      path: '/rounds'
-      fullPath: '/rounds'
-      preLoaderRoute: typeof AuthenticatedRoundsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/results': {
@@ -307,7 +288,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPmRoute: typeof AuthenticatedPmRoute
   AuthenticatedPopulationRoute: typeof AuthenticatedPopulationRoute
   AuthenticatedResultsRoute: typeof AuthenticatedResultsRoute
-  AuthenticatedRoundsRoute: typeof AuthenticatedRoundsRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
   AuthenticatedTrialRoute: typeof AuthenticatedTrialRoute
   AuthenticatedWeighRoute: typeof AuthenticatedWeighRoute
@@ -321,7 +301,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPmRoute: AuthenticatedPmRoute,
   AuthenticatedPopulationRoute: AuthenticatedPopulationRoute,
   AuthenticatedResultsRoute: AuthenticatedResultsRoute,
-  AuthenticatedRoundsRoute: AuthenticatedRoundsRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,
   AuthenticatedTrialRoute: AuthenticatedTrialRoute,
   AuthenticatedWeighRoute: AuthenticatedWeighRoute,
