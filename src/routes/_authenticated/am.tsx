@@ -96,7 +96,18 @@ function AmPage() {
 
   const pens = useQuery({
     queryKey: ["pens"],
-    queryFn: async () => (await supabase.from("pens").select("id,label").order("label")).data ?? [],
+    queryFn: async () => (await supabase.from("pens").select("id,label,initial_snail_count").order("label")).data ?? [],
+  });
+
+  const popEvents = useQuery({
+    queryKey: ["pop-events", trialId],
+    enabled: !!trialId,
+    queryFn: async () =>
+      (await supabase
+        .from("population_events")
+        .select("id,pen_id,event_date,event_type,count")
+        .eq("trial_id", trialId!)
+        .order("created_at")).data ?? [],
   });
 
   const assignments = useQuery({
