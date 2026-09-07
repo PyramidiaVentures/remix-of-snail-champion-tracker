@@ -8,7 +8,7 @@ import {
 } from "@/lib/metrics";
 import { readIncludeAcclimation } from "@/lib/acclimation";
 import {
-  BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend,
+  XAxis, YAxis, ResponsiveContainer, Tooltip, Legend,
   LineChart, Line, CartesianGrid,
 } from "recharts";
 
@@ -269,9 +269,20 @@ function ResultsPage() {
           }}
         />
       )}
-      {metrics && (
-        <Charts metrics={metrics} view={view} hiddenSeries={hiddenSeries} onToggleSeries={toggleSeries} />
+      {metrics && rangeStart && rangeEnd && (
+        <Charts
+          metrics={metrics}
+          view={view}
+          domain={[rangeStart, rangeEnd]}
+          observations={scopedObservations}
+          startDate={trial.data?.start_date ?? rangeStart}
+          acclimationDays={trial.data?.acclimation_days ?? 0}
+          includeAcclimation={includeAcclimation}
+          hiddenSeries={hiddenSeries}
+          onToggleSeries={toggleSeries}
+        />
       )}
+
       {metrics && <SummaryTable metrics={metrics} />}
     </div>
   );
@@ -279,7 +290,11 @@ function ResultsPage() {
 
 /* ---------- charts ---------- */
 
+const ms = (d: string) => Date.parse(`${d}T00:00:00`);
+
 interface Series { name: string; points: { x: string; y: number | null }[] }
+interface Span { from: string; to: string; y: number | null }
+interface SpanSeries { name: string; spans: Span[] }
 
 function seriesFor(
   metrics: TrialMetrics,
@@ -304,14 +319,64 @@ function seriesFor(
   });
 }
 
+/** Same averaging rule as seriesFor, but for values that cover a date span. */
+function spanSeriesFor(
+  metrics: TrialMetrics,
+  view: View,
+  pick: (pen: PenMetrics) => Span[],
+): SpanSeries[] {
+  if (view === "pen") {
+    return metrics.pens.map((p) => ({ name: p.label, spans: pick(p) }));
+  }
+  return metrics.treatments.map((t) => {
+    const perPen = t.pens.map(pick);
+    const keys = Array.from(new Set(perPen.flat().map((s) => `${s.from}|${s.to}`))).sort();
+    return {
+      name: t.label,
+      spans: keys.map((k) => {
+        const [from, to] = k.split("|") as [string, string];
+        const vals = perPen
+          .map((sp) => sp.find((s) => s.from === from && s.to === to)?.y)
+          .filter((v): v is number => v != null && Number.isFinite(v));
+        return { from, to, y: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null };
+      }),
+    };
+  });
+}
+
 interface ToggleProps { hiddenSeries: Set<string>; onToggleSeries: (name: string) => void }
+type Domain = [string, string];
+
+function ChartLegend({ hiddenSeries, onToggleSeries }: ToggleProps) {
+  return (
+    <Legend
+      wrapperStyle={{ fontSize: 11, cursor: "pointer" }}
+      onClick={(e) => onToggleSeries(String((e as { dataKey?: unknown }).dataKey ?? e.value))}
+      formatter={(value: string) => (
+        <span style={{ opacity: hiddenSeries.has(value) ? 0.4 : 1 }}>{value}</span>
+      )}
+    />
+  );
+}
+
+function timeAxisProps(domain: Domain, ticks: number[]) {
+  return {
+    dataKey: "x" as const,
+    type: "number" as const,
+    scale: "time" as const,
+    domain: [ms(domain[0]), ms(domain[1])] as [number, number],
+    ticks,
+    tickFormatter: (v: number) => fmtShort(new Date(v).toISOString().slice(0, 10)),
+    tick: { fontSize: 10 },
+  };
+}
 
 function LineChartCard({
-  title, note, series, unit, hiddenSeries, onToggleSeries,
-}: { title: string; note?: string; series: Series[]; unit?: string } & ToggleProps) {
+  title, note, series, unit, domain, hiddenSeries, onToggleSeries,
+}: { title: string; note?: string; series: Series[]; unit?: string; domain: Domain } & ToggleProps) {
   const xs = Array.from(new Set(series.flatMap((s) => s.points.map((p) => p.x)))).sort();
   const data = xs.map((x) => {
-    const row: Record<string, string | number | null> = { x };
+    const row: Record<string, number | null> = { x: ms(x) };
     for (const s of series) row[s.name] = s.points.find((p) => p.x === x)?.y ?? null;
     return row;
   });
@@ -326,16 +391,10 @@ function LineChartCard({
           <ResponsiveContainer>
             <LineChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="x" tick={{ fontSize: 10 }} />
+              <XAxis {...timeAxisProps(domain, xs.map(ms))} />
               <YAxis tick={{ fontSize: 10 }} unit={unit} />
-              <Tooltip />
-              <Legend
-                wrapperStyle={{ fontSize: 11, cursor: "pointer" }}
-                onClick={(e) => onToggleSeries(String((e as { dataKey?: unknown }).dataKey ?? e.value))}
-                formatter={(value: string) => (
-                  <span style={{ opacity: hiddenSeries.has(value) ? 0.4 : 1 }}>{value}</span>
-                )}
-              />
+              <Tooltip labelFormatter={(v) => fmtShort(new Date(Number(v)).toISOString().slice(0, 10))} />
+              <ChartLegend hiddenSeries={hiddenSeries} onToggleSeries={onToggleSeries} />
               {series.map((s, i) => (
                 <Line key={s.name} type="monotone" dataKey={s.name} stroke={COLORS[i % COLORS.length]}
                   hide={hiddenSeries.has(s.name)}
@@ -351,14 +410,87 @@ function LineChartCard({
   );
 }
 
-function Charts({
-  metrics, view, hiddenSeries, onToggleSeries,
-}: { metrics: TrialMetrics; view: View } & ToggleProps) {
-  const basisLabel = metrics.dmBasis ? "dry matter" : "fresh weight";
-  const toggles = { hiddenSeries, onToggleSeries };
+/**
+ * A metric measured over a period is drawn as a step held flat across the whole
+ * interval, from its start date to its end date. Intervals with no value leave
+ * a gap — nothing is plotted as zero.
+ */
+function IntervalChartCard({
+  title, note, series, unit, domain, hiddenSeries, onToggleSeries,
+}: { title: string; note?: string; series: SpanSeries[]; unit?: string; domain: Domain } & ToggleProps) {
+  const edges = Array.from(
+    new Set(series.flatMap((s) => s.spans.flatMap((sp) => [sp.from, sp.to]))),
+  ).sort();
 
-  const perInterval = seriesFor(metrics, view, (p) =>
-    p.intervals.map((i) => ({ x: i.to, y: i.offeredPerKgGain })));
+  const data = edges.map((x, idx) => {
+    const row: Record<string, number | null> = { x: ms(x) };
+    for (const s of series) {
+      const covering = s.spans.find((sp) => sp.from <= x && x < sp.to);
+      const ending = idx === edges.length - 1 ? s.spans.find((sp) => sp.to === x) : undefined;
+      row[s.name] = (covering ?? ending)?.y ?? null;
+    }
+    return row;
+  });
+  const hasData = data.some((row) => series.some((s) => row[s.name] != null));
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <h2 className="font-semibold">{title}</h2>
+      {note && <p className="text-xs text-muted-foreground mb-1">{note}</p>}
+      {hasData ? (
+        <div className="h-60">
+          <ResponsiveContainer>
+            <LineChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+              <XAxis {...timeAxisProps(domain, edges.map(ms))} />
+              <YAxis tick={{ fontSize: 10 }} unit={unit} />
+              <Tooltip labelFormatter={(v) => fmtShort(new Date(Number(v)).toISOString().slice(0, 10))} />
+              <ChartLegend hiddenSeries={hiddenSeries} onToggleSeries={onToggleSeries} />
+              {series.map((s, i) => (
+                <Line
+                  key={s.name}
+                  type="stepAfter"
+                  dataKey={s.name}
+                  stroke={COLORS[i % COLORS.length]}
+                  hide={hiddenSeries.has(s.name)}
+                  strokeWidth={3}
+                  dot={false}
+                  activeDot={{ r: 3 }}
+                  connectNulls={false}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <p className="py-6 text-center text-sm text-muted-foreground">Not enough recorded data yet.</p>
+      )}
+    </section>
+  );
+}
+
+function Charts({
+  metrics, view, domain, observations, startDate, acclimationDays, includeAcclimation,
+  hiddenSeries, onToggleSeries,
+}: {
+  metrics: TrialMetrics;
+  view: View;
+  domain: Domain;
+  observations: { pen_id: string; obs_date: string; offered_g: number | null; dish_action: string | null }[];
+  startDate: string;
+  acclimationDays: number;
+  includeAcclimation: boolean;
+} & ToggleProps) {
+  const basisLabel = metrics.dmBasis ? "dry matter" : "fresh weight";
+  const toggles = { hiddenSeries, onToggleSeries, domain };
+
+  const acclimationEnd = addDays(startDate, acclimationDays ?? 0);
+  const dateIncluded = (d: string) => includeAcclimation || d >= acclimationEnd;
+  const extrasFor = (pen: PenMetrics, iv: { from: string; to: string }) =>
+    intervalExtras(iv, observations.filter((o) => o.pen_id === pen.penId), dateIncluded);
+
+  const perInterval = spanSeriesFor(metrics, view, (p) =>
+    p.intervals.map((i) => ({ from: i.from, to: i.to, y: i.offeredPerKgGain })));
 
   const cumulativeConversion = seriesFor(metrics, view, (p) => {
     let offered = 0;
@@ -373,35 +505,29 @@ function Charts({
   const growth = seriesFor(metrics, view, (p) =>
     p.weightSeries.map((w) => ({ x: w.date, y: w.meanWeight })));
 
-  const sgr = seriesFor(metrics, view, (p) =>
-    p.intervals.map((i) => ({ x: i.to, y: i.sgr })));
+  const sgr = spanSeriesFor(metrics, view, (p) =>
+    p.intervals.map((i) => ({ from: i.from, to: i.to, y: i.sgr })));
 
-  const survival = seriesFor(metrics, view, (p) =>
-    p.intervals.map((i) => ({ x: i.to, y: i.survival })));
+  const survival = spanSeriesFor(metrics, view, (p) =>
+    p.intervals.map((i) => ({ from: i.from, to: i.to, y: i.survival })));
 
-  const feedingRate = seriesFor(metrics, view, (p) =>
-    p.intervals.map((i) => ({ x: i.to, y: i.feedingRate })));
+  const feedingRate = spanSeriesFor(metrics, view, (p) =>
+    p.intervals.map((i) => ({ from: i.from, to: i.to, y: i.feedingRate })));
+
+  const carryOver = spanSeriesFor(metrics, view, (p) =>
+    p.intervals.map((i) => ({ from: i.from, to: i.to, y: extrasFor(p, i).meanCarryOverDays })));
+
+  const spoilage = spanSeriesFor(metrics, view, (p) =>
+    p.intervals.map((i) => ({ from: i.from, to: i.to, y: extrasFor(p, i).spoilageRate })));
 
   const cumulativeOffered = seriesFor(metrics, view, (p) =>
     p.offeredSeries.map((o) => ({ x: o.date, y: o.cumulative })));
 
-  const dishData = metrics.treatments.map((t) => ({
-    treatment: t.label,
-    "Mean carry-over days": round(t.meanCarryOverDays),
-    "Longest carry-over run": round(t.maxCarryOverDays),
-    "Spoiled dishes (%)": round(t.spoilageRate),
-  }));
-  const bars: [string, string][] = [
-    ["Mean carry-over days", COLORS[0]!],
-    ["Longest carry-over run", COLORS[1]!],
-    ["Spoiled dishes (%)", COLORS[2]!],
-  ];
-
   return (
     <>
-      <LineChartCard
+      <IntervalChartCard
         title="Feed offered per kg gain — each weighing interval"
-        note={`kg of feed offered (${basisLabel}) for every kg of snail gained. Lower is better. Tap a name in the key to hide or show it.`}
+        note={`kg of feed offered (${basisLabel}) for every kg of snail gained, held flat across the interval it covers. Lower is better. Tap a name in the key to hide or show it.`}
         series={perInterval}
         {...toggles}
       />
@@ -418,23 +544,23 @@ function Charts({
         unit=" g"
         {...toggles}
       />
-      <LineChartCard
+      <IntervalChartCard
         title="Growth rate per day"
-        note="Specific growth rate, % per day, for each interval."
+        note="Specific growth rate, % per day, across each weighing interval."
         series={sgr}
         unit="%"
         {...toggles}
       />
-      <LineChartCard
+      <IntervalChartCard
         title="Survival"
-        note="Percentage of snails surviving each interval."
+        note="Percentage of snails surviving across each weighing interval."
         series={survival}
         unit="%"
         {...toggles}
       />
-      <LineChartCard
+      <IntervalChartCard
         title="Feeding rate"
-        note="Feed offered per day as a percentage of body weight."
+        note="Feed offered per day as a percentage of body weight, across each interval."
         series={feedingRate}
         unit="%"
         {...toggles}
@@ -446,36 +572,23 @@ function Charts({
         unit=" g"
         {...toggles}
       />
-
-      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <h2 className="font-semibold">Carry-over and spoilage by treatment</h2>
-        <p className="text-xs text-muted-foreground mb-1">
-          How long dishes are topped up before being emptied, and how often feed spoils.
-        </p>
-        <div className="h-60">
-          <ResponsiveContainer>
-            <BarChart data={dishData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="treatment" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip />
-              <Legend
-                wrapperStyle={{ fontSize: 11, cursor: "pointer" }}
-                onClick={(e) => onToggleSeries(String((e as { dataKey?: unknown }).dataKey ?? e.value))}
-                formatter={(value: string) => (
-                  <span style={{ opacity: hiddenSeries.has(value) ? 0.4 : 1 }}>{value}</span>
-                )}
-              />
-              {bars.map(([key, color]) => (
-                <Bar key={key} dataKey={key} fill={color} radius={[4, 4, 0, 0]} hide={hiddenSeries.has(key)} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
+      <IntervalChartCard
+        title="Carry-over per interval"
+        note="Mean number of days in a row a dish is topped up before being emptied."
+        series={carryOver}
+        {...toggles}
+      />
+      <IntervalChartCard
+        title="Spoilage per interval"
+        note="Percentage of dishes emptied because the feed had spoiled."
+        series={spoilage}
+        unit="%"
+        {...toggles}
+      />
     </>
   );
 }
+
 
 /* ---------- summary ---------- */
 
