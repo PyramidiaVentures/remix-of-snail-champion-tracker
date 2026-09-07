@@ -165,11 +165,15 @@ function PopulationPage() {
         </div>
       </section>
 
-      <Reconciliation
-        pens={trialPens}
-        events={allEvents}
-        biomass={biomass.data ?? []}
-      />
+      {trialId && (
+        <Reconciliation
+          trialId={trialId}
+          pens={trialPens}
+          events={allEvents}
+          biomass={biomass.data ?? []}
+          onSaved={refresh}
+        />
+      )}
     </div>
   );
 }
