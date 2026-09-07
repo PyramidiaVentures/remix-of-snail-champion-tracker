@@ -9,7 +9,6 @@ export const Route = createFileRoute("/_authenticated/setup")({
   component: SetupPage,
 });
 
-type AgeGroup = "Juveniles" | "Growers" | "Adults";
 type DmSource = Database["public"]["Enums"]["dm_source"];
 
 function SetupPage() {
