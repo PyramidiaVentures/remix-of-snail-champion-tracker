@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedTrialRouteImport } from './routes/_authenticated/trial'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
 import { Route as AuthenticatedRoundsRouteImport } from './routes/_authenticated/rounds'
 import { Route as AuthenticatedResultsRouteImport } from './routes/_authenticated/results'
@@ -34,6 +35,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedTrialRoute = AuthenticatedTrialRouteImport.update({
+  id: '/trial',
+  path: '/trial',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
   id: '/setup',
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/results': typeof AuthenticatedResultsRoute
   '/rounds': typeof AuthenticatedRoundsRoute
   '/setup': typeof AuthenticatedSetupRoute
+  '/trial': typeof AuthenticatedTrialRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/results': typeof AuthenticatedResultsRoute
   '/rounds': typeof AuthenticatedRoundsRoute
   '/setup': typeof AuthenticatedSetupRoute
+  '/trial': typeof AuthenticatedTrialRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/_authenticated/results': typeof AuthenticatedResultsRoute
   '/_authenticated/rounds': typeof AuthenticatedRoundsRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
+  '/_authenticated/trial': typeof AuthenticatedTrialRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/results'
     | '/rounds'
     | '/setup'
+    | '/trial'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/results'
     | '/rounds'
     | '/setup'
+    | '/trial'
   id:
     | '__root__'
     | '/'
@@ -152,6 +163,7 @@ export interface FileRouteTypes {
     | '/_authenticated/results'
     | '/_authenticated/rounds'
     | '/_authenticated/setup'
+    | '/_authenticated/trial'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -182,6 +194,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/trial': {
+      id: '/_authenticated/trial'
+      path: '/trial'
+      fullPath: '/trial'
+      preLoaderRoute: typeof AuthenticatedTrialRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/setup': {
       id: '/_authenticated/setup'
@@ -251,6 +270,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedResultsRoute: typeof AuthenticatedResultsRoute
   AuthenticatedRoundsRoute: typeof AuthenticatedRoundsRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
+  AuthenticatedTrialRoute: typeof AuthenticatedTrialRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -262,6 +282,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedResultsRoute: AuthenticatedResultsRoute,
   AuthenticatedRoundsRoute: AuthenticatedRoundsRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,
+  AuthenticatedTrialRoute: AuthenticatedTrialRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

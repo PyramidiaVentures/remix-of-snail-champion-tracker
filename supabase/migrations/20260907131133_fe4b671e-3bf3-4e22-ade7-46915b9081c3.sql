@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS trials_one_active_idx ON public.trials ((status)) WHERE status = 'active';
