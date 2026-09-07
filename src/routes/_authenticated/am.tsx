@@ -19,7 +19,6 @@ export const Route = createFileRoute("/_authenticated/am")({
 type RefusalScore = Database["public"]["Enums"]["refusal_score"];
 type SnailActivity = Database["public"]["Enums"]["snail_activity"];
 type HealthFlag = Database["public"]["Enums"]["health_flag"];
-type DishCondition = Database["public"]["Enums"]["dish_condition"];
 type SubstrateCondition = Database["public"]["Enums"]["substrate_condition"];
 type PopulationEventType = Database["public"]["Enums"]["population_event_type"];
 type WelfareRow = Database["public"]["Tables"]["welfare_checks"]["Row"];
@@ -44,11 +43,6 @@ const HEALTH_FLAGS: { value: HealthFlag; label: string }[] = [
   { value: "foul_smell", label: "Foul smell" },
   { value: "mould_in_dish", label: "Mould in dish" },
   { value: "visible_dead", label: "Visible dead" },
-];
-const DISH: { value: DishCondition; label: string }[] = [
-  { value: "clean", label: "Clean" },
-  { value: "soiled", label: "Soiled" },
-  { value: "mouldy", label: "Mouldy" },
 ];
 const SUBSTRATE: { value: SubstrateCondition; label: string }[] = [
   { value: "good", label: "Good" },
@@ -179,7 +173,6 @@ function AmPage() {
     if (!photoSaved(penId)) missing.push("AM photo");
     if (!obsFor(penId)?.refusal_score) missing.push("refusal score");
     if (!w?.activity) missing.push("activity");
-    if (!w?.dish_condition) missing.push("dish condition");
     if (!w?.substrate_condition) missing.push("substrate condition");
     return missing;
   };
@@ -364,7 +357,6 @@ function PenCard({
   const [refusal, setRefusal] = useState<RefusalScore | null>(obsRow?.refusal_score ?? null);
   const [activity, setActivity] = useState<SnailActivity | null>(welfareRow?.activity ?? null);
   const [flags, setFlags] = useState<HealthFlag[]>((welfareRow?.health_flags as HealthFlag[] | null) ?? []);
-  const [dish, setDish] = useState<DishCondition | null>(welfareRow?.dish_condition ?? null);
   const [substrate, setSubstrate] = useState<SubstrateCondition | null>(welfareRow?.substrate_condition ?? null);
 
   const saveRefusal = async (value: RefusalScore) => {
@@ -488,11 +480,6 @@ function PenCard({
             </button>
           ))}
         </div>
-      </div>
-
-      <div className="space-y-1">
-        <span className="text-sm font-medium">Dish condition</span>
-        <OptionRow options={DISH} value={dish} onPick={(v) => { setDish(v); void saveWelfare({ dish_condition: v }, setWelfareState); }} columns={2} />
       </div>
 
       <div className="space-y-1">
