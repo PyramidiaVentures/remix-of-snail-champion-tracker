@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { computeMetrics, carryOverRuns, daysBetween } from "@/lib/metrics";
+import { computeMetrics, daysBetween, intervalExtras } from "@/lib/metrics";
 import { liveCount } from "@/lib/liveCount";
 import { readIncludeAcclimation } from "@/lib/acclimation";
 import { today } from "@/lib/date";
