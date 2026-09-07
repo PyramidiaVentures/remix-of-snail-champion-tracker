@@ -14,6 +14,9 @@ import {
 
 export const Route = createFileRoute("/_authenticated/results")({
   component: ResultsPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    pen: typeof search['pen'] === "string" ? search['pen'] : "",
+  }),
   head: () => ({
     meta: [
       { title: "Trial Results — SNOVA Growth Tracker" },
