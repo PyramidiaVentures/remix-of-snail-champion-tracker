@@ -162,3 +162,23 @@ export async function uploadTrialPenPhoto(args: TrialPhotoArgs): Promise<string>
   }
   return url;
 }
+
+export interface WeighPhotoArgs {
+  trial_id: string;
+  pen_id: string;
+  event_date: string;
+  file: File;
+}
+
+/** Uploads a weigh-day scale photo and returns its permanent public URL.
+ *  Path: {trial_id}/{pen_id}/{event_date}-weigh.jpg
+ *  The URL is written to biomass_events.photo_url by the caller. */
+export async function uploadWeighPhoto(args: WeighPhotoArgs): Promise<string> {
+  const path = `${args.trial_id}/${args.pen_id}/${args.event_date}-weigh.jpg`;
+  const blob = await compressImage(args.file);
+  const { error } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .upload(path, blob, { contentType: "image/jpeg", upsert: true, cacheControl: "3600" });
+  if (error) throw error;
+  return publicPhotoUrl(path);
+}
