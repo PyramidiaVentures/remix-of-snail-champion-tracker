@@ -609,10 +609,16 @@ function DesignIntegrityPanel({
             ) : (
               <Ok>Every treatment has at least 3 pens.</Ok>
             )}
-            {imbalance.length > 0 ? (
-              <Warn>Age classes are unevenly spread across treatments — consider rebalancing.</Warn>
+            {!baselineReady ? (
+              <Ok>Baseline mean weight check pending — awaiting a first weighing for every assigned pen.</Ok>
+            ) : baselineOutliers.length > 0 ? (
+              <Warn>
+                Treatments did not start from comparable snail sizes. Growth comparison between arms is confounded by
+                starting weight. ({baselineOutliers.map((x) => `${x.t.label}: ${x.mean.toFixed(1)} g`).join("; ")} vs
+                trial mean {trialMean.toFixed(1)} g)
+              </Warn>
             ) : (
-              <Ok>Age classes are reasonably balanced across treatments.</Ok>
+              <Ok>Baseline mean weights are within 10% of the trial mean across treatments.</Ok>
             )}
           </>
         )}
