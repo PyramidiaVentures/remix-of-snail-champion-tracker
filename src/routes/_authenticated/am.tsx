@@ -8,6 +8,7 @@ import { NumberField } from "@/components/NumberField";
 import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { useUploads } from "@/lib/photoUploads.store";
+import { liveCount } from "@/lib/liveCount";
 import type { Database } from "@/integrations/supabase/types";
 import { BookOpen, AlertTriangle, CheckCircle2, Loader2, Save, Plus } from "lucide-react";
 
