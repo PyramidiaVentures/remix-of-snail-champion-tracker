@@ -202,9 +202,13 @@ function AmPage() {
       : undefined,
   );
 
-  // Session-level defaults, applied to each pen's welfare row and overridable per pen.
+  // One site reading per session, written to every pen's welfare row for the date.
+  const existingTemp = (welfare.data ?? []).find((w) => w.temp_c != null)?.temp_c ?? null;
+  const existingHumidity = (welfare.data ?? []).find((w) => w.humidity_pct != null)?.humidity_pct ?? null;
   const [sessionTemp, setSessionTemp] = useState<number | null>(null);
   const [sessionHumidity, setSessionHumidity] = useState<number | null>(null);
+  const temp = sessionTemp ?? existingTemp;
+  const humidity = sessionHumidity ?? existingHumidity;
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["trial-obs", trialId, date] });
