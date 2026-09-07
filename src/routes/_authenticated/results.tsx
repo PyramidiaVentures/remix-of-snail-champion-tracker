@@ -1,8 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
-import { computeMetrics, type PenMetrics, type TrialMetrics } from "@/lib/metrics";
+import {
+  computeMetrics, daysBetween, intervalExtras, meanOf, addDays,
+  type PenMetrics, type TrialMetrics,
+} from "@/lib/metrics";
 import { readIncludeAcclimation } from "@/lib/acclimation";
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend,
