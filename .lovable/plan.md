@@ -1,29 +1,40 @@
-# SNOVA Feed Tracker — Product Document (PDF)
+# SNOVA Feed Tracker — Product Specification Document (PDF)
 
-Produce a polished, downloadable PDF that describes everything the tool does, so it can be shared with collaborators, funders, or a new field assistant.
+Produce a downloadable PDF that describes the tool's full functionality, written and structured so that another AI (Claude) can ingest it and reason about the system accurately with no other context.
 
-## What the document will cover
+## Optimised for machine reading
 
-1. **Cover page** — product name, one-line purpose, date, owners (Peter: field entry; Simon: setup and decisions).
-2. **Overview** — what the experiment is, what the app solves (reliable daily records, no lost data, SOP built in).
-3. **Who uses it and how** — the two roles and their daily/weekly touchpoints.
-4. **Daily workflow** — the PM feeding session and the AM check, step by step, mirroring the in-app checklists word for word.
-5. **Screen-by-screen reference** — Home, PM Feeding, AM Check, Rounds, Results, Setup, Field Guide, Export: what each screen shows and what can be done there.
-6. **Photo evidence system** — one photo per pen plus one control-cage photo, per session, stored permanently with links included in the export.
-7. **How a feed wins** — plain-language explanation of leftover weighing, the snail-free evaporation control, intake, the day-1 acclimation exclusion, round scoring, champion promotion and the running champion value. A worked numeric example included.
-8. **Data captured** — a table of everything recorded (feeds, pens, rounds, daily observations, evaporation controls, session photos) in plain terms.
-9. **Export and data safety** — CSV export contents, cloud storage, sign-in requirement.
-10. **Troubleshooting and field rules** — mould, spillage, sealed snails, missed days, catching up on an earlier date.
-11. **Current limitations** — anything the app does not yet do (e.g. offline capture queue).
+- Strict, predictable hierarchy: numbered sections and subsections, one idea per paragraph, no marketing prose, no ambiguous pronouns.
+- Every entity, field, screen and rule named exactly as it exists in the system, with its type and allowed values.
+- Formulas written explicitly with named variables, plus a worked numeric example with the exact inputs and outputs.
+- Rules stated as declarative statements ("The system does X when Y"), not narrative.
+- Terminology table at the front so a reader binds each domain term once.
+- Selectable, extractable text (no text-as-image), simple single-column layout, plain tables — so PDF text extraction preserves reading order.
+- Short section IDs (e.g. `4.2`) so a reader can cite precisely.
+
+## Contents
+
+1. Document purpose, scope, and how to read it (audience: an AI assistant reasoning about the system).
+2. Glossary of domain terms.
+3. System overview: what the experiment is, what the app does, roles (Peter — field entry; Simon — round setup and decisions).
+4. Data model: each entity (feeds, pens, rounds, observations, evaporation controls, session photos) with fields, types, enumerated values, keys and relationships.
+5. Screen reference: Home, PM Feeding, AM Check, Rounds, Results, Setup, Field Guide, Export — purpose, inputs, outputs, and behaviour of each.
+6. Daily workflow: PM and AM checklist steps quoted verbatim from the app, plus date-linkage rules (AM completes the prior day's PM entry).
+7. Photo evidence model: one photo per pen plus one control-cage photo per session, storage path convention, permanent links, and how completeness is computed.
+8. Scoring and decision logic: fresh loss, evaporation fraction, intake (floored at zero), acclimation-day exclusion, per-pen champion ratio, round score, champion promotion, running champion value — with formulas and a worked example.
+9. Business rules and invariants, including the "never block saving" principle and independent save of numbers vs photos.
+10. Export format: CSV sections and columns, including photo link columns.
+11. Field troubleshooting rules (if X then Y), quoted from the Field Guide.
+12. Known limitations and non-goals.
 
 ## Style
 
-Clean, calm field-tool look matching the app: green/earth palette, generous spacing, US Letter, headings and tables, no decorative filler.
+Clean and utilitarian, matching the app's green/earth palette lightly (headings and rules only). US Letter, generous margins, high-contrast body text.
 
 ## Technical notes
 
-- Generated with a Python ReportLab script; a DejaVu Sans Unicode font registered so accents and symbols render correctly.
-- Wording for checklists and the guide pulled directly from the app source (`pm.tsx`, `am.tsx`, `guide.tsx`) so the document cannot drift from what the assistant sees on the phone.
-- Every page rendered to an image and visually inspected for overflow, clipping or layout faults before delivery.
-- Saved to `/mnt/documents/SNOVA-Feed-Tracker-Product-Document.pdf` and attached in chat.
+- Generated with a Python ReportLab script; DejaVu Sans registered as a Unicode font.
+- Content sourced directly from project files (`src/routes/_authenticated/*.tsx`, `src/lib/scoring.ts`, `src/lib/csv.ts`, `src/integrations/supabase/types.ts`) so the document matches the shipped behaviour.
+- Text-extraction check after generation (`pdftotext`) to confirm the reading order and formulas survive extraction, plus per-page visual inspection for clipping or overflow.
+- Saved to `/mnt/documents/SNOVA-Feed-Tracker-Spec.pdf` and attached in chat.
 - No application code or database changes.
