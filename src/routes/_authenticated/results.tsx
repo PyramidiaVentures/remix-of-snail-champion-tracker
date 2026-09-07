@@ -719,6 +719,7 @@ interface PenDetailProps {
 }
 
 const PEN_COLUMNS = [
+  { key: "pen", label: "Pen" },
   { key: "from", label: "Start" },
   { key: "to", label: "End" },
   { key: "days", label: "Days" },
@@ -741,66 +742,63 @@ function PenDetail({
   metrics, observations, biomass, startDate, acclimationDays, includeAcclimation,
   hiddenColumns, onToggleColumn,
 }: PenDetailProps) {
-  const navigate = useNavigate({ from: "/results" });
-  const { pen: penParam } = Route.useSearch();
   const [chooserOpen, setChooserOpen] = useState(false);
 
-  const pens = useMemo(
-    () => [...metrics.pens].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })),
-    [metrics.pens],
-  );
-  const selected = pens.find((p) => p.penId === penParam) ?? pens[0];
-
   const acclimationEnd = addDays(startDate, acclimationDays ?? 0);
-  const dateIncluded = (d: string) => includeAcclimation || d >= acclimationEnd;
 
-  const rows = useMemo(() => {
-    if (!selected) return [];
-    const penObs = observations.filter((o) => o.pen_id === selected.penId);
-    return selected.intervals.map((iv) => {
-      const extras = intervalExtras(iv, penObs, dateIncluded);
-      const usable = iv.gain_g != null && iv.gain_g > 0;
-      return {
-        iv,
-        extras,
-        liveStart:
-          biomass.find((b) => b.pen_id === selected.penId && b.event_date === iv.from)?.live_count ?? null,
-        perKgFresh: usable ? iv.offered_g / iv.gain_g! : null,
-        perKgDm: usable && iv.offeredDm_g != null ? iv.offeredDm_g / iv.gain_g! : null,
+  const penBlocks = useMemo(() => {
+    const dateIncluded = (d: string) => includeAcclimation || d >= acclimationEnd;
+    const sorted = [...metrics.pens].sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, { numeric: true }));
+    return sorted.map((pen) => {
+      const penObs = observations.filter((o) => o.pen_id === pen.penId);
+      const rows = [...pen.intervals]
+        .sort((a, b) => a.from.localeCompare(b.from))
+        .map((iv) => {
+          const extras = intervalExtras(iv, penObs, dateIncluded);
+          const usable = iv.gain_g != null && iv.gain_g > 0;
+          return {
+            iv,
+            extras,
+            liveStart:
+              biomass.find((b) => b.pen_id === pen.penId && b.event_date === iv.from)?.live_count ?? null,
+            perKgFresh: usable ? iv.offered_g / iv.gain_g! : null,
+            perKgDm: usable && iv.offeredDm_g != null ? iv.offeredDm_g / iv.gain_g! : null,
+          };
+        });
+      const first = rows[0];
+      const last = rows[rows.length - 1];
+      const totalGain = pen.totalGain_g;
+      const totals = {
+        days: rows.reduce((s, r) => s + daysBetween(r.iv.from, r.iv.to), 0),
+        liveStart: first?.liveStart ?? null,
+        liveEnd: last?.iv.survivingCount ?? null,
+        meanWeightStart: first && Number.isFinite(first.iv.meanWeight1) ? first.iv.meanWeight1 : null,
+        meanWeightEnd: last && Number.isFinite(last.iv.meanWeight2) ? last.iv.meanWeight2 : null,
+        gain: totalGain,
+        offered: pen.cumOffered_g,
+        perKgFresh: totalGain != null && totalGain > 0 ? pen.cumOffered_g / totalGain : null,
+        perKgDm:
+          totalGain != null && totalGain > 0 && pen.cumOfferedDm_g != null
+            ? pen.cumOfferedDm_g / totalGain
+            : null,
+        sgr: pen.meanSgr,
+        survival: pen.survival,
+        missing: rows.reduce((s, r) => s + r.extras.missingFeedingDays, 0),
+        maxCarry: pen.maxCarryOverDays,
+        spoilage: meanOf(rows.map((r) => r.extras.spoilageRate)),
       };
+      return { pen, rows, totals };
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, observations, biomass, includeAcclimation, acclimationEnd]);
-
-  if (!selected) return null;
-
-  const first = rows[0];
-  const last = rows[rows.length - 1];
-  const totalGain = selected.totalGain_g;
-  const totals = {
-    days: rows.reduce((s, r) => s + daysBetween(r.iv.from, r.iv.to), 0),
-    liveStart: first?.liveStart ?? null,
-    liveEnd: last?.iv.survivingCount ?? null,
-    meanWeightStart: first && Number.isFinite(first.iv.meanWeight1) ? first.iv.meanWeight1 : null,
-    meanWeightEnd: last && Number.isFinite(last.iv.meanWeight2) ? last.iv.meanWeight2 : null,
-    gain: totalGain,
-    offered: selected.cumOffered_g,
-    perKgFresh: totalGain != null && totalGain > 0 ? selected.cumOffered_g / totalGain : null,
-    perKgDm:
-      totalGain != null && totalGain > 0 && selected.cumOfferedDm_g != null
-        ? selected.cumOfferedDm_g / totalGain
-        : null,
-    sgr: selected.meanSgr,
-    survival: selected.survival,
-    missing: rows.reduce((s, r) => s + r.extras.missingFeedingDays, 0),
-    maxCarry: selected.maxCarryOverDays,
-    spoilage: meanOf(rows.map((r) => r.extras.spoilageRate)),
-  };
+  }, [metrics.pens, observations, biomass, includeAcclimation, acclimationEnd]);
 
   const visible = PEN_COLUMNS.filter((c) => !hiddenColumns.has(c.key));
 
-  const rowValue = (key: string, r: (typeof rows)[number]) => {
+  type Block = (typeof penBlocks)[number];
+
+  const rowValue = (key: string, label: string, r: Block["rows"][number]) => {
     switch (key) {
+      case "pen": return label;
       case "from": return r.iv.from;
       case "to": return r.iv.to;
       case "days": return daysBetween(r.iv.from, r.iv.to);
@@ -821,8 +819,9 @@ function PenDetail({
     }
   };
 
-  const totalValue = (key: string) => {
+  const totalValue = (key: string, label: string, totals: Block["totals"]) => {
     switch (key) {
+      case "pen": return label;
       case "from": return "Trial to date";
       case "to": return "";
       case "days": return totals.days;
@@ -847,25 +846,8 @@ function PenDetail({
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <h2 className="font-semibold">Pen detail</h2>
       <p className="text-xs text-muted-foreground mb-2">
-        One row for each weighing interval in the selected pen.
+        One row for each weighing interval, for every selected pen.
       </p>
-
-      <div className="mb-3 flex flex-wrap gap-2">
-        {pens.map((p) => (
-          <button
-            key={p.penId}
-            type="button"
-            onClick={() => navigate({ search: (prev) => ({ ...prev, pen: p.penId }), replace: true })}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
-              p.penId === selected.penId
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border"
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
 
       <div className="mb-3">
         <button
@@ -899,31 +881,30 @@ function PenDetail({
               {visible.map((c) => <th key={c.key} className="py-2 pr-3">{c.label}</th>)}
             </tr>
           </thead>
-          <tbody className="divide-y divide-border tabular-nums">
-            {rows.map((r) => (
-              <tr key={`${r.iv.from}-${r.iv.to}`}>
-                {visible.map((c) => (
-                  <td key={c.key} className="py-2 pr-3">{rowValue(c.key, r)}</td>
-                ))}
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={Math.max(visible.length, 1)} className="py-3 text-muted-foreground whitespace-normal">
-                  This pen needs at least two weighings before intervals can be shown.
-                </td>
-              </tr>
-            )}
-          </tbody>
-          {rows.length > 0 && visible.length > 0 && (
-            <tfoot>
-              <tr className="border-t-2 border-border font-medium tabular-nums">
-                {visible.map((c) => (
-                  <td key={c.key} className="py-2 pr-3">{totalValue(c.key)}</td>
-                ))}
-              </tr>
-            </tfoot>
-          )}
+          {penBlocks.map((b) => (
+            <tbody key={b.pen.penId} className="divide-y divide-border tabular-nums">
+              {b.rows.map((r) => (
+                <tr key={`${b.pen.penId}-${r.iv.from}-${r.iv.to}`}>
+                  {visible.map((c) => (
+                    <td key={c.key} className="py-2 pr-3">{rowValue(c.key, b.pen.label, r)}</td>
+                  ))}
+                </tr>
+              ))}
+              {b.rows.length === 0 ? (
+                <tr>
+                  <td colSpan={Math.max(visible.length, 1)} className="py-3 text-muted-foreground whitespace-normal">
+                    {b.pen.label}: at least two weighings are needed before intervals can be shown.
+                  </td>
+                </tr>
+              ) : (
+                <tr className="border-t-2 border-border bg-muted/40 font-medium">
+                  {visible.map((c) => (
+                    <td key={c.key} className="py-2 pr-3">{totalValue(c.key, b.pen.label, b.totals)}</td>
+                  ))}
+                </tr>
+              )}
+            </tbody>
+          ))}
         </table>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
@@ -932,3 +913,4 @@ function PenDetail({
     </section>
   );
 }
+
