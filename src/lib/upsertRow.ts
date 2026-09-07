@@ -40,7 +40,7 @@ export async function upsertRow(
  * Same conflict-safe pattern for tables without a natural key
  * (insert / update / delete by id): one automatic retry, real error logged.
  */
-export async function writeWithRetry(label: string, fn: () => Promise<{ error: unknown }>): Promise<void> {
+export async function writeWithRetry(label: string, fn: () => PromiseLike<{ error: unknown }>): Promise<void> {
   const attempt = async () => {
     const { error } = await fn();
     if (error) throw error;
