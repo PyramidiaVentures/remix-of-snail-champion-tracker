@@ -36,6 +36,33 @@ export async function upsertRow(
   }
 }
 
+/**
+ * Same conflict-safe pattern for tables without a natural key
+ * (insert / update / delete by id): one automatic retry, real error logged.
+ */
+export async function writeWithRetry(label: string, fn: () => Promise<{ error: unknown }>): Promise<void> {
+  const attempt = async () => {
+    const { error } = await fn();
+    if (error) throw error;
+  };
+  try {
+    await attempt();
+  } catch (first) {
+    await new Promise((r) => setTimeout(r, 400));
+    try {
+      await attempt();
+    } catch (second) {
+      const err = second ?? first;
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message: unknown }).message)
+          : String(err);
+      console.error(`[save failed] ${label}`, message, { error: err });
+      throw new Error(message);
+    }
+  }
+}
+
 export const OBSERVATIONS_TRIAL_KEY = "trial_id,pen_id,feed_id,obs_date";
 export const OBSERVATIONS_ROUND_KEY = "round_id,pen_id,feed_id,obs_date";
 export const EVAP_CONTROLS_KEY = "round_id,feed_id,obs_date";

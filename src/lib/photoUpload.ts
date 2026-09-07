@@ -163,6 +163,25 @@ export async function uploadTrialPenPhoto(args: TrialPhotoArgs): Promise<string>
   return url;
 }
 
+export interface PopulationPhotoArgs {
+  trial_id: string;
+  pen_id: string;
+  event_date: string;
+  file: File;
+}
+
+/** Uploads a population-event photo and returns its permanent public URL.
+ *  Path: {trial_id}/{pen_id}/{event_date}-pop-{timestamp}.jpg */
+export async function uploadPopulationPhoto(args: PopulationPhotoArgs): Promise<string> {
+  const path = `${args.trial_id}/${args.pen_id}/${args.event_date}-pop-${Date.now()}.jpg`;
+  const blob = await compressImage(args.file);
+  const { error } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .upload(path, blob, { contentType: "image/jpeg", upsert: true, cacheControl: "3600" });
+  if (error) throw error;
+  return publicPhotoUrl(path);
+}
+
 export interface WeighPhotoArgs {
   trial_id: string;
   pen_id: string;
