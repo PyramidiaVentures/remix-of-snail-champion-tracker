@@ -94,7 +94,7 @@ export function daysBetween(a: string, b: string): number {
   return Math.round((Date.parse(b) - Date.parse(a)) / DAY);
 }
 
-function addDays(date: string, n: number): string {
+export function addDays(date: string, n: number): string {
   const d = new Date(Date.parse(date) + n * DAY);
   return d.toISOString().slice(0, 10);
 }
