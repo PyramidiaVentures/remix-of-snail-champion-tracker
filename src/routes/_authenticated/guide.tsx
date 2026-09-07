@@ -4,78 +4,133 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/guide")({
   component: GuidePage,
+  head: () => ({
+    meta: [
+      { title: "Field Guide — SNOVA Feed Tracker" },
+      { name: "description", content: "The standing operating procedure for the snail feeding trial: evening feeding, morning check, weighing day, dish discard criteria and troubleshooting." },
+      { property: "og:title", content: "Field Guide — SNOVA Feed Tracker" },
+      { property: "og:description", content: "Evening feeding, morning check, weighing day, discard criteria and troubleshooting." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
 });
+
+const List = ({ items, ordered }: { items: string[]; ordered?: boolean }) => {
+  const Tag = ordered ? "ol" : "ul";
+  return (
+    <Tag className={`${ordered ? "list-decimal" : "list-disc"} pl-5 space-y-1`}>
+      {items.map((t) => <li key={t}>{t}</li>)}
+    </Tag>
+  );
+};
 
 const SECTIONS: { title: string; body: React.ReactNode }[] = [
   {
-    title: "Golden rules (never break these)",
+    title: "PM checklist (feeding)",
     body: (
-      <ul className="list-disc pl-5 space-y-1">
-        <li>Always leave leftovers in every dish — never let a feed be eaten to zero.</li>
-        <li>Control feed gets identical treatment to test feed (same feed, same cut time, same portion, same dish, same location, same weigh times) — only difference: no snails.</li>
-        <li>Weigh everything to 0.1 g on the same scale; record on the spot, never from memory.</li>
-        <li>Same feeding time and same check time every day (keep the ~16 h window constant).</li>
-        <li>Same-day cut leaves only; never fed after overnight storage.</li>
-        <li>Rotate each feed's dish position in the pen every day.</li>
-        <li>Calcium and water always present in separate dishes; never weighed, never varied.</li>
-      </ul>
+      <List
+        ordered
+        items={[
+          "Cut/collect every feed fresh today — no overnight leaves (bran/dry goods exempt).",
+          "Check each dish against the discard criteria. If the remaining feed is sound, top up. If it fails any criterion, empty and clean the dish first.",
+          "Weigh the portion for each pen and enter grams offered.",
+          "Record the dish action: topped up, emptied and refilled, or emptied because spoiled.",
+          "Place feed in each pen, rotating the dish position from yesterday.",
+          "Top up calcium and water dishes (never weighed, always present).",
+          "Upload one PM photo per pen, dish and paper tag in frame.",
+        ]}
+      />
     ),
   },
   {
-    title: "Equipment",
+    title: "AM checklist (check)",
     body: (
-      <p>0.1 g digital scale + spare batteries; identical numbered feed dishes; a snail-free control cage that sits inside or beside a pen so its climate matches; paper tags + marker; the app on a phone; cloth for cleaning dishes.</p>
+      <List
+        ordered
+        items={[
+          "Upload the AM photos (one per pen) — dish untouched, tag in frame.",
+          "Record the refusal score for each pen by eye. Do not weigh.",
+          "Record snail activity and any signs of sickness.",
+          "Record temperature and humidity.",
+          "Log any deaths, escapes or removals.",
+          "Empty and clean any dish whose remaining feed fails the discard criteria.",
+        ]}
+      />
     ),
   },
   {
-    title: "PM routine (feeding)",
+    title: "Weighing checklist",
     body: (
-      <ol className="list-decimal pl-5 space-y-1">
-        <li>Cut/collect every feed fresh today — no overnight leaves (bran/dry goods exempt).</li>
-        <li>Weigh a generous portion of each feed — enough that there WILL be leftovers tomorrow.</li>
-        <li>Enter grams given for each pen × feed.</li>
-        <li>Weigh a matching-size control portion of each feed; enter control given.</li>
-        <li>Place feed in each pen, rotating each feed's position from yesterday.</li>
-        <li>Put control portions in the snail-free control cage beside the pens.</li>
-        <li>Top up calcium and water dishes (never weighed, always present).</li>
-        <li>Take the PM photo with the paper tag (feed + pen + date) in frame.</li>
-      </ol>
+      <List
+        ordered
+        items={[
+          "Place the empty container on the scale and zero it, so the scale reads only the snails.",
+          "Count every live snail in the pen and enter the count.",
+          "Weigh all the snails together and enter the weight the scale shows.",
+          "Photograph the scale display with the pen tag in frame.",
+          "Return the snails to the pen and confirm the count matches.",
+          "Log any snail found dead during handling as a mortality event.",
+        ]}
+      />
     ),
   },
   {
-    title: "AM routine (check)",
+    title: "Dish discard criteria",
     body: (
-      <ol className="list-decimal pl-5 space-y-1">
-        <li>Take the AM photo first — leftovers untouched, tag in frame.</li>
-        <li>Weigh leftover of each pen × feed; enter it.</li>
-        <li>Weigh leftover of each control; enter it.</li>
-        <li>Remove and bin ALL old feed; wipe dishes clean.</li>
-      </ol>
+      <div className="space-y-2">
+        <p>
+          Empty and clean the dish if ANY of these is true, otherwise the feed may be carried over and topped up.
+          There is NO time limit; judge the feed, not the clock:
+        </p>
+        <List
+          ordered
+          items={[
+            "Visible mould or fungal growth of any extent.",
+            "Sour, fermented or foul smell.",
+            "Slimy or sticky texture on the feed itself, as distinct from snail mucus.",
+            "Leaves fully dried, brittle or blackened.",
+            "Compounded or pelleted feed that has gone soft, swollen, clumped or pasty.",
+            "Soil, faeces or substrate mixed into the dish.",
+            "Any dead snail found in the dish.",
+          ]}
+        />
+      </div>
     ),
   },
   {
-    title: "Round close (Simon)",
-    body: <p>Review the 3 days → drop day 1 (acclimation) → check the ranking → promote the winner to champion → load the 2 new challengers → relabel dishes.</p>,
-  },
-  {
-    title: "Troubleshooting (if X, do Y)",
+    title: "Golden rules",
     body: (
-      <ul className="list-disc pl-5 space-y-1">
-        <li>Feed eaten to zero → increase its portion next feeding; note it (measurement was capped).</li>
-        <li>Snail dies or is missing → remove it from the pen.</li>
-        <li>Missed a feeding or check → log the gap; never backfill numbers from memory.</li>
-        <li>Leaves wilted before feeding → discard, cut fresh.</li>
-        <li>Spill/contamination in a dish → void that dish for the day in notes.</li>
-      </ul>
+      <List
+        items={[
+          "All weights are recorded to 0.1 g on the same scale, on the spot, never from memory.",
+          "Feeding time and check time are held constant so the interval stays about 16 hours.",
+          "Each feed's dish position within a pen is rotated daily.",
+          "Calcium and water are always present in separate dishes, never weighed, never varied.",
+          "Weighing is done at the same time of day, before the evening feeding.",
+          "Every biomass entry requires a photograph of the scale display.",
+          "Live count is never edited directly — it changes only by logging a population event.",
+          "Nothing blocks data entry. Missing data, missing photos and missed days all produce advisories, never hard stops.",
+        ]}
+      />
     ),
   },
   {
-    title: "Roles",
+    title: "Troubleshooting",
     body: (
-      <ul className="list-disc pl-5 space-y-1">
-        <li><strong>Peter</strong> — feeding, weighing, photos, observations, entry.</li>
-        <li><strong>Simon</strong> — round setup, ranking, decisions.</li>
-      </ul>
+      <List
+        items={[
+          "Feed finished completely, several days running → increase the portion and note it. The snails may have been feed-limited and growth understated.",
+          "Most of the feed left, several days running → reduce the portion. Over-portioning inflates the conversion figure without affecting growth.",
+          "A snail dies or is missing → log a population event the same day. Never adjust a count silently.",
+          "Missed a feeding or a check → log the gap. Never backfill numbers from memory.",
+          "Leaves wilted before feeding → discard and cut fresh.",
+          "Unsure whether feed has spoiled → discard it. A wasted portion costs a few shillings; feed that sours in the dish can suppress intake across the whole pen.",
+          "Weighing count does not match the ledger → re-count. If the count is confirmed, log the difference as a mortality or escape with cause \"unknown\".",
+          "Mean weight jumped or dropped implausibly → re-check the count, the scale zero and the entry before accepting it.",
+          "Snails escaped during weighing → log an escape; return recovered snails as an addition.",
+        ]}
+      />
     ),
   },
 ];
@@ -88,7 +143,11 @@ function GuidePage() {
         <p className="text-sm text-muted-foreground">Read-only reference. Tap a section to expand.</p>
       </header>
       <div className="space-y-2">
-        {SECTIONS.map((s) => <Collapsible key={s.title} title={s.title} defaultOpen={s.title === "Golden rules (never break these)"}>{s.body}</Collapsible>)}
+        {SECTIONS.map((s) => (
+          <Collapsible key={s.title} title={s.title} defaultOpen={s.title === "PM checklist (feeding)"}>
+            {s.body}
+          </Collapsible>
+        ))}
       </div>
     </div>
   );
