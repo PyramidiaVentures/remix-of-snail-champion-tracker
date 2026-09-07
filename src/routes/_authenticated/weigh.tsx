@@ -6,6 +6,7 @@ import { upsertRow, BIOMASS_EVENTS_KEY } from "@/lib/upsertRow";
 import { uploadWeighPhoto } from "@/lib/photoUpload";
 import { runUpload, useUploads } from "@/lib/photoUploads.store";
 import { today } from "@/lib/date";
+import { liveCount, hasAddition } from "@/lib/liveCount";
 import { Checklist } from "@/components/Checklist";
 import { NumberField } from "@/components/NumberField";
 import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
@@ -103,17 +104,14 @@ function WeighPage() {
       .sort((a, b) => a.event_date.localeCompare(b.event_date))
       .at(-1) ?? null;
 
-  /** Ledger count: stocked snails, adjusted by population events up to the date. */
+  /** Ledger count: derived live count for the pen on the selected date. */
   const ledgerFor = (penId: string) => {
-    const base = (pens.data ?? []).find((p) => p.id === penId)?.snail_count ?? 0;
-    let count = base;
-    let hadAddition = false;
-    for (const e of popEvents.data ?? []) {
-      if (e.pen_id !== penId || e.event_date > date) continue;
-      if (e.event_type === "addition") { count += e.count; hadAddition = true; }
-      else count -= e.count;
-    }
-    return { count, hadAddition };
+    const pen = (pens.data ?? []).find((p) => p.id === penId);
+    const events = popEvents.data ?? [];
+    return {
+      count: liveCount(pen, events, date),
+      hadAddition: hasAddition(penId, events, date),
+    };
   };
 
   const uploadedUrl = (penId: string) => uploads.get(weighPhotoKey(trialId ?? "", penId, date))?.url ?? null;
