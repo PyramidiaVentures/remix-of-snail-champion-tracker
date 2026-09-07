@@ -1,8 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
-import { computeMetrics, type PenMetrics, type TrialMetrics } from "@/lib/metrics";
+import {
+  computeMetrics, daysBetween, intervalExtras, meanOf, addDays,
+  type PenMetrics, type TrialMetrics,
+} from "@/lib/metrics";
 import { readIncludeAcclimation } from "@/lib/acclimation";
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend,
@@ -11,6 +14,9 @@ import {
 
 export const Route = createFileRoute("/_authenticated/results")({
   component: ResultsPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    pen: typeof search['pen'] === "string" ? search['pen'] : "",
+  }),
   head: () => ({
     meta: [
       { title: "Trial Results — SNOVA Growth Tracker" },
@@ -143,6 +149,16 @@ function ResultsPage() {
 
       {metrics && <Charts metrics={metrics} view={view} />}
       {metrics && <SummaryTable metrics={metrics} />}
+      {metrics && trial.data && (
+        <PenDetail
+          metrics={metrics}
+          observations={observations.data ?? []}
+          biomass={biomass.data ?? []}
+          startDate={trial.data.start_date}
+          acclimationDays={trial.data.acclimation_days}
+          includeAcclimation={includeAcclimation}
+        />
+      )}
     </div>
   );
 }
@@ -358,6 +374,171 @@ function SummaryTable({ metrics }: { metrics: TrialMetrics }) {
               <tr><td colSpan={6} className="py-3 text-muted-foreground">No treatments yet.</td></tr>
             )}
           </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        A figure shows as “—” when it cannot be calculated: no gain, a missing weighing, or a pen with no snails.
+      </p>
+    </section>
+  );
+}
+
+/* ---------- pen detail ---------- */
+
+interface PenDetailProps {
+  metrics: TrialMetrics;
+  observations: { pen_id: string; obs_date: string; offered_g: number | null; dish_action: string | null }[];
+  biomass: { pen_id: string; event_date: string; live_count: number }[];
+  startDate: string;
+  acclimationDays: number;
+  includeAcclimation: boolean;
+}
+
+function PenDetail({
+  metrics, observations, biomass, startDate, acclimationDays, includeAcclimation,
+}: PenDetailProps) {
+  const navigate = useNavigate({ from: "/results" });
+  const { pen: penParam } = Route.useSearch();
+
+  const pens = useMemo(
+    () => [...metrics.pens].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })),
+    [metrics.pens],
+  );
+  const selected = pens.find((p) => p.penId === penParam) ?? pens[0];
+
+  const acclimationEnd = addDays(startDate, acclimationDays ?? 0);
+  const dateIncluded = (d: string) => includeAcclimation || d >= acclimationEnd;
+
+  const rows = useMemo(() => {
+    if (!selected) return [];
+    const penObs = observations.filter((o) => o.pen_id === selected.penId);
+    return selected.intervals.map((iv) => {
+      const extras = intervalExtras(iv, penObs, dateIncluded);
+      const usable = iv.gain_g != null && iv.gain_g > 0;
+      return {
+        iv,
+        extras,
+        liveStart:
+          biomass.find((b) => b.pen_id === selected.penId && b.event_date === iv.from)?.live_count ?? null,
+        perKgFresh: usable ? iv.offered_g / iv.gain_g! : null,
+        perKgDm: usable && iv.offeredDm_g != null ? iv.offeredDm_g / iv.gain_g! : null,
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, observations, biomass, includeAcclimation, acclimationEnd]);
+
+  if (!selected) return null;
+
+  const first = rows[0];
+  const last = rows[rows.length - 1];
+  const totalGain = selected.totalGain_g;
+  const totals = {
+    days: rows.reduce((s, r) => s + daysBetween(r.iv.from, r.iv.to), 0),
+    liveStart: first?.liveStart ?? null,
+    liveEnd: last?.iv.survivingCount ?? null,
+    meanWeightStart: first && Number.isFinite(first.iv.meanWeight1) ? first.iv.meanWeight1 : null,
+    meanWeightEnd: last && Number.isFinite(last.iv.meanWeight2) ? last.iv.meanWeight2 : null,
+    gain: totalGain,
+    offered: selected.cumOffered_g,
+    perKgFresh: totalGain != null && totalGain > 0 ? selected.cumOffered_g / totalGain : null,
+    perKgDm:
+      totalGain != null && totalGain > 0 && selected.cumOfferedDm_g != null
+        ? selected.cumOfferedDm_g / totalGain
+        : null,
+    sgr: selected.meanSgr,
+    survival: selected.survival,
+    missing: rows.reduce((s, r) => s + r.extras.missingFeedingDays, 0),
+    maxCarry: selected.maxCarryOverDays,
+    spoilage: meanOf(rows.map((r) => r.extras.spoilageRate)),
+  };
+
+  const headers = [
+    "Start", "End", "Days", "Live start", "Live end", "Mean wt start (g)", "Mean wt end (g)",
+    "Gain (g)", "Feed offered (g)", "Feed / kg gain", "Feed / kg gain (DM)", "SGR (%/day)",
+    "Survival (%)", "Missing feeding days", "Max carry-over days", "Spoilage (%)",
+  ];
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <h2 className="font-semibold">Pen detail</h2>
+      <p className="text-xs text-muted-foreground mb-2">
+        One row for each weighing interval in the selected pen.
+      </p>
+
+      <div className="mb-3 flex flex-wrap gap-2">
+        {pens.map((p) => (
+          <button
+            key={p.penId}
+            type="button"
+            onClick={() => navigate({ search: { pen: p.penId }, replace: true })}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+              p.penId === selected.penId
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm whitespace-nowrap">
+          <thead>
+            <tr className="text-left text-xs uppercase text-muted-foreground">
+              {headers.map((h) => <th key={h} className="py-2 pr-3">{h}</th>)}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border tabular-nums">
+            {rows.map((r) => (
+              <tr key={`${r.iv.from}-${r.iv.to}`}>
+                <td className="py-2 pr-3">{r.iv.from}</td>
+                <td className="py-2 pr-3">{r.iv.to}</td>
+                <td className="py-2 pr-3">{daysBetween(r.iv.from, r.iv.to)}</td>
+                <td className="py-2 pr-3">{r.liveStart ?? "—"}</td>
+                <td className="py-2 pr-3">{r.iv.survivingCount}</td>
+                <td className="py-2 pr-3">{cell(Number.isFinite(r.iv.meanWeight1) ? r.iv.meanWeight1 : null)}</td>
+                <td className="py-2 pr-3">{cell(Number.isFinite(r.iv.meanWeight2) ? r.iv.meanWeight2 : null)}</td>
+                <td className="py-2 pr-3">{cell(r.iv.gain_g, 1)}</td>
+                <td className="py-2 pr-3">{cell(r.iv.offered_g, 0)}</td>
+                <td className="py-2 pr-3">{cell(r.perKgFresh)}</td>
+                <td className="py-2 pr-3">{cell(r.perKgDm)}</td>
+                <td className="py-2 pr-3">{cell(r.iv.sgr)}</td>
+                <td className="py-2 pr-3">{cell(r.iv.survival, 1)}</td>
+                <td className="py-2 pr-3">{r.extras.missingFeedingDays}</td>
+                <td className="py-2 pr-3">{cell(r.extras.maxCarryOverDays, 0)}</td>
+                <td className="py-2 pr-3">{cell(r.extras.spoilageRate, 1)}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={headers.length} className="py-3 text-muted-foreground whitespace-normal">
+                  This pen needs at least two weighings before intervals can be shown.
+                </td>
+              </tr>
+            )}
+          </tbody>
+          {rows.length > 0 && (
+            <tfoot>
+              <tr className="border-t-2 border-border font-medium tabular-nums">
+                <td className="py-2 pr-3" colSpan={2}>Trial to date</td>
+                <td className="py-2 pr-3">{totals.days}</td>
+                <td className="py-2 pr-3">{totals.liveStart ?? "—"}</td>
+                <td className="py-2 pr-3">{totals.liveEnd ?? "—"}</td>
+                <td className="py-2 pr-3">{cell(totals.meanWeightStart)}</td>
+                <td className="py-2 pr-3">{cell(totals.meanWeightEnd)}</td>
+                <td className="py-2 pr-3">{cell(totals.gain, 1)}</td>
+                <td className="py-2 pr-3">{cell(totals.offered, 0)}</td>
+                <td className="py-2 pr-3">{cell(totals.perKgFresh)}</td>
+                <td className="py-2 pr-3">{cell(totals.perKgDm)}</td>
+                <td className="py-2 pr-3">{cell(totals.sgr)}</td>
+                <td className="py-2 pr-3">{cell(totals.survival, 1)}</td>
+                <td className="py-2 pr-3">{totals.missing}</td>
+                <td className="py-2 pr-3">{cell(totals.maxCarry, 0)}</td>
+                <td className="py-2 pr-3">{cell(totals.spoilage, 1)}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
