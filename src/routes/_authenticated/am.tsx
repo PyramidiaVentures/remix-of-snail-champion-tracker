@@ -209,7 +209,18 @@ function AmPage() {
     void qc.invalidateQueries({ queryKey: ["trial-obs", trialId, date] });
     void qc.invalidateQueries({ queryKey: ["welfare", trialId, date] });
     void qc.invalidateQueries({ queryKey: ["trial-photos", trialId, date] });
+    void qc.invalidateQueries({ queryKey: ["pop-events", trialId] });
   };
+
+  const eventsForPenDate = (penId: string) =>
+    (popEvents.data ?? []).filter((e) => e.pen_id === penId && e.event_date === date);
+
+  const liveCountFor = (penId: string) =>
+    liveCount(
+      (pens.data ?? []).find((p) => p.id === penId),
+      popEvents.data ?? [],
+      date,
+    );
 
   return (
     <div className="space-y-4">
