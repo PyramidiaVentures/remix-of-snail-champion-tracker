@@ -16,6 +16,10 @@ export const Route = createFileRoute("/_authenticated/results")({
   component: ResultsPage,
   validateSearch: (search: Record<string, unknown>) => ({
     pen: typeof search['pen'] === "string" ? search['pen'] : "",
+    from: typeof search['from'] === "string" ? search['from'] : "",
+    to: typeof search['to'] === "string" ? search['to'] : "",
+    hide: typeof search['hide'] === "string" ? search['hide'] : "",
+    hs: typeof search['hs'] === "string" ? search['hs'] : "",
   }),
   head: () => ({
     meta: [
@@ -36,10 +40,26 @@ const COLORS = [
 
 type View = "treatment" | "pen";
 
+function fmtShort(d: string) {
+  const dt = new Date(`${d}T00:00:00`);
+  return Number.isNaN(dt.getTime())
+    ? d
+    : dt.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+function listToSet(v: string) {
+  return new Set(v.split(",").map((s) => s.trim()).filter(Boolean));
+}
+
 function ResultsPage() {
   const [view, setView] = useState<View>("treatment");
   const [dryMatter, setDryMatter] = useState(false);
   const includeAcclimation = readIncludeAcclimation();
+
+  const navigate = useNavigate({ from: "/results" });
+  const search = Route.useSearch();
+  const hiddenColumns = useMemo(() => listToSet(search.hide), [search.hide]);
+  const hiddenSeries = useMemo(() => listToSet(search.hs), [search.hs]);
 
   const trial = useQuery({
     queryKey: ["active-trial"],
@@ -67,8 +87,40 @@ function ResultsPage() {
     queryFn: async () => (await supabase.from("biomass_events").select("pen_id,event_date,net_biomass_g,live_count").eq("trial_id", trialId!)).data ?? [],
   });
 
+  // Weighing dates kept by the range filter. Because a range is contiguous,
+  // keeping only the weighings inside it means every interval that survives has
+  // BOTH of its weighing dates inside the range.
+  const weighDates = useMemo(
+    () => Array.from(new Set((biomass.data ?? []).map((b) => b.event_date))).sort(),
+    [biomass.data],
+  );
+  const keptDates = useMemo(
+    () => weighDates.filter((d) => (!search.from || d >= search.from) && (!search.to || d <= search.to)),
+    [weighDates, search.from, search.to],
+  );
+  const selectedIntervals = useMemo(
+    () => keptDates.slice(1).map((to, i) => ({ from: keptDates[i]!, to })),
+    [keptDates],
+  );
+  const rangeStart = keptDates[0];
+  const rangeEnd = keptDates[keptDates.length - 1];
+
+  // Feed offered is only ever summed across the same days the intervals cover.
+  const scopedBiomass = useMemo(
+    () => (biomass.data ?? []).filter((b) => keptDates.includes(b.event_date)),
+    [biomass.data, keptDates],
+  );
+  const scopedObservations = useMemo(
+    () =>
+      rangeStart && rangeEnd
+        ? (observations.data ?? []).filter((o) => o.obs_date > rangeStart && o.obs_date <= rangeEnd)
+        : [],
+    [observations.data, rangeStart, rangeEnd],
+  );
+
   const metrics: TrialMetrics | null = useMemo(() => {
     if (!trial.data || !pens.data || !feeds.data || !treatments.data || !assignments.data || !observations.data || !biomass.data) return null;
+    if (selectedIntervals.length === 0) return null;
     const assignedPens = pens.data.filter((p) => assignments.data!.some((a) => a.pen_id === p.id));
     return computeMetrics({
       trial: { id: trial.data.id, start_date: trial.data.start_date, acclimation_days: trial.data.acclimation_days },
@@ -76,12 +128,12 @@ function ResultsPage() {
       feeds: feeds.data,
       treatments: treatments.data,
       assignments: assignments.data,
-      observations: observations.data,
-      biomass: biomass.data,
+      observations: scopedObservations,
+      biomass: scopedBiomass,
       includeAcclimation,
       dryMatter,
     });
-  }, [trial.data, pens.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, includeAcclimation, dryMatter]);
+  }, [trial.data, pens.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, scopedObservations, scopedBiomass, selectedIntervals.length, includeAcclimation, dryMatter]);
 
   if (!trial.isLoading && !trial.data) {
     return (
@@ -95,6 +147,13 @@ function ResultsPage() {
   }
 
   const basis = metrics?.dmBasis ? "dry matter" : "fresh";
+  const setSearch = (patch: Partial<typeof search>) =>
+    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+  const toggleSeries = (name: string) => {
+    const next = new Set(hiddenSeries);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    setSearch({ hs: Array.from(next).join(",") });
+  };
 
   return (
     <div className="space-y-4">
@@ -107,6 +166,53 @@ function ResultsPage() {
       </header>
 
       <section className="rounded-2xl border border-border bg-card p-3 shadow-sm space-y-3">
+        <div className="flex items-end gap-2">
+          <label className="flex-1 text-xs text-muted-foreground">
+            From
+            <input
+              type="date"
+              value={search.from}
+              min={weighDates[0] ?? undefined}
+              max={weighDates[weighDates.length - 1] ?? undefined}
+              onChange={(e) => setSearch({ from: e.target.value })}
+              className="mt-1 block w-full rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground"
+            />
+          </label>
+          <label className="flex-1 text-xs text-muted-foreground">
+            To
+            <input
+              type="date"
+              value={search.to}
+              min={weighDates[0] ?? undefined}
+              max={weighDates[weighDates.length - 1] ?? undefined}
+              onChange={(e) => setSearch({ to: e.target.value })}
+              className="mt-1 block w-full rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground"
+            />
+          </label>
+        </div>
+
+        <p className="text-sm">
+          {selectedIntervals.length === 0 ? (
+            <span className="text-destructive">
+              No complete weighing interval in this range. Widen the dates.
+            </span>
+          ) : (
+            <span className="text-muted-foreground">
+              Showing {selectedIntervals.length}{" "}
+              {selectedIntervals.length === 1 ? "interval" : "intervals"}:{" "}
+              {selectedIntervals.map((i) => `${fmtShort(i.from)} – ${fmtShort(i.to)}`).join(", ")}.
+            </span>
+          )}
+        </p>
+
+        <button
+          type="button"
+          onClick={() => navigate({ search: { pen: search.pen, from: "", to: "", hide: "", hs: "" }, replace: true })}
+          className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium"
+        >
+          Reset view
+        </button>
+
         <div className="flex gap-2">
           {(["treatment", "pen"] as View[]).map((v) => (
             <button
@@ -147,18 +253,26 @@ function ResultsPage() {
         </p>
       </section>
 
-      {metrics && <Charts metrics={metrics} view={view} />}
-      {metrics && <SummaryTable metrics={metrics} />}
       {metrics && trial.data && (
         <PenDetail
           metrics={metrics}
-          observations={observations.data ?? []}
-          biomass={biomass.data ?? []}
+          observations={scopedObservations}
+          biomass={scopedBiomass}
           startDate={trial.data.start_date}
           acclimationDays={trial.data.acclimation_days}
           includeAcclimation={includeAcclimation}
+          hiddenColumns={hiddenColumns}
+          onToggleColumn={(key) => {
+            const next = new Set(hiddenColumns);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            setSearch({ hide: Array.from(next).join(",") });
+          }}
         />
       )}
+      {metrics && (
+        <Charts metrics={metrics} view={view} hiddenSeries={hiddenSeries} onToggleSeries={toggleSeries} />
+      )}
+      {metrics && <SummaryTable metrics={metrics} />}
     </div>
   );
 }
@@ -190,7 +304,11 @@ function seriesFor(
   });
 }
 
-function LineChartCard({ title, note, series, unit }: { title: string; note?: string; series: Series[]; unit?: string }) {
+interface ToggleProps { hiddenSeries: Set<string>; onToggleSeries: (name: string) => void }
+
+function LineChartCard({
+  title, note, series, unit, hiddenSeries, onToggleSeries,
+}: { title: string; note?: string; series: Series[]; unit?: string } & ToggleProps) {
   const xs = Array.from(new Set(series.flatMap((s) => s.points.map((p) => p.x)))).sort();
   const data = xs.map((x) => {
     const row: Record<string, string | number | null> = { x };
@@ -211,9 +329,16 @@ function LineChartCard({ title, note, series, unit }: { title: string; note?: st
               <XAxis dataKey="x" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} unit={unit} />
               <Tooltip />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Legend
+                wrapperStyle={{ fontSize: 11, cursor: "pointer" }}
+                onClick={(e) => onToggleSeries(String((e as { dataKey?: unknown }).dataKey ?? e.value))}
+                formatter={(value: string) => (
+                  <span style={{ opacity: hiddenSeries.has(value) ? 0.4 : 1 }}>{value}</span>
+                )}
+              />
               {series.map((s, i) => (
                 <Line key={s.name} type="monotone" dataKey={s.name} stroke={COLORS[i % COLORS.length]}
+                  hide={hiddenSeries.has(s.name)}
                   strokeWidth={2} dot={{ r: 3 }} connectNulls />
               ))}
             </LineChart>
@@ -226,8 +351,11 @@ function LineChartCard({ title, note, series, unit }: { title: string; note?: st
   );
 }
 
-function Charts({ metrics, view }: { metrics: TrialMetrics; view: View }) {
+function Charts({
+  metrics, view, hiddenSeries, onToggleSeries,
+}: { metrics: TrialMetrics; view: View } & ToggleProps) {
   const basisLabel = metrics.dmBasis ? "dry matter" : "fresh weight";
+  const toggles = { hiddenSeries, onToggleSeries };
 
   const perInterval = seriesFor(metrics, view, (p) =>
     p.intervals.map((i) => ({ x: i.to, y: i.offeredPerKgGain })));
@@ -263,48 +391,60 @@ function Charts({ metrics, view }: { metrics: TrialMetrics; view: View }) {
     "Longest carry-over run": round(t.maxCarryOverDays),
     "Spoiled dishes (%)": round(t.spoilageRate),
   }));
+  const bars: [string, string][] = [
+    ["Mean carry-over days", COLORS[0]!],
+    ["Longest carry-over run", COLORS[1]!],
+    ["Spoiled dishes (%)", COLORS[2]!],
+  ];
 
   return (
     <>
       <LineChartCard
         title="Feed offered per kg gain — each weighing interval"
-        note={`kg of feed offered (${basisLabel}) for every kg of snail gained. Lower is better.`}
+        note={`kg of feed offered (${basisLabel}) for every kg of snail gained. Lower is better. Tap a name in the key to hide or show it.`}
         series={perInterval}
+        {...toggles}
       />
       <LineChartCard
         title="Feed offered per kg gain — cumulative"
-        note={`Running total since the first weighing (${basisLabel}).`}
+        note={`Running total since the first weighing in range (${basisLabel}).`}
         series={cumulativeConversion}
+        {...toggles}
       />
       <LineChartCard
         title="Mean weight per snail"
         note="Grams per snail at each weighing."
         series={growth}
         unit=" g"
+        {...toggles}
       />
       <LineChartCard
         title="Growth rate per day"
         note="Specific growth rate, % per day, for each interval."
         series={sgr}
         unit="%"
+        {...toggles}
       />
       <LineChartCard
         title="Survival"
         note="Percentage of snails surviving each interval."
         series={survival}
         unit="%"
+        {...toggles}
       />
       <LineChartCard
         title="Feeding rate"
         note="Feed offered per day as a percentage of body weight."
         series={feedingRate}
         unit="%"
+        {...toggles}
       />
       <LineChartCard
         title="Cumulative feed offered"
-        note="Grams of feed offered since the trial began."
+        note="Grams of feed offered across the selected intervals."
         series={cumulativeOffered}
         unit=" g"
+        {...toggles}
       />
 
       <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
@@ -319,10 +459,16 @@ function Charts({ metrics, view }: { metrics: TrialMetrics; view: View }) {
               <XAxis dataKey="treatment" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="Mean carry-over days" fill={COLORS[0]} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Longest carry-over run" fill={COLORS[1]} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Spoiled dishes (%)" fill={COLORS[2]} radius={[4, 4, 0, 0]} />
+              <Legend
+                wrapperStyle={{ fontSize: 11, cursor: "pointer" }}
+                onClick={(e) => onToggleSeries(String((e as { dataKey?: unknown }).dataKey ?? e.value))}
+                formatter={(value: string) => (
+                  <span style={{ opacity: hiddenSeries.has(value) ? 0.4 : 1 }}>{value}</span>
+                )}
+              />
+              {bars.map(([key, color]) => (
+                <Bar key={key} dataKey={key} fill={color} radius={[4, 4, 0, 0]} hide={hiddenSeries.has(key)} />
+              ))}
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -392,13 +538,36 @@ interface PenDetailProps {
   startDate: string;
   acclimationDays: number;
   includeAcclimation: boolean;
+  hiddenColumns: Set<string>;
+  onToggleColumn: (key: string) => void;
 }
+
+const PEN_COLUMNS = [
+  { key: "from", label: "Start" },
+  { key: "to", label: "End" },
+  { key: "days", label: "Days" },
+  { key: "liveStart", label: "Live start" },
+  { key: "liveEnd", label: "Live end" },
+  { key: "mwStart", label: "Mean wt start (g)" },
+  { key: "mwEnd", label: "Mean wt end (g)" },
+  { key: "gain", label: "Gain (g)" },
+  { key: "offered", label: "Feed offered (g)" },
+  { key: "perKgFresh", label: "Feed / kg gain" },
+  { key: "perKgDm", label: "Feed / kg gain (DM)" },
+  { key: "sgr", label: "SGR (%/day)" },
+  { key: "survival", label: "Survival (%)" },
+  { key: "missing", label: "Missing feeding days" },
+  { key: "maxCarry", label: "Max carry-over days" },
+  { key: "spoilage", label: "Spoilage (%)" },
+] as const;
 
 function PenDetail({
   metrics, observations, biomass, startDate, acclimationDays, includeAcclimation,
+  hiddenColumns, onToggleColumn,
 }: PenDetailProps) {
   const navigate = useNavigate({ from: "/results" });
   const { pen: penParam } = Route.useSearch();
+  const [chooserOpen, setChooserOpen] = useState(false);
 
   const pens = useMemo(
     () => [...metrics.pens].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })),
@@ -452,11 +621,51 @@ function PenDetail({
     spoilage: meanOf(rows.map((r) => r.extras.spoilageRate)),
   };
 
-  const headers = [
-    "Start", "End", "Days", "Live start", "Live end", "Mean wt start (g)", "Mean wt end (g)",
-    "Gain (g)", "Feed offered (g)", "Feed / kg gain", "Feed / kg gain (DM)", "SGR (%/day)",
-    "Survival (%)", "Missing feeding days", "Max carry-over days", "Spoilage (%)",
-  ];
+  const visible = PEN_COLUMNS.filter((c) => !hiddenColumns.has(c.key));
+
+  const rowValue = (key: string, r: (typeof rows)[number]) => {
+    switch (key) {
+      case "from": return r.iv.from;
+      case "to": return r.iv.to;
+      case "days": return daysBetween(r.iv.from, r.iv.to);
+      case "liveStart": return r.liveStart ?? "—";
+      case "liveEnd": return r.iv.survivingCount;
+      case "mwStart": return cell(Number.isFinite(r.iv.meanWeight1) ? r.iv.meanWeight1 : null);
+      case "mwEnd": return cell(Number.isFinite(r.iv.meanWeight2) ? r.iv.meanWeight2 : null);
+      case "gain": return cell(r.iv.gain_g, 1);
+      case "offered": return cell(r.iv.offered_g, 0);
+      case "perKgFresh": return cell(r.perKgFresh);
+      case "perKgDm": return cell(r.perKgDm);
+      case "sgr": return cell(r.iv.sgr);
+      case "survival": return cell(r.iv.survival, 1);
+      case "missing": return r.extras.missingFeedingDays;
+      case "maxCarry": return cell(r.extras.maxCarryOverDays, 0);
+      case "spoilage": return cell(r.extras.spoilageRate, 1);
+      default: return "";
+    }
+  };
+
+  const totalValue = (key: string) => {
+    switch (key) {
+      case "from": return "Trial to date";
+      case "to": return "";
+      case "days": return totals.days;
+      case "liveStart": return totals.liveStart ?? "—";
+      case "liveEnd": return totals.liveEnd ?? "—";
+      case "mwStart": return cell(totals.meanWeightStart);
+      case "mwEnd": return cell(totals.meanWeightEnd);
+      case "gain": return cell(totals.gain, 1);
+      case "offered": return cell(totals.offered, 0);
+      case "perKgFresh": return cell(totals.perKgFresh);
+      case "perKgDm": return cell(totals.perKgDm);
+      case "sgr": return cell(totals.sgr);
+      case "survival": return cell(totals.survival, 1);
+      case "missing": return totals.missing;
+      case "maxCarry": return cell(totals.maxCarry, 0);
+      case "spoilage": return cell(totals.spoilage, 1);
+      default: return "";
+    }
+  };
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
@@ -470,7 +679,7 @@ function PenDetail({
           <button
             key={p.penId}
             type="button"
-            onClick={() => navigate({ search: { pen: p.penId }, replace: true })}
+            onClick={() => navigate({ search: (prev) => ({ ...prev, pen: p.penId }), replace: true })}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
               p.penId === selected.penId
                 ? "border-primary bg-primary/10 text-primary"
@@ -482,60 +691,60 @@ function PenDetail({
         ))}
       </div>
 
+      <div className="mb-3">
+        <button
+          type="button"
+          onClick={() => setChooserOpen((o) => !o)}
+          className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium"
+        >
+          {chooserOpen ? "Hide columns list" : `Choose columns (${visible.length}/${PEN_COLUMNS.length})`}
+        </button>
+        {chooserOpen && (
+          <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg border border-border p-3">
+            {PEN_COLUMNS.map((c) => (
+              <label key={c.key} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={!hiddenColumns.has(c.key)}
+                  onChange={() => onToggleColumn(c.key)}
+                />
+                <span>{c.label}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm whitespace-nowrap">
           <thead>
             <tr className="text-left text-xs uppercase text-muted-foreground">
-              {headers.map((h) => <th key={h} className="py-2 pr-3">{h}</th>)}
+              {visible.map((c) => <th key={c.key} className="py-2 pr-3">{c.label}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-border tabular-nums">
             {rows.map((r) => (
               <tr key={`${r.iv.from}-${r.iv.to}`}>
-                <td className="py-2 pr-3">{r.iv.from}</td>
-                <td className="py-2 pr-3">{r.iv.to}</td>
-                <td className="py-2 pr-3">{daysBetween(r.iv.from, r.iv.to)}</td>
-                <td className="py-2 pr-3">{r.liveStart ?? "—"}</td>
-                <td className="py-2 pr-3">{r.iv.survivingCount}</td>
-                <td className="py-2 pr-3">{cell(Number.isFinite(r.iv.meanWeight1) ? r.iv.meanWeight1 : null)}</td>
-                <td className="py-2 pr-3">{cell(Number.isFinite(r.iv.meanWeight2) ? r.iv.meanWeight2 : null)}</td>
-                <td className="py-2 pr-3">{cell(r.iv.gain_g, 1)}</td>
-                <td className="py-2 pr-3">{cell(r.iv.offered_g, 0)}</td>
-                <td className="py-2 pr-3">{cell(r.perKgFresh)}</td>
-                <td className="py-2 pr-3">{cell(r.perKgDm)}</td>
-                <td className="py-2 pr-3">{cell(r.iv.sgr)}</td>
-                <td className="py-2 pr-3">{cell(r.iv.survival, 1)}</td>
-                <td className="py-2 pr-3">{r.extras.missingFeedingDays}</td>
-                <td className="py-2 pr-3">{cell(r.extras.maxCarryOverDays, 0)}</td>
-                <td className="py-2 pr-3">{cell(r.extras.spoilageRate, 1)}</td>
+                {visible.map((c) => (
+                  <td key={c.key} className="py-2 pr-3">{rowValue(c.key, r)}</td>
+                ))}
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={headers.length} className="py-3 text-muted-foreground whitespace-normal">
+                <td colSpan={Math.max(visible.length, 1)} className="py-3 text-muted-foreground whitespace-normal">
                   This pen needs at least two weighings before intervals can be shown.
                 </td>
               </tr>
             )}
           </tbody>
-          {rows.length > 0 && (
+          {rows.length > 0 && visible.length > 0 && (
             <tfoot>
               <tr className="border-t-2 border-border font-medium tabular-nums">
-                <td className="py-2 pr-3" colSpan={2}>Trial to date</td>
-                <td className="py-2 pr-3">{totals.days}</td>
-                <td className="py-2 pr-3">{totals.liveStart ?? "—"}</td>
-                <td className="py-2 pr-3">{totals.liveEnd ?? "—"}</td>
-                <td className="py-2 pr-3">{cell(totals.meanWeightStart)}</td>
-                <td className="py-2 pr-3">{cell(totals.meanWeightEnd)}</td>
-                <td className="py-2 pr-3">{cell(totals.gain, 1)}</td>
-                <td className="py-2 pr-3">{cell(totals.offered, 0)}</td>
-                <td className="py-2 pr-3">{cell(totals.perKgFresh)}</td>
-                <td className="py-2 pr-3">{cell(totals.perKgDm)}</td>
-                <td className="py-2 pr-3">{cell(totals.sgr)}</td>
-                <td className="py-2 pr-3">{cell(totals.survival, 1)}</td>
-                <td className="py-2 pr-3">{totals.missing}</td>
-                <td className="py-2 pr-3">{cell(totals.maxCarry, 0)}</td>
-                <td className="py-2 pr-3">{cell(totals.spoilage, 1)}</td>
+                {visible.map((c) => (
+                  <td key={c.key} className="py-2 pr-3">{totalValue(c.key)}</td>
+                ))}
               </tr>
             </tfoot>
           )}
