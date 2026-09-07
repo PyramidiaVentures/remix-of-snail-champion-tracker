@@ -377,19 +377,19 @@ function PenCard({
     if (!Number.isFinite(count) || count <= 0) return;
     setEventState("saving");
     try {
-      const { error } = await supabase.from("population_events").insert({
-        trial_id: trialId,
-        pen_id: pen.id,
-        event_date: date,
-        event_type: eventType,
-        count,
-      } as never);
-      if (error) throw error;
+      await writeWithRetry("population_events", () =>
+        supabase.from("population_events").insert({
+          trial_id: trialId,
+          pen_id: pen.id,
+          event_date: date,
+          event_type: eventType,
+          count,
+        } as never),
+      );
       setEventState("saved");
       setEventCount("1");
       onSaved();
-    } catch (err) {
-      console.error("[save failed] population_events", err);
+    } catch {
       setEventState("failed");
     }
   };
