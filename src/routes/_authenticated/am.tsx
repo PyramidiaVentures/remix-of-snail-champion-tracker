@@ -217,6 +217,13 @@ function AmPage() {
     void qc.invalidateQueries({ queryKey: ["pop-events", trialId] });
   };
 
+  /** Rewrite the session reading on every welfare row already saved for this date. */
+  const applySessionValue = async (patch: Record<string, number | null>) => {
+    if (!trialId) return;
+    await supabase.from("welfare_checks").update(patch).eq("trial_id", trialId).eq("obs_date", date);
+    refresh();
+  };
+
   const eventsForPenDate = (penId: string) =>
     (popEvents.data ?? []).filter((e) => e.pen_id === penId && e.event_date === date);
 
@@ -267,17 +274,27 @@ function AmPage() {
         <>
           <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
             <h2 className="font-semibold">Conditions for this session</h2>
-            <p className="text-xs text-muted-foreground">Applied to every pen you record. Any pen can be overridden on its own card.</p>
+            <p className="text-xs text-muted-foreground">One reading for the whole site. Applied to every pen recorded on this date, including pens already saved.</p>
             <div className="grid grid-cols-2 gap-3">
               <NumberField
                 label="Temperature" suffix="°C"
-                defaultValue=""
-                onBlur={(e) => setSessionTemp(e.currentTarget.value === "" ? null : Number(e.currentTarget.value))}
+                key={`sess-temp-${date}`}
+                defaultValue={temp ?? ""}
+                onBlur={(e) => {
+                  const v = e.currentTarget.value === "" ? null : Number(e.currentTarget.value);
+                  setSessionTemp(v);
+                  void applySessionValue({ temp_c: v });
+                }}
               />
               <NumberField
                 label="Humidity" suffix="%"
-                defaultValue=""
-                onBlur={(e) => setSessionHumidity(e.currentTarget.value === "" ? null : Number(e.currentTarget.value))}
+                key={`sess-hum-${date}`}
+                defaultValue={humidity ?? ""}
+                onBlur={(e) => {
+                  const v = e.currentTarget.value === "" ? null : Number(e.currentTarget.value);
+                  setSessionHumidity(v);
+                  void applySessionValue({ humidity_pct: v });
+                }}
               />
             </div>
           </section>
@@ -297,8 +314,8 @@ function AmPage() {
                 obsRow={obsFor(pen.id)}
                 welfareRow={welfareFor(pen.id)}
                 photoUrl={photoUrlFor(pen.id)}
-                sessionTemp={sessionTemp}
-                sessionHumidity={sessionHumidity}
+                sessionTemp={temp}
+                sessionHumidity={humidity}
                 penEvents={eventsForPenDate(pen.id)}
                 liveCountValue={liveCountFor(pen.id)}
                 onSaved={refresh}
@@ -384,7 +401,14 @@ function PenCard({
     try {
       await upsertRow(
         "welfare_checks",
-        { trial_id: trialId, pen_id: pen.id, obs_date: date, ...patch },
+        {
+          trial_id: trialId,
+          pen_id: pen.id,
+          obs_date: date,
+          temp_c: sessionTemp,
+          humidity_pct: sessionHumidity,
+          ...patch,
+        },
         WELFARE_CHECKS_KEY,
       );
       setState("saved");
@@ -489,27 +513,6 @@ function PenCard({
       <div className="space-y-1">
         <span className="text-sm font-medium">Substrate condition</span>
         <OptionRow options={SUBSTRATE} value={substrate} onPick={(v) => { setSubstrate(v); void saveWelfare({ substrate_condition: v }, setWelfareState); }} columns={2} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <NumberField
-          label="Temperature" suffix="°C"
-          key={`${pen.id}-${date}-temp`}
-          defaultValue={welfareRow?.temp_c ?? (sessionTemp ?? "")}
-          onBlur={(e) => {
-            const v = e.currentTarget.value;
-            if (v !== "") void saveWelfare({ temp_c: Number(v) }, setWelfareState);
-          }}
-        />
-        <NumberField
-          label="Humidity" suffix="%"
-          key={`${pen.id}-${date}-hum`}
-          defaultValue={welfareRow?.humidity_pct ?? (sessionHumidity ?? "")}
-          onBlur={(e) => {
-            const v = e.currentTarget.value;
-            if (v !== "") void saveWelfare({ humidity_pct: Number(v) }, setWelfareState);
-          }}
-        />
       </div>
 
       <div className="rounded-lg border border-border p-3 space-y-2">
