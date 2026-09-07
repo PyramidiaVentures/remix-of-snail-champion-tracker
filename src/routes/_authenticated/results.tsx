@@ -456,7 +456,7 @@ function LineChartCard({
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
               <XAxis {...timeAxisProps(domain, xs.map(ms))} />
               <YAxis tick={{ fontSize: 10 }} unit={unit} />
-              <Tooltip labelFormatter={(v) => fmtShort(new Date(Number(v)).toISOString().slice(0, 10))} />
+              <Tooltip formatter={(v: number | string) => (typeof v === "number" ? Number(v.toFixed(2)) : v)} labelFormatter={(v) => fmtShort(new Date(Number(v)).toISOString().slice(0, 10))} />
               <ChartLegend hiddenSeries={hiddenSeries} onToggleSeries={onToggleSeries} />
               {series.map((s, i) => (
                 <Line key={s.name} type="monotone" dataKey={s.name} stroke={COLORS[i % COLORS.length]}
@@ -507,7 +507,7 @@ function IntervalChartCard({
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
               <XAxis {...timeAxisProps(domain, edges.map(ms))} />
               <YAxis tick={{ fontSize: 10 }} unit={unit} />
-              <Tooltip labelFormatter={(v) => fmtShort(new Date(Number(v)).toISOString().slice(0, 10))} />
+              <Tooltip formatter={(v: number | string) => (typeof v === "number" ? Number(v.toFixed(2)) : v)} labelFormatter={(v) => fmtShort(new Date(Number(v)).toISOString().slice(0, 10))} />
               <ChartLegend hiddenSeries={hiddenSeries} onToggleSeries={onToggleSeries} />
               {series.map((s, i) => (
                 <Line
