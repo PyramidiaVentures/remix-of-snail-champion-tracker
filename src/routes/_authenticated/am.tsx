@@ -295,6 +295,8 @@ function AmPage() {
                 photoUrl={photoUrlFor(pen.id)}
                 sessionTemp={sessionTemp}
                 sessionHumidity={sessionHumidity}
+                penEvents={eventsForPenDate(pen.id)}
+                liveCountValue={liveCountFor(pen.id)}
                 onSaved={refresh}
               />
             )}
