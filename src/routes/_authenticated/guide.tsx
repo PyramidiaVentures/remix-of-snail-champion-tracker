@@ -127,6 +127,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
           "Leaves wilted before feeding → discard and cut fresh.",
           "Unsure whether feed has spoiled → discard it. A wasted portion costs a few shillings; feed that sours in the dish can suppress intake across the whole pen.",
           "Weighing count does not match the ledger → re-count. If the count is confirmed, log the difference as a mortality or escape with cause \"unknown\".",
+          "Reconciliation panel flags a pen → recount that pen before leaving. If the recount matches the ledger, correct the weighing's live count. If the recount confirms your original number, use Reconcile to log the difference. Never edit a count to silence the warning — the count is what you observed, the ledger is only a running total.",
           "Mean weight jumped or dropped implausibly → re-check the count, the scale zero and the entry before accepting it.",
           "Snails escaped during weighing → log an escape; return recovered snails as an addition.",
         ]}
