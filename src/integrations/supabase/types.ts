@@ -579,7 +579,6 @@ export type Database = {
         Row: {
           activity: Database["public"]["Enums"]["snail_activity"] | null
           created_at: string
-          dish_condition: Database["public"]["Enums"]["dish_condition"] | null
           health_flags: Database["public"]["Enums"]["health_flag"][] | null
           humidity_pct: number | null
           id: string
@@ -597,7 +596,6 @@ export type Database = {
         Insert: {
           activity?: Database["public"]["Enums"]["snail_activity"] | null
           created_at?: string
-          dish_condition?: Database["public"]["Enums"]["dish_condition"] | null
           health_flags?: Database["public"]["Enums"]["health_flag"][] | null
           humidity_pct?: number | null
           id?: string
@@ -615,7 +613,6 @@ export type Database = {
         Update: {
           activity?: Database["public"]["Enums"]["snail_activity"] | null
           created_at?: string
-          dish_condition?: Database["public"]["Enums"]["dish_condition"] | null
           health_flags?: Database["public"]["Enums"]["health_flag"][] | null
           humidity_pct?: number | null
           id?: string
@@ -657,7 +654,6 @@ export type Database = {
     Enums: {
       biomass_method: "whole_pen" | "subsample"
       dish_action: "emptied_refilled" | "topped_up" | "emptied_spoiled"
-      dish_condition: "clean" | "soiled" | "mouldy"
       dm_source: "literature" | "supplier" | "measured"
       feed_status: "pending" | "active" | "champion" | "eliminated"
       health_flag:
@@ -814,7 +810,6 @@ export const Constants = {
     Enums: {
       biomass_method: ["whole_pen", "subsample"],
       dish_action: ["emptied_refilled", "topped_up", "emptied_spoiled"],
-      dish_condition: ["clean", "soiled", "mouldy"],
       dm_source: ["literature", "supplier", "measured"],
       feed_status: ["pending", "active", "champion", "eliminated"],
       health_flag: [
