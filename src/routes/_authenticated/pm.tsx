@@ -24,7 +24,7 @@ const PM_STEPS = [
 ];
 const PM_PHOTO_STEP_INDEX = 7;
 
-type PenRow = { id: string; label: string; age_group: string };
+type PenRow = { id: string; label: string };
 type FeedRow = { id: string; name: string };
 
 function PmPage() {
@@ -33,7 +33,7 @@ function PmPage() {
     queryKey: ["active-round"],
     queryFn: async () => (await supabase.from("rounds").select("*").eq("status", "active").maybeSingle()).data,
   });
-  const pens = useQuery({ queryKey: ["pens"], queryFn: async () => (await supabase.from("pens").select("*").order("age_group")).data ?? [] });
+  const pens = useQuery({ queryKey: ["pens"], queryFn: async () => (await supabase.from("pens").select("*").order("label")).data ?? [] });
   const feeds = useQuery({
     queryKey: ["round-feeds", round.data?.id],
     enabled: !!round.data,
@@ -129,7 +129,7 @@ function PmPhotoSlots({ roundId, date, pens }: { roundId: string; date: string; 
       {pens.map((pen) => (
         <SessionPhotoSlot key={pen.id}
           round_id={roundId} pen_id={pen.id} obs_date={date} kind="pm"
-          label={`${pen.label} (${pen.age_group}) — all feeds`}
+          label={`${pen.label} — all feeds`}
           existingUrl={urlFor(pen.id)}
           onSaved={() => qc.invalidateQueries({ queryKey: ["session-photos", roundId, date] })}
         />
@@ -182,7 +182,7 @@ function PmGivenGrid({ roundId, date, pens, feeds }: { roundId: string; date: st
       <h2 className="font-semibold">Grams given</h2>
       {pens.map((pen) => (
         <div key={pen.id} className="space-y-2">
-          <div className="text-sm font-semibold">{pen.label} <span className="text-xs text-muted-foreground ml-1">{pen.age_group}</span></div>
+          <div className="text-sm font-semibold">{pen.label}</div>
           <div className="grid grid-cols-1 gap-2">
             {feeds.map((feed) => {
               const row = rowOf(pen.id, feed.id);

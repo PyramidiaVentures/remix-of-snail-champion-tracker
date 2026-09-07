@@ -21,9 +21,10 @@ type Trial = {
   notes: string | null;
 };
 type Feed = { id: string; name: string };
-type Pen = { id: string; label: string; age_group: string; snail_count: number; area_m2: number | null };
+type Pen = { id: string; label: string; snail_count: number; area_m2: number | null };
 type Treatment = { id: string; trial_id: string; feed_id: string; label: string };
 type Assignment = { id: string; trial_id: string; pen_id: string; treatment_id: string; start_date: string };
+type BiomassRow = { pen_id: string; event_date: string; live_count: number; net_biomass_g: number };
 
 function TrialPage() {
   const qc = useQueryClient();
@@ -48,7 +49,19 @@ function TrialPage() {
   const pens = useQuery({
     queryKey: ["pens"],
     queryFn: async () =>
-      ((await supabase.from("pens").select("id,label,age_group,snail_count,area_m2").order("label")).data ?? []) as Pen[],
+      ((await supabase.from("pens").select("id,label,snail_count,area_m2").order("label")).data ?? []) as Pen[],
+  });
+  const biomass = useQuery({
+    queryKey: ["biomass_events", current?.id],
+    enabled: !!current,
+    queryFn: async () =>
+      ((
+        await supabase
+          .from("biomass_events")
+          .select("pen_id,event_date,live_count,net_biomass_g")
+          .eq("trial_id", current!.id)
+          .order("event_date")
+      ).data ?? []) as BiomassRow[],
   });
   const treatments = useQuery({
     queryKey: ["treatments", current?.id],
@@ -78,6 +91,16 @@ function TrialPage() {
     aList.forEach((a) => m.set(a.pen_id, a.treatment_id));
     return m;
   }, [aList]);
+
+  const baselineByPen = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const b of biomass.data ?? []) {
+      if (m.has(b.pen_id)) continue; // rows ordered by date; first is baseline
+      if (!b.live_count || b.live_count <= 0) continue;
+      m.set(b.pen_id, Number(b.net_biomass_g) / b.live_count);
+    }
+    return m;
+  }, [biomass.data]);
 
   const unassigned = penList.filter((p) => !assignmentByPen.get(p.id)).length;
   const canStart = !activeTrial && !!setupTrial && tList.length >= 2 && penList.length > 0 && unassigned === 0;
@@ -136,7 +159,12 @@ function TrialPage() {
         </>
       )}
 
-      <DesignIntegrityPanel pens={penList} treatments={tList} assignmentByPen={assignmentByPen} />
+      <DesignIntegrityPanel
+        pens={penList}
+        treatments={tList}
+        assignmentByPen={assignmentByPen}
+        baselineByPen={baselineByPen}
+      />
 
       {!activeTrial && (
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
@@ -381,7 +409,7 @@ function StepThree({
               <div className="flex-1">
                 <div className="font-medium">{p.label}</div>
                 <div className="text-xs text-muted-foreground">
-                  {p.age_group} · {p.snail_count} snails
+                  {p.snail_count} snails
                 </div>
               </div>
               <select
@@ -510,24 +538,38 @@ function DesignIntegrityPanel({
   pens,
   treatments,
   assignmentByPen,
+  baselineByPen,
 }: {
   pens: Pen[];
   treatments: Treatment[];
   assignmentByPen: Map<string, string>;
+  baselineByPen: Map<string, number>;
 }) {
   const perTreatment = treatments.map((t) => ({
     t,
     pens: pens.filter((p) => assignmentByPen.get(p.id) === t.id),
   }));
 
-  const ageClasses = Array.from(new Set(pens.map((p) => p.age_group)));
-  const imbalance = perTreatment.filter(({ pens: ps }) =>
-    ageClasses.some((ac) => {
-      const counts = perTreatment.map((x) => x.pens.filter((p) => p.age_group === ac).length);
-      const mine = ps.filter((p) => p.age_group === ac).length;
-      return counts.length > 1 && Math.max(...counts) - Math.min(...counts) > 1 && mine === Math.min(...counts);
-    }),
-  );
+  // Baseline mean weight check — only once every assigned pen has a first biomass row.
+  const assignedForBaseline = pens.filter((p) => assignmentByPen.get(p.id));
+  const baselineReady =
+    assignedForBaseline.length > 0 && assignedForBaseline.every((p) => baselineByPen.has(p.id));
+  const treatmentBaselines = baselineReady
+    ? perTreatment
+        .filter(({ pens: ps }) => ps.length > 0)
+        .map(({ t, pens: ps }) => ({
+          t,
+          mean: ps.reduce((s, p) => s + (baselineByPen.get(p.id) as number), 0) / ps.length,
+        }))
+    : [];
+  const trialMean = baselineReady
+    ? assignedForBaseline.reduce((s, p) => s + (baselineByPen.get(p.id) as number), 0) /
+      assignedForBaseline.length
+    : 0;
+  const baselineOutliers =
+    baselineReady && trialMean > 0
+      ? treatmentBaselines.filter((x) => Math.abs(x.mean - trialMean) / trialMean > 0.1)
+      : [];
 
   const assignedPens = pens.filter((p) => assignmentByPen.get(p.id));
   const totalSnails = assignedPens.reduce((s, p) => s + (p.snail_count ?? 0), 0);
@@ -567,10 +609,16 @@ function DesignIntegrityPanel({
             ) : (
               <Ok>Every treatment has at least 3 pens.</Ok>
             )}
-            {imbalance.length > 0 ? (
-              <Warn>Age classes are unevenly spread across treatments — consider rebalancing.</Warn>
+            {!baselineReady ? (
+              <Ok>Baseline mean weight check pending — awaiting a first weighing for every assigned pen.</Ok>
+            ) : baselineOutliers.length > 0 ? (
+              <Warn>
+                Treatments did not start from comparable snail sizes. Growth comparison between arms is confounded by
+                starting weight. ({baselineOutliers.map((x) => `${x.t.label}: ${x.mean.toFixed(1)} g`).join("; ")} vs
+                trial mean {trialMean.toFixed(1)} g)
+              </Warn>
             ) : (
-              <Ok>Age classes are reasonably balanced across treatments.</Ok>
+              <Ok>Baseline mean weights are within 10% of the trial mean across treatments.</Ok>
             )}
           </>
         )}
