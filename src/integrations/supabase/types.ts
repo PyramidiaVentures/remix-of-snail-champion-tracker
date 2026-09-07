@@ -177,7 +177,7 @@ export type Database = {
           pen_id: string
           recorded_by: string | null
           refusal_score: Database["public"]["Enums"]["refusal_score"] | null
-          round_id: string
+          round_id: string | null
           trial_id: string | null
           updated_at: string
           weight_given_g: number | null
@@ -195,7 +195,7 @@ export type Database = {
           pen_id: string
           recorded_by?: string | null
           refusal_score?: Database["public"]["Enums"]["refusal_score"] | null
-          round_id: string
+          round_id?: string | null
           trial_id?: string | null
           updated_at?: string
           weight_given_g?: number | null
@@ -213,7 +213,7 @@ export type Database = {
           pen_id?: string
           recorded_by?: string | null
           refusal_score?: Database["public"]["Enums"]["refusal_score"] | null
-          round_id?: string
+          round_id?: string | null
           trial_id?: string | null
           updated_at?: string
           weight_given_g?: number | null
@@ -444,7 +444,7 @@ export type Database = {
           pen_id: string | null
           photo_am_url: string | null
           photo_pm_url: string | null
-          round_id: string
+          round_id: string | null
           trial_id: string | null
           updated_at: string
         }
@@ -455,7 +455,7 @@ export type Database = {
           pen_id?: string | null
           photo_am_url?: string | null
           photo_pm_url?: string | null
-          round_id: string
+          round_id?: string | null
           trial_id?: string | null
           updated_at?: string
         }
@@ -466,7 +466,7 @@ export type Database = {
           pen_id?: string | null
           photo_am_url?: string | null
           photo_pm_url?: string | null
-          round_id?: string
+          round_id?: string | null
           trial_id?: string | null
           updated_at?: string
         }
