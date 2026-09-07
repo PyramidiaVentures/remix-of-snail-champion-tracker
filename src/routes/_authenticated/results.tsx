@@ -685,7 +685,7 @@ function SummaryTable({ metrics }: { metrics: TrialMetrics }) {
             {metrics.treatments.map((t) => (
               <tr key={t.treatmentId}>
                 <td className="py-2 pr-3 font-medium">{t.label}</td>
-                <td className="py-2 pr-3">{cell(t.cumOffered_g, 0)}</td>
+                <td className="py-2 pr-3">{cell(t.cumOffered_g, 1)}</td>
                 <td className="py-2 pr-3">{cell(t.totalGain_g, 1)}</td>
                 <td className="py-2 pr-3">{cell(t.offeredPerKgGain)}</td>
                 <td className="py-2 pr-3">{cell(t.meanSgr)}</td>
@@ -807,7 +807,7 @@ function PenDetail({
       case "mwStart": return cell(Number.isFinite(r.iv.meanWeight1) ? r.iv.meanWeight1 : null);
       case "mwEnd": return cell(Number.isFinite(r.iv.meanWeight2) ? r.iv.meanWeight2 : null);
       case "gain": return cell(r.iv.gain_g, 1);
-      case "offered": return cell(r.iv.offered_g, 0);
+      case "offered": return cell(r.iv.offered_g, 1);
       case "perKgFresh": return cell(r.perKgFresh);
       case "perKgDm": return cell(r.perKgDm);
       case "sgr": return cell(r.iv.sgr);
@@ -830,7 +830,7 @@ function PenDetail({
       case "mwStart": return cell(totals.meanWeightStart);
       case "mwEnd": return cell(totals.meanWeightEnd);
       case "gain": return cell(totals.gain, 1);
-      case "offered": return cell(totals.offered, 0);
+      case "offered": return cell(totals.offered, 1);
       case "perKgFresh": return cell(totals.perKgFresh);
       case "perKgDm": return cell(totals.perKgDm);
       case "sgr": return cell(totals.sgr);
