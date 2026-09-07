@@ -3,8 +3,8 @@
  * Nothing here is persisted, so correcting an input or adding a dry-matter %
  * retroactively updates every figure.
  *
- * The term "FCR" is deliberately never used: the conversion metric is
- * offer-based and is always called "Feed offered per kg gain".
+ * The conversion metric is offer-based and is always called
+ * "Feed offered per kg gain".
  */
 
 export interface MetricsInput {
