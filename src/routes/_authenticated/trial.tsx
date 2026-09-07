@@ -538,24 +538,38 @@ function DesignIntegrityPanel({
   pens,
   treatments,
   assignmentByPen,
+  baselineByPen,
 }: {
   pens: Pen[];
   treatments: Treatment[];
   assignmentByPen: Map<string, string>;
+  baselineByPen: Map<string, number>;
 }) {
   const perTreatment = treatments.map((t) => ({
     t,
     pens: pens.filter((p) => assignmentByPen.get(p.id) === t.id),
   }));
 
-  const ageClasses = Array.from(new Set(pens.map((p) => p.age_group)));
-  const imbalance = perTreatment.filter(({ pens: ps }) =>
-    ageClasses.some((ac) => {
-      const counts = perTreatment.map((x) => x.pens.filter((p) => p.age_group === ac).length);
-      const mine = ps.filter((p) => p.age_group === ac).length;
-      return counts.length > 1 && Math.max(...counts) - Math.min(...counts) > 1 && mine === Math.min(...counts);
-    }),
-  );
+  // Baseline mean weight check — only once every assigned pen has a first biomass row.
+  const assignedForBaseline = pens.filter((p) => assignmentByPen.get(p.id));
+  const baselineReady =
+    assignedForBaseline.length > 0 && assignedForBaseline.every((p) => baselineByPen.has(p.id));
+  const treatmentBaselines = baselineReady
+    ? perTreatment
+        .filter(({ pens: ps }) => ps.length > 0)
+        .map(({ t, pens: ps }) => ({
+          t,
+          mean: ps.reduce((s, p) => s + (baselineByPen.get(p.id) as number), 0) / ps.length,
+        }))
+    : [];
+  const trialMean = baselineReady
+    ? assignedForBaseline.reduce((s, p) => s + (baselineByPen.get(p.id) as number), 0) /
+      assignedForBaseline.length
+    : 0;
+  const baselineOutliers =
+    baselineReady && trialMean > 0
+      ? treatmentBaselines.filter((x) => Math.abs(x.mean - trialMean) / trialMean > 0.1)
+      : [];
 
   const assignedPens = pens.filter((p) => assignmentByPen.get(p.id));
   const totalSnails = assignedPens.reduce((s, p) => s + (p.snail_count ?? 0), 0);
