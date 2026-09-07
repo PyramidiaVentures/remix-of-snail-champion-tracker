@@ -235,10 +235,10 @@ async function buildRows(name: ExportName): Promise<Row[]> {
             sgr_percent_per_day: iv.sgr ?? "",
             survival_percent: iv.survival ?? "",
             feeding_rate_percent_bw_day: iv.feedingRate ?? "",
-            mean_carry_over_days: runs.length ? runs.reduce((a, b) => a + b, 0) / runs.length : "",
-            max_carry_over_days: runs.length ? Math.max(...runs) : "",
-            spoilage_rate_percent: byDate.size ? (spoiled / byDate.size) * 100 : "",
-            missing_feeding_days: missing,
+            mean_carry_over_days: extras.meanCarryOverDays ?? "",
+            max_carry_over_days: extras.maxCarryOverDays ?? "",
+            spoilage_rate_percent: extras.spoilageRate ?? "",
+            missing_feeding_days: extras.missingFeedingDays,
           });
         }
       }
