@@ -149,6 +149,16 @@ function ResultsPage() {
 
       {metrics && <Charts metrics={metrics} view={view} />}
       {metrics && <SummaryTable metrics={metrics} />}
+      {metrics && trial.data && (
+        <PenDetail
+          metrics={metrics}
+          observations={observations.data ?? []}
+          biomass={biomass.data ?? []}
+          startDate={trial.data.start_date}
+          acclimationDays={trial.data.acclimation_days}
+          includeAcclimation={includeAcclimation}
+        />
+      )}
     </div>
   );
 }
