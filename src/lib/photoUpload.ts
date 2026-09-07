@@ -116,3 +116,49 @@ export async function uploadSessionPhoto(args: SessionUploadArgs): Promise<strin
   return url;
 }
 
+
+export interface TrialPhotoArgs {
+  trial_id: string;
+  pen_id: string;
+  obs_date: string;
+  kind: PhotoKind;
+  file: File;
+}
+
+/** Uploads a trial pen photo and upserts the trial-scoped session_photos row.
+ *  Path: {trial_id}/{pen_id}/{obs_date}-{am|pm}.jpg */
+export async function uploadTrialPenPhoto(args: TrialPhotoArgs): Promise<string> {
+  const path = `${args.trial_id}/${args.pen_id}/${args.obs_date}-${args.kind}.jpg`;
+  const blob = await compressImage(args.file);
+  const { error: upErr } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .upload(path, blob, { contentType: "image/jpeg", upsert: true, cacheControl: "3600" });
+  if (upErr) throw upErr;
+  const url = publicPhotoUrl(path);
+  const column = args.kind === "am" ? "photo_am_url" : "photo_pm_url";
+
+  const { data: existing } = await supabase
+    .from("session_photos")
+    .select("id")
+    .eq("trial_id", args.trial_id)
+    .eq("pen_id", args.pen_id)
+    .eq("obs_date", args.obs_date)
+    .maybeSingle();
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from("session_photos")
+      .update({ [column]: url } as never)
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("session_photos").insert({
+      trial_id: args.trial_id,
+      pen_id: args.pen_id,
+      obs_date: args.obs_date,
+      [column]: url,
+    } as never);
+    if (error) throw error;
+  }
+  return url;
+}

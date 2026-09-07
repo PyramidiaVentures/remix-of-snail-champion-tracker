@@ -6,11 +6,9 @@ type Entry = { status: UploadStatus; url?: string; error?: string };
 
 const entries = new Map<string, Entry>();
 const listeners = new Set<() => void>();
-let snapshotVersion = 0;
 let cached: ReadonlyMap<string, Entry> = new Map();
 
 function emit() {
-  snapshotVersion++;
   cached = new Map(entries);
   listeners.forEach((l) => l());
 }
