@@ -43,7 +43,7 @@ export function clearUpload(key: string) {
 export function useUploads(): ReadonlyMap<string, Entry> {
   return useSyncExternalStore(
     subscribe,
-    () => (cached.size === entries.size && snapshotVersion >= 0 ? cached : cached),
+    () => cached,
     () => cached,
   );
 }
