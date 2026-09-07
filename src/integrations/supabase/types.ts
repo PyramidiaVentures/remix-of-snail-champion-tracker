@@ -18,7 +18,6 @@ export type Database = {
         Row: {
           created_at: string
           event_date: string
-          gross_g: number | null
           id: string
           live_count: number
           method: Database["public"]["Enums"]["biomass_method"]
@@ -28,14 +27,12 @@ export type Database = {
           photo_url: string | null
           recorded_by: string | null
           subsample_count: number | null
-          tare_g: number | null
           trial_id: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           event_date: string
-          gross_g?: number | null
           id?: string
           live_count: number
           method?: Database["public"]["Enums"]["biomass_method"]
@@ -45,14 +42,12 @@ export type Database = {
           photo_url?: string | null
           recorded_by?: string | null
           subsample_count?: number | null
-          tare_g?: number | null
           trial_id: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           event_date?: string
-          gross_g?: number | null
           id?: string
           live_count?: number
           method?: Database["public"]["Enums"]["biomass_method"]
@@ -62,7 +57,6 @@ export type Database = {
           photo_url?: string | null
           recorded_by?: string | null
           subsample_count?: number | null
-          tare_g?: number | null
           trial_id?: string
           updated_at?: string
         }
@@ -83,54 +77,6 @@ export type Database = {
           },
         ]
       }
-      evap_controls: {
-        Row: {
-          control_given_g: number | null
-          control_leftover_g: number | null
-          created_at: string
-          feed_id: string
-          id: string
-          obs_date: string
-          round_id: string
-          updated_at: string
-        }
-        Insert: {
-          control_given_g?: number | null
-          control_leftover_g?: number | null
-          created_at?: string
-          feed_id: string
-          id?: string
-          obs_date: string
-          round_id: string
-          updated_at?: string
-        }
-        Update: {
-          control_given_g?: number | null
-          control_leftover_g?: number | null
-          created_at?: string
-          feed_id?: string
-          id?: string
-          obs_date?: string
-          round_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "evap_controls_feed_id_fkey"
-            columns: ["feed_id"]
-            isOneToOne: false
-            referencedRelation: "feeds"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "evap_controls_round_id_fkey"
-            columns: ["round_id"]
-            isOneToOne: false
-            referencedRelation: "rounds"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       feeds: {
         Row: {
           cost_per_kg: number | null
@@ -140,7 +86,6 @@ export type Database = {
           id: string
           name: string
           notes: string | null
-          status: Database["public"]["Enums"]["feed_status"]
         }
         Insert: {
           cost_per_kg?: number | null
@@ -150,7 +95,6 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
-          status?: Database["public"]["Enums"]["feed_status"]
         }
         Update: {
           cost_per_kg?: number | null
@@ -160,7 +104,6 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
-          status?: Database["public"]["Enums"]["feed_status"]
         }
         Relationships: []
       }
@@ -177,11 +120,8 @@ export type Database = {
           pen_id: string
           recorded_by: string | null
           refusal_score: Database["public"]["Enums"]["refusal_score"] | null
-          round_id: string | null
-          trial_id: string | null
+          trial_id: string
           updated_at: string
-          weight_given_g: number | null
-          weight_leftover_g: number | null
         }
         Insert: {
           created_at?: string
@@ -195,11 +135,8 @@ export type Database = {
           pen_id: string
           recorded_by?: string | null
           refusal_score?: Database["public"]["Enums"]["refusal_score"] | null
-          round_id?: string | null
-          trial_id?: string | null
+          trial_id: string
           updated_at?: string
-          weight_given_g?: number | null
-          weight_leftover_g?: number | null
         }
         Update: {
           created_at?: string
@@ -213,11 +150,8 @@ export type Database = {
           pen_id?: string
           recorded_by?: string | null
           refusal_score?: Database["public"]["Enums"]["refusal_score"] | null
-          round_id?: string | null
-          trial_id?: string | null
+          trial_id?: string
           updated_at?: string
-          weight_given_g?: number | null
-          weight_leftover_g?: number | null
         }
         Relationships: [
           {
@@ -232,13 +166,6 @@ export type Database = {
             columns: ["pen_id"]
             isOneToOne: false
             referencedRelation: "pens"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "observations_round_id_fkey"
-            columns: ["round_id"]
-            isOneToOne: false
-            referencedRelation: "rounds"
             referencedColumns: ["id"]
           },
           {
@@ -389,85 +316,35 @@ export type Database = {
           },
         ]
       }
-      rounds: {
-        Row: {
-          champion_feed_id: string | null
-          champion_global_value: number
-          created_at: string
-          end_date: string | null
-          feed_ids: string[]
-          id: string
-          notes: string | null
-          round_number: number
-          start_date: string
-          status: Database["public"]["Enums"]["round_status"]
-        }
-        Insert: {
-          champion_feed_id?: string | null
-          champion_global_value?: number
-          created_at?: string
-          end_date?: string | null
-          feed_ids: string[]
-          id?: string
-          notes?: string | null
-          round_number: number
-          start_date: string
-          status?: Database["public"]["Enums"]["round_status"]
-        }
-        Update: {
-          champion_feed_id?: string | null
-          champion_global_value?: number
-          created_at?: string
-          end_date?: string | null
-          feed_ids?: string[]
-          id?: string
-          notes?: string | null
-          round_number?: number
-          start_date?: string
-          status?: Database["public"]["Enums"]["round_status"]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "rounds_champion_feed_id_fkey"
-            columns: ["champion_feed_id"]
-            isOneToOne: false
-            referencedRelation: "feeds"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       session_photos: {
         Row: {
           created_at: string
           id: string
           obs_date: string
-          pen_id: string | null
+          pen_id: string
           photo_am_url: string | null
           photo_pm_url: string | null
-          round_id: string | null
-          trial_id: string | null
+          trial_id: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
           obs_date: string
-          pen_id?: string | null
+          pen_id: string
           photo_am_url?: string | null
           photo_pm_url?: string | null
-          round_id?: string | null
-          trial_id?: string | null
+          trial_id: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
           obs_date?: string
-          pen_id?: string | null
+          pen_id?: string
           photo_am_url?: string | null
           photo_pm_url?: string | null
-          round_id?: string | null
-          trial_id?: string | null
+          trial_id?: string
           updated_at?: string
         }
         Relationships: [
@@ -476,13 +353,6 @@ export type Database = {
             columns: ["pen_id"]
             isOneToOne: false
             referencedRelation: "pens"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "session_photos_round_id_fkey"
-            columns: ["round_id"]
-            isOneToOne: false
-            referencedRelation: "rounds"
             referencedColumns: ["id"]
           },
           {
@@ -655,7 +525,6 @@ export type Database = {
       biomass_method: "whole_pen" | "subsample"
       dish_action: "emptied_refilled" | "topped_up" | "emptied_spoiled"
       dm_source: "literature" | "supplier" | "measured"
-      feed_status: "active" | "inactive"
       health_flag:
         | "shell_damage"
         | "lethargy"
@@ -811,7 +680,6 @@ export const Constants = {
       biomass_method: ["whole_pen", "subsample"],
       dish_action: ["emptied_refilled", "topped_up", "emptied_spoiled"],
       dm_source: ["literature", "supplier", "measured"],
-      feed_status: ["active", "inactive"],
       health_flag: [
         "shell_damage",
         "lethargy",
