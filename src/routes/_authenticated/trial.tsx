@@ -429,7 +429,7 @@ function StepThree({
               <div className="flex-1">
                 <div className="font-medium">{p.label}</div>
                 <div className="text-xs text-muted-foreground">
-                  {p.snail_count} snails
+                  {p.live_count} snails
                 </div>
               </div>
               <select
@@ -592,11 +592,11 @@ function DesignIntegrityPanel({
       : [];
 
   const assignedPens = pens.filter((p) => assignmentByPen.get(p.id));
-  const totalSnails = assignedPens.reduce((s, p) => s + (p.snail_count ?? 0), 0);
+  const totalSnails = assignedPens.reduce((s, p) => s + (p.live_count ?? 0), 0);
   const withArea = assignedPens.filter((p) => p.area_m2 && p.area_m2 > 0);
   const meanDensity =
     withArea.length > 0
-      ? withArea.reduce((s, p) => s + p.snail_count / (p.area_m2 as number), 0) / withArea.length
+      ? withArea.reduce((s, p) => s + p.live_count / (p.area_m2 as number), 0) / withArea.length
       : null;
 
   const thin = perTreatment.filter(({ pens: ps }) => ps.length < 3);
