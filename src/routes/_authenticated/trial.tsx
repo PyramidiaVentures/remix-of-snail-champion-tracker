@@ -3,7 +3,9 @@ import { readIncludeAcclimation, writeIncludeAcclimation } from "@/lib/acclimati
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
-import { Plus, Trash2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, AlertTriangle, CheckCircle2, Lock } from "lucide-react";
+import { usePensWithData, TREATMENT_LOCK_MESSAGE } from "@/lib/penDataLock";
+
 import { today } from "@/lib/date";
 import { liveCount } from "@/lib/liveCount";
 
@@ -165,6 +167,9 @@ function TrialPage() {
           feeds={feeds.data ?? []}
           pens={penList}
           assignments={aList}
+          assignmentByPen={assignmentByPen}
+          onChanged={invalidate}
+
           onClose={() => closeTrial.mutate()}
           closing={closeTrial.isPending}
         />
@@ -476,6 +481,8 @@ function ActiveTrialPanel({
   feeds,
   pens,
   assignments,
+  assignmentByPen,
+  onChanged,
   onClose,
   closing,
 }: {
@@ -484,9 +491,12 @@ function ActiveTrialPanel({
   feeds: Feed[];
   pens: Pen[];
   assignments: Assignment[];
+  assignmentByPen: Map<string, string>;
+  onChanged: () => void;
   onClose: () => void;
   closing: boolean;
 }) {
+
   const [includeAcclimation, setIncludeAcclimation] = useState(readIncludeAcclimation);
   const day = Math.floor((Date.parse(today()) - Date.parse(trial.start_date)) / 86400000) + 1;
 
@@ -564,9 +574,166 @@ function ActiveTrialPanel({
           {closing ? "Closing…" : "Close trial"}
         </button>
       </section>
+
+      <TrialSettingsEditor trial={trial} onSaved={onChanged} />
+      <ActiveAssignments
+        trial={trial}
+        pens={pens}
+        treatments={treatments}
+        assignmentByPen={assignmentByPen}
+        onChanged={onChanged}
+      />
     </>
   );
 }
+
+/* ---------- Editable trial configuration (always allowed) ---------- */
+
+function TrialSettingsEditor({ trial, onSaved }: { trial: Trial; onSaved: () => void }) {
+  const [name, setName] = useState(trial.name);
+  const [plannedEnd, setPlannedEnd] = useState(trial.planned_end_date ?? "");
+  const [interval, setIntervalDays] = useState(String(trial.weighing_interval_days));
+  const [acclim, setAcclim] = useState(String(trial.acclimation_days));
+  const [notes, setNotes] = useState(trial.notes ?? "");
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("trials")
+        .update({
+          name,
+          planned_end_date: plannedEnd || null,
+          weighing_interval_days: Number(interval) || 7,
+          acclimation_days: Number(acclim) || 0,
+          notes: notes || null,
+        })
+        .eq("id", trial.id);
+      if (error) throw error;
+    },
+    onSuccess: onSaved,
+  });
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <h3 className="font-semibold">Trial settings</h3>
+      <p className="mb-3 text-xs text-muted-foreground">
+        These are settings, not measurements — editing them changes nothing already recorded. The start date is fixed
+        because every interval is measured from it.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <Field className="col-span-2" label="Name">
+          <input value={name} onChange={(e) => setName(e.target.value)} className="inp" />
+        </Field>
+        <Field label="Planned end date">
+          <input type="date" value={plannedEnd} onChange={(e) => setPlannedEnd(e.target.value)} className="inp" />
+        </Field>
+        <Field label="Weighing interval (days)">
+          <input type="number" min={1} value={interval} onChange={(e) => setIntervalDays(e.target.value)} className="inp" />
+        </Field>
+        <Field label="Acclimation (days)">
+          <input type="number" min={0} value={acclim} onChange={(e) => setAcclim(e.target.value)} className="inp" />
+        </Field>
+        <Field className="col-span-2" label="Notes">
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="inp" />
+        </Field>
+      </div>
+      <button
+        disabled={!name || save.isPending}
+        onClick={() => save.mutate()}
+        className="mt-3 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+      >
+        {save.isPending ? "Saving…" : "Save settings"}
+      </button>
+    </section>
+  );
+}
+
+/* ---------- Pen assignments during a running trial ---------- */
+
+function ActiveAssignments({
+  trial,
+  pens,
+  treatments,
+  assignmentByPen,
+  onChanged,
+}: {
+  trial: Trial;
+  pens: Pen[];
+  treatments: Treatment[];
+  assignmentByPen: Map<string, string>;
+  onChanged: () => void;
+}) {
+  const qc = useQueryClient();
+  const withData = usePensWithData(trial.id);
+  const locked = (id: string) => withData.data?.has(id) ?? false;
+
+  const assign = useMutation({
+    mutationFn: async (p: { penId: string; treatmentId: string }) => {
+      await supabase.from("pen_assignments").delete().eq("trial_id", trial.id).eq("pen_id", p.penId);
+      if (p.treatmentId) {
+        const { error } = await supabase.from("pen_assignments").insert({
+          trial_id: trial.id,
+          pen_id: p.penId,
+          treatment_id: p.treatmentId,
+          // A pen joining a running trial starts on the day it joins.
+          start_date: today(),
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["pens-with-data"] });
+      onChanged();
+    },
+  });
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <h3 className="font-semibold">Pen assignments</h3>
+      <p className="mb-3 text-xs text-muted-foreground">
+        A pen with no recorded data can still join or change treatment. Its intervals begin from its own first weighing.
+      </p>
+      <ul className="space-y-2">
+        {pens.map((p) => (
+          <li key={p.id} className="rounded-lg border border-border p-2">
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <div className="font-medium">{p.label}</div>
+                <div className="text-xs text-muted-foreground">{p.live_count} snails</div>
+              </div>
+              {locked(p.id) ? (
+                <div className="w-40 rounded-md border border-input bg-muted px-2 py-1 text-sm">
+                  {treatments.find((t) => t.id === assignmentByPen.get(p.id))?.label ?? "Unassigned"}
+                </div>
+              ) : (
+                <select
+                  value={assignmentByPen.get(p.id) ?? ""}
+                  onChange={(e) => assign.mutate({ penId: p.id, treatmentId: e.target.value })}
+                  className="inp w-40"
+                >
+                  <option value="">Unassigned</option>
+                  {treatments.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            {locked(p.id) && (
+              <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
+                <Lock className="mt-0.5 h-3 w-3 shrink-0" />
+                <span>{TREATMENT_LOCK_MESSAGE}</span>
+              </p>
+            )}
+          </li>
+        ))}
+        {pens.length === 0 && <li className="text-sm text-muted-foreground">No pens yet — add them in Setup.</li>}
+      </ul>
+    </section>
+  );
+}
+
 
 /* ---------- Start trial confirmation ---------- */
 

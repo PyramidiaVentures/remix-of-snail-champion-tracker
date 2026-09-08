@@ -5,7 +5,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { useState } from "react";
-import { Plus, Trash2, Pencil, X, Check } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Check, Lock } from "lucide-react";
+import { usePensWithData, INITIAL_COUNT_LOCK_MESSAGE } from "@/lib/penDataLock";
+
 
 export const Route = createFileRoute("/_authenticated/setup")({
   component: SetupPage,
@@ -46,87 +48,121 @@ function PensSection() {
       (await supabase.from("population_events").select("pen_id,event_date,event_type,count").eq("trial_id", trial.data!.id)).data ?? [],
   });
 
+  const withData = usePensWithData();
+  const locked = (id: string) => withData.data?.has(id) ?? false;
+
   const [label, setLabel] = useState("");
   const [count, setCount] = useState(0);
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["pens"] });
+    qc.invalidateQueries({ queryKey: ["pens-with-data"] });
+  };
 
   const add = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("pens").insert({ label, initial_snail_count: count });
       if (error) throw error;
     },
-    onSuccess: () => { setLabel(""); setCount(0); qc.invalidateQueries({ queryKey: ["pens"] }); },
+    onSuccess: () => { setLabel(""); setCount(0); refresh(); },
   });
 
   const del = useMutation({
     mutationFn: async (id: string) => { await supabase.from("pens").delete().eq("id", id); },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["pens"] }),
+    onSuccess: refresh,
   });
 
   const update = useMutation({
-    mutationFn: async (p: { id: string; initial_snail_count: number }) => {
-      await supabase.from("pens").update({ initial_snail_count: p.initial_snail_count }).eq("id", p.id);
+    mutationFn: async (p: { id: string; patch: { label?: string; initial_snail_count?: number; area_m2?: number | null } }) => {
+      await supabase.from("pens").update(p.patch).eq("id", p.id);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["pens"] }),
+    onSuccess: refresh,
   });
+
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <h2 className="font-semibold mb-3">Pens</h2>
       {trialActive && (
         <p className="mb-3 text-xs text-muted-foreground">
-          A trial is running, so pen populations are managed on the{" "}
+          A trial is running. Snail numbers change through the{" "}
           <Link to="/population" className="text-primary underline">population screen</Link>.
         </p>
       )}
       <ul className="space-y-2 mb-4">
         {pens.data?.map((p) => (
-          <li key={p.id} className="flex items-center gap-2 rounded-lg border border-border p-2">
-            <div className="flex-1">
-              <div className="font-medium">{p.label}</div>
+          <li key={p.id} className="rounded-lg border border-border p-2 space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                defaultValue={p.label}
+                aria-label={`Label for ${p.label}`}
+                onBlur={(e) => e.target.value.trim() && e.target.value !== p.label && update.mutate({ id: p.id, patch: { label: e.target.value.trim() } })}
+                className="flex-1 rounded-md border border-input bg-background px-2 py-1 font-medium"
+              />
               {trialActive && (
-                <div className="text-xs text-muted-foreground">Initial snail count {p.initial_snail_count}</div>
+                <div className="text-right">
+                  <div className="font-semibold">{liveCount(p, popEvents.data ?? [], t)}</div>
+                  <div className="text-[10px] text-muted-foreground">live now</div>
+                </div>
+              )}
+              {!locked(p.id) && (
+                <button onClick={() => del.mutate(p.id)} aria-label={`Remove ${p.label}`} className="p-2 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
               )}
             </div>
-            {trialActive ? (
-              <div className="text-right">
-                <div className="font-semibold">{liveCount(p, popEvents.data ?? [], t)}</div>
-                <div className="text-[10px] text-muted-foreground">live now</div>
-              </div>
-            ) : (
-              <>
-                <input type="number" defaultValue={p.initial_snail_count} min={0}
-                  aria-label={`Initial snail count for ${p.label}`}
-                  onBlur={(e) => update.mutate({ id: p.id, initial_snail_count: Number(e.target.value) })}
-                  className="w-20 rounded-md border border-input bg-background px-2 py-1 text-right" />
-                <span className="text-xs text-muted-foreground">snails</span>
-              </>
-            )}
-            {!trialActive && (
-              <button onClick={() => del.mutate(p.id)} className="p-2 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs">
+                <span className="block mb-1 text-muted-foreground">Initial snail count</span>
+                {locked(p.id) ? (
+                  <div className="rounded-md border border-input bg-muted px-2 py-1">{p.initial_snail_count}</div>
+                ) : (
+                  <input type="number" min={0} defaultValue={p.initial_snail_count}
+                    aria-label={`Initial snail count for ${p.label}`}
+                    onBlur={(e) => update.mutate({ id: p.id, patch: { initial_snail_count: Number(e.target.value) } })}
+                    className="w-full rounded-md border border-input bg-background px-2 py-1" />
+                )}
+              </label>
+              <label className="text-xs">
+                <span className="block mb-1 text-muted-foreground">Area (m²)</span>
+                <input type="number" step="0.01" min={0} defaultValue={p.area_m2 ?? ""}
+                  aria-label={`Area for ${p.label}`}
+                  onBlur={(e) => update.mutate({ id: p.id, patch: { area_m2: e.target.value === "" ? null : Number(e.target.value) } })}
+                  className="w-full rounded-md border border-input bg-background px-2 py-1" />
+              </label>
+            </div>
+            {locked(p.id) && (
+              <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                <Lock className="mt-0.5 h-3 w-3 shrink-0" />
+                <span>{INITIAL_COUNT_LOCK_MESSAGE} The pen also cannot be removed while it holds recorded data.</span>
+              </p>
             )}
           </li>
         ))}
         {pens.data?.length === 0 && <li className="text-sm text-muted-foreground">No pens yet.</li>}
       </ul>
-      {!trialActive && (
-        <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
-          <label className="text-xs col-span-full sm:col-span-1">
-            <span className="block mb-1 text-muted-foreground">Label</span>
-            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Pen A"
-              className="w-full rounded-md border border-input bg-background px-3 py-2" />
-          </label>
-          <label className="text-xs">
-            <span className="block mb-1 text-muted-foreground">Initial snail count</span>
-            <input type="number" value={count} onChange={(e) => setCount(Number(e.target.value))} className="w-20 rounded-md border border-input bg-background px-3 py-2" />
-          </label>
-          <button disabled={!label} onClick={() => add.mutate()} className="rounded-md bg-primary px-3 py-2 text-primary-foreground text-sm font-medium disabled:opacity-50">
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
+      <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
+        <label className="text-xs col-span-full sm:col-span-1">
+          <span className="block mb-1 text-muted-foreground">Label</span>
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Pen A"
+            className="w-full rounded-md border border-input bg-background px-3 py-2" />
+        </label>
+        <label className="text-xs">
+          <span className="block mb-1 text-muted-foreground">Initial snail count</span>
+          <input type="number" value={count} onChange={(e) => setCount(Number(e.target.value))} className="w-20 rounded-md border border-input bg-background px-3 py-2" />
+        </label>
+        <button disabled={!label} onClick={() => add.mutate()} className="rounded-md bg-primary px-3 py-2 text-primary-foreground text-sm font-medium disabled:opacity-50">
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+      {trialActive && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          A new pen can join a running trial — give it a treatment on the{" "}
+          <Link to="/trial" className="text-primary underline">trial screen</Link>; its intervals start from its own first weighing.
+        </p>
       )}
     </section>
   );
 }
+
 
 const DM_SOURCE_OPTIONS: { value: DmSource; label: string }[] = [
   { value: "literature", label: "Literature" },
