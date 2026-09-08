@@ -214,7 +214,7 @@ function WeighPage() {
           paramName="pen"
           renderPen={(pen) => (
             <PenCard
-              key={pen.id}
+              key={`${pen.id}-${date}`}
               trialId={trial.data!.id}
               pen={pen}
               date={date}
