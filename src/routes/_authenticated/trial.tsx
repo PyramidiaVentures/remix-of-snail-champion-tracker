@@ -3,7 +3,9 @@ import { readIncludeAcclimation, writeIncludeAcclimation } from "@/lib/acclimati
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
-import { Plus, Trash2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, AlertTriangle, CheckCircle2, Lock } from "lucide-react";
+import { usePensWithData, TREATMENT_LOCK_MESSAGE } from "@/lib/penDataLock";
+
 import { today } from "@/lib/date";
 import { liveCount } from "@/lib/liveCount";
 
