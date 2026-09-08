@@ -37,6 +37,8 @@ type BiomassRow = { pen_id: string; event_date: string; live_count: number; net_
 
 function TrialPage() {
   const qc = useQueryClient();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
 
   const trials = useQuery({
     queryKey: ["trials"],
@@ -191,7 +193,7 @@ function TrialPage() {
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <button
             disabled={!canStart || startTrial.isPending}
-            onClick={() => startTrial.mutate()}
+            onClick={() => setConfirmOpen(true)}
             className="w-full rounded-xl bg-primary py-3 text-primary-foreground font-semibold disabled:opacity-50"
           >
             {startTrial.isPending ? "Starting…" : "Start trial"}
@@ -209,6 +211,19 @@ function TrialPage() {
           )}
         </div>
       )}
+
+      {confirmOpen && (
+        <StartTrialConfirm
+          pens={penList}
+          pending={startTrial.isPending}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            startTrial.mutate();
+          }}
+        />
+      )}
+
     </div>
   );
 }
@@ -553,7 +568,79 @@ function ActiveTrialPanel({
   );
 }
 
+/* ---------- Start trial confirmation ---------- */
+
+export function medianCount(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const s = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+function StartTrialConfirm({
+  pens,
+  pending,
+  onCancel,
+  onConfirm,
+}: {
+  pens: Pen[];
+  pending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const [checked, setChecked] = useState(false);
+  const total = pens.reduce((s, p) => s + (p.initial_snail_count ?? 0), 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-3">
+      <div className="w-full max-w-md rounded-2xl bg-card border border-border shadow-lg p-4 max-h-[85vh] overflow-y-auto">
+        <h2 className="text-lg font-semibold">Confirm starting counts</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          These counts set the baseline for mean weight, gain and every conversion figure. An error here cannot be
+          detected later.
+        </p>
+
+        <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
+          {pens.map((p) => (
+            <li key={p.id} className="flex items-center justify-between px-3 py-2 text-sm">
+              <span>{p.label}</span>
+              <span className="font-medium tabular-nums">{p.initial_snail_count} snails</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {pens.length} pens · {total} snails in total
+        </p>
+
+        <label className="mt-4 flex items-start gap-3 rounded-lg border border-border p-3 text-sm">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={(e) => setChecked(e.target.checked)}
+            className="mt-0.5 h-5 w-5"
+          />
+          <span>I physically counted every pen today and confirm these counts are correct.</span>
+        </label>
+
+        <div className="mt-4 flex gap-2">
+          <button onClick={onCancel} className="flex-1 rounded-xl border border-border py-3 font-medium">
+            Cancel
+          </button>
+          <button
+            disabled={!checked || pending}
+            onClick={onConfirm}
+            className="flex-1 rounded-xl bg-primary py-3 text-primary-foreground font-semibold disabled:opacity-50"
+          >
+            {pending ? "Starting…" : "Start trial"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Design integrity ---------- */
+
 
 function DesignIntegrityPanel({
   pens,
@@ -602,6 +689,13 @@ function DesignIntegrityPanel({
 
   const thin = perTreatment.filter(({ pens: ps }) => ps.length < 3);
 
+  const countMedian = medianCount(pens.map((p) => p.initial_snail_count ?? 0));
+  const countOutliers =
+    countMedian && countMedian > 0
+      ? pens.filter((p) => Math.abs((p.initial_snail_count ?? 0) - countMedian) / countMedian > 0.5)
+      : [];
+
+
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <h2 className="font-semibold mb-1">Design integrity</h2>
@@ -643,6 +737,16 @@ function DesignIntegrityPanel({
             )}
           </>
         )}
+
+        {countOutliers.length > 0 &&
+          countOutliers.map((p) => (
+            <Warn key={p.id}>
+              Pen {p.label} holds {p.initial_snail_count} snails while most pens hold {countMedian}. Confirm this is
+              correct.
+            </Warn>
+          ))}
+
+
 
         <div className="rounded-lg border border-border p-2 text-sm">
           <div className="font-medium mb-1">Totals</div>
