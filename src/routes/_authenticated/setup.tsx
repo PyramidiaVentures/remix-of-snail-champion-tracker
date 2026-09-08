@@ -73,11 +73,12 @@ function PensSection() {
   });
 
   const update = useMutation({
-    mutationFn: async (p: { id: string; patch: Record<string, unknown> }) => {
+    mutationFn: async (p: { id: string; patch: { label?: string; initial_snail_count?: number; area_m2?: number | null } }) => {
       await supabase.from("pens").update(p.patch).eq("id", p.id);
     },
     onSuccess: refresh,
   });
+
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
