@@ -165,6 +165,9 @@ function TrialPage() {
           feeds={feeds.data ?? []}
           pens={penList}
           assignments={aList}
+          assignmentByPen={assignmentByPen}
+          onChanged={invalidate}
+
           onClose={() => closeTrial.mutate()}
           closing={closeTrial.isPending}
         />
