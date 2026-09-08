@@ -64,7 +64,7 @@ function PmPage() {
 
   const pens = useQuery({
     queryKey: ["pens"],
-    queryFn: async () => (await supabase.from("pens").select("id,label").order("label")).data ?? [],
+    queryFn: async () => (await supabase.from("pens").select("id,label")).data?.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })) ?? [],
   });
 
   const assignments = useQuery({

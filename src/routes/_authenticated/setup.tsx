@@ -33,7 +33,7 @@ function PensSection() {
   const t = today();
   const pens = useQuery({
     queryKey: ["pens"],
-    queryFn: async () => (await supabase.from("pens").select("*").order("label")).data ?? [],
+    queryFn: async () => (await supabase.from("pens").select("*")).data?.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })) ?? [],
   });
   const trial = useQuery({
     queryKey: ["active-trial"],
