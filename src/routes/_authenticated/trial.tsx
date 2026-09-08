@@ -689,6 +689,13 @@ function DesignIntegrityPanel({
 
   const thin = perTreatment.filter(({ pens: ps }) => ps.length < 3);
 
+  const countMedian = medianCount(pens.map((p) => p.initial_snail_count ?? 0));
+  const countOutliers =
+    countMedian && countMedian > 0
+      ? pens.filter((p) => Math.abs((p.initial_snail_count ?? 0) - countMedian) / countMedian > 0.5)
+      : [];
+
+
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <h2 className="font-semibold mb-1">Design integrity</h2>
