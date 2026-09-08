@@ -191,7 +191,7 @@ function TrialPage() {
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <button
             disabled={!canStart || startTrial.isPending}
-            onClick={() => startTrial.mutate()}
+            onClick={() => setConfirmOpen(true)}
             className="w-full rounded-xl bg-primary py-3 text-primary-foreground font-semibold disabled:opacity-50"
           >
             {startTrial.isPending ? "Starting…" : "Start trial"}
@@ -209,6 +209,19 @@ function TrialPage() {
           )}
         </div>
       )}
+
+      {confirmOpen && (
+        <StartTrialConfirm
+          pens={penList}
+          pending={startTrial.isPending}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            startTrial.mutate();
+          }}
+        />
+      )}
+
     </div>
   );
 }
