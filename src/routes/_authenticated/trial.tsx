@@ -738,6 +738,16 @@ function DesignIntegrityPanel({
           </>
         )}
 
+        {countOutliers.length > 0 &&
+          countOutliers.map((p) => (
+            <Warn key={p.id}>
+              Pen {p.label} holds {p.initial_snail_count} snails while most pens hold {countMedian}. Confirm this is
+              correct.
+            </Warn>
+          ))}
+
+
+
         <div className="rounded-lg border border-border p-2 text-sm">
           <div className="font-medium mb-1">Totals</div>
           <div className="text-xs text-muted-foreground">
