@@ -5,7 +5,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { useState } from "react";
-import { Plus, Trash2, Pencil, X, Check } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Check, Lock } from "lucide-react";
+import { usePensWithData, INITIAL_COUNT_LOCK_MESSAGE } from "@/lib/penDataLock";
+
 
 export const Route = createFileRoute("/_authenticated/setup")({
   component: SetupPage,
