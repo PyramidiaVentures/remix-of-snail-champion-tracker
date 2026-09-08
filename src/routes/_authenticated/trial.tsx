@@ -37,6 +37,8 @@ type BiomassRow = { pen_id: string; event_date: string; live_count: number; net_
 
 function TrialPage() {
   const qc = useQueryClient();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
 
   const trials = useQuery({
     queryKey: ["trials"],
