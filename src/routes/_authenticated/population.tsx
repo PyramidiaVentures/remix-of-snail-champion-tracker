@@ -60,7 +60,7 @@ function PopulationPage() {
   const pens = useQuery({
     queryKey: ["pens"],
     queryFn: async () =>
-      (await supabase.from("pens").select("id,label,initial_snail_count").order("label")).data ?? [],
+      (await supabase.from("pens").select("id,label,initial_snail_count")).data?.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })) ?? [],
   });
 
   const assignments = useQuery({

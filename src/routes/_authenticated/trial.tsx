@@ -62,7 +62,7 @@ function TrialPage() {
   const pens = useQuery({
     queryKey: ["pens"],
     queryFn: async () =>
-      (await supabase.from("pens").select("id,label,initial_snail_count,area_m2").order("label")).data ?? [],
+      (await supabase.from("pens").select("id,label,initial_snail_count,area_m2")).data?.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })) ?? [],
   });
   const popEvents = useQuery({
     queryKey: ["population-events", current?.id],
