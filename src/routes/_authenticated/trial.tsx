@@ -479,6 +479,8 @@ function ActiveTrialPanel({
   feeds,
   pens,
   assignments,
+  assignmentByPen,
+  onChanged,
   onClose,
   closing,
 }: {
@@ -487,9 +489,12 @@ function ActiveTrialPanel({
   feeds: Feed[];
   pens: Pen[];
   assignments: Assignment[];
+  assignmentByPen: Map<string, string>;
+  onChanged: () => void;
   onClose: () => void;
   closing: boolean;
 }) {
+
   const [includeAcclimation, setIncludeAcclimation] = useState(readIncludeAcclimation);
   const day = Math.floor((Date.parse(today()) - Date.parse(trial.start_date)) / 86400000) + 1;
 
