@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import { today } from "@/lib/date";
 import { daysBetween } from "@/lib/metrics";
+import { NoActiveTrial, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+
 
 export const Route = createFileRoute("/_authenticated/home")({
   component: HomePage,
