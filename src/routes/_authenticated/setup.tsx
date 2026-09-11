@@ -234,10 +234,8 @@ type TablesRow<T extends keyof Database["public"]["Tables"]> = Database["public"
 
 function FeedsSection() {
   const qc = useQueryClient();
-  const feeds = useQuery({
-    queryKey: ["feeds"],
-    queryFn: async () => (await supabase.from("feeds").select("*").order("created_at", { ascending: false })).data ?? [],
-  });
+  const { siteName, siteId } = useSiteScope();
+  const feeds = useSiteFeeds();
 
   const [addValues, setAddValues] = useState<FeedFormValues>(emptyFeedForm());
   const [addError, setAddError] = useState<string | null>(null);
@@ -248,7 +246,8 @@ function FeedsSection() {
 
   const add = useMutation({
     mutationFn: async (values: FeedFormValues) => {
-      const { error } = await supabase.from("feeds").insert(formToFeedInsert(values));
+      if (!siteId) throw new Error("No site selected");
+      const { error } = await supabase.from("feeds").insert({ ...formToFeedInsert(values), site_id: siteId });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -258,6 +257,7 @@ function FeedsSection() {
     },
     onError: (err: Error) => setAddError(err.message),
   });
+
 
   const update = useMutation({
     mutationFn: async ({ id, values }: { id: string; values: FeedFormValues }) => {
