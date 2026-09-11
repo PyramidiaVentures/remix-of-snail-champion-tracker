@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { writeWithRetry } from "@/lib/upsertRow";
 import { uploadPopulationPhoto } from "@/lib/photoUpload";
+import { useSignedPhotoUrl } from "@/lib/useSignedPhotoUrl";
 import { today } from "@/lib/date";
 import { liveCount, cumulativeMortality } from "@/lib/liveCount";
 import type { Database } from "@/integrations/supabase/types";

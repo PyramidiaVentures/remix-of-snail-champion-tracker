@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { upsertRow, BIOMASS_EVENTS_KEY } from "@/lib/upsertRow";
 import { uploadWeighPhoto } from "@/lib/photoUpload";
+import { useSignedPhotoUrl } from "@/lib/useSignedPhotoUrl";
 import { runUpload, useUploads } from "@/lib/photoUploads.store";
 import { today } from "@/lib/date";
 import { liveCount, hasAddition } from "@/lib/liveCount";
