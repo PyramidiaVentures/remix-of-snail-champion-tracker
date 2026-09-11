@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { writeWithRetry } from "@/lib/upsertRow";
+import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+
 import { uploadPopulationPhoto } from "@/lib/photoUpload";
 import { useSignedPhotoUrl } from "@/lib/useSignedPhotoUrl";
 import { today } from "@/lib/date";
@@ -51,18 +53,13 @@ function PopulationPage() {
   const qc = useQueryClient();
   const t = today();
   const [penFilter, setPenFilter] = useState<string>("all");
+  const { siteName, siteId } = useSiteScope();
 
-  const trial = useQuery({
-    queryKey: ["active-trial"],
-    queryFn: async () => (await supabase.from("trials").select("*").eq("status", "active").maybeSingle()).data,
-  });
+  const trial = useSiteTrial();
   const trialId = trial.data?.id;
 
-  const pens = useQuery({
-    queryKey: ["pens"],
-    queryFn: async () =>
-      (await supabase.from("pens").select("id,label,initial_snail_count")).data?.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })) ?? [],
-  });
+  const pens = useSitePens();
+
 
   const assignments = useQuery({
     queryKey: ["pen-assignments", trialId],
