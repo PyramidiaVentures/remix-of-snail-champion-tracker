@@ -1,2 +1,2 @@
 - [x] Mandatory AM/PM SOP checklists popup
-- [ ] Add live-safe multi-site database support and verify the app
+- [x] Add live-safe multi-site database support and verify the app
