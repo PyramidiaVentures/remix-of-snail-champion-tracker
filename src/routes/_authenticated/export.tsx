@@ -173,7 +173,7 @@ async function buildRows(name: ExportName): Promise<Row[]> {
     case "biomass_events": {
       const rows = await all("biomass_events");
       const signed = await signPhotoRefs(rows.map((b) => b['photo_url'] as string).filter(Boolean));
-      return rows.map((b) => ({
+      return rows.map((b) => {
         const n = (b['live_count'] as number) ?? 0;
         const net = (b['net_biomass_g'] as number) ?? 0;
         return {
