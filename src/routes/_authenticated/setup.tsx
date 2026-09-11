@@ -31,14 +31,9 @@ function SetupPage() {
 function PensSection() {
   const qc = useQueryClient();
   const t = today();
-  const pens = useQuery({
-    queryKey: ["pens"],
-    queryFn: async () => (await supabase.from("pens").select("*")).data?.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })) ?? [],
-  });
-  const trial = useQuery({
-    queryKey: ["active-trial"],
-    queryFn: async () => (await supabase.from("trials").select("id").eq("status", "active").maybeSingle()).data,
-  });
+  const { siteName, siteId } = useSiteScope();
+  const pens = useSitePens();
+  const trial = useSiteTrial();
   const trialActive = !!trial.data;
 
   const popEvents = useQuery({
@@ -61,11 +56,13 @@ function PensSection() {
 
   const add = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("pens").insert({ label, initial_snail_count: count });
+      if (!siteId) throw new Error("No site selected");
+      const { error } = await supabase.from("pens").insert({ label, initial_snail_count: count, site_id: siteId });
       if (error) throw error;
     },
     onSuccess: () => { setLabel(""); setCount(0); refresh(); },
   });
+
 
   const del = useMutation({
     mutationFn: async (id: string) => { await supabase.from("pens").delete().eq("id", id); },
