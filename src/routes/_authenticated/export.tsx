@@ -178,6 +178,7 @@ async function buildRows(name: ExportName): Promise<Row[]> {
         const net = (b['net_biomass_g'] as number) ?? 0;
         return {
           ...b,
+          photo_url: signed.get(b['photo_url'] as string) ?? "",
           mean_weight_g: n > 0 ? net / n : "",
           pen_label: penLabel.get(b['pen_id'] as string) ?? "",
           treatment_label: labelOfTreatmentForPen(b['trial_id'], b['pen_id']),
