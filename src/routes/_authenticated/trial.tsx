@@ -230,7 +230,9 @@ function TrialPage() {
 
 /* ---------- Step 1 ---------- */
 
-function StepOne({ trial, onSaved }: { trial: Trial | null; onSaved: () => void }) {
+function StepOne({
+  trial, siteId, siteName, onSaved,
+}: { trial: Trial | null; siteId: string | null; siteName: string; onSaved: () => void }) {
   const [name, setName] = useState(trial?.name ?? "");
   const [start, setStart] = useState(trial?.start_date ?? today());
   const [plannedEnd, setPlannedEnd] = useState(trial?.planned_end_date ?? "");
@@ -252,7 +254,8 @@ function StepOne({ trial, onSaved }: { trial: Trial | null; onSaved: () => void 
         const { error } = await supabase.from("trials").update(payload).eq("id", trial.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("trials").insert({ ...payload, status: "setup" });
+        if (!siteId) throw new Error("No site selected");
+        const { error } = await supabase.from("trials").insert({ ...payload, status: "setup", site_id: siteId });
         if (error) throw error;
       }
     },
@@ -262,6 +265,10 @@ function StepOne({ trial, onSaved }: { trial: Trial | null; onSaved: () => void 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <StepHeader n={1} title="Trial details" done={!!trial} />
+      <p className="mb-3 text-xs text-muted-foreground">
+        This trial belongs to <span className="font-medium text-foreground">{siteName || "the selected site"}</span>.
+      </p>
+
       <div className="grid grid-cols-2 gap-3">
         <Field className="col-span-2" label="Name">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Palatability trial 1" className="inp" />
