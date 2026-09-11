@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { today } from "@/lib/date";
 import { Checklist } from "@/components/Checklist";
+import { ChecklistBlocker } from "@/components/ChecklistBlocker";
 import { NumberField } from "@/components/NumberField";
 import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
