@@ -1,2 +1,3 @@
 - [x] Mandatory AM/PM SOP checklists popup
 - [x] Add live-safe multi-site database support and verify the app
+- [ ] Add a persistent site selector and global site context
