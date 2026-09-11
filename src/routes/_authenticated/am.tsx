@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { upsertRow, writeWithRetry, OBSERVATIONS_TRIAL_KEY, WELFARE_CHECKS_KEY } from "@/lib/upsertRow";
+import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+
 import { useCallback, useMemo, useState } from "react";
 import { Checklist } from "@/components/Checklist";
 import { ChecklistBlocker } from "@/components/ChecklistBlocker";
@@ -91,16 +93,12 @@ function AmPage() {
   const isDefault = date === defaultDate;
   const uploads = useUploads();
 
-  const trial = useQuery({
-    queryKey: ["active-trial"],
-    queryFn: async () => (await supabase.from("trials").select("*").eq("status", "active").maybeSingle()).data,
-  });
+  const { siteName, siteId } = useSiteScope();
+  const trial = useSiteTrial();
   const trialId = trial.data?.id;
 
-  const pens = useQuery({
-    queryKey: ["pens"],
-    queryFn: async () => (await supabase.from("pens").select("id,label,initial_snail_count")).data?.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })) ?? [],
-  });
+  const pens = useSitePens();
+
 
   const popEvents = useQuery({
     queryKey: ["pop-events", trialId],
