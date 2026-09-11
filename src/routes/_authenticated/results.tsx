@@ -68,7 +68,22 @@ function ResultsPage() {
   });
   const trialId = trial.data?.id;
 
-  const pens = useQuery({ queryKey: ["pens"], queryFn: async () => (await supabase.from("pens").select("id,label").order("label")).data ?? [] });
+  // Results span every site, so each pen is named with its site: "Pen 1" exists at both.
+  const pens = useQuery({
+    queryKey: ["pens", "with-site"],
+    queryFn: async () => {
+      const [{ data: rows }, { data: sites }] = await Promise.all([
+        supabase.from("pens").select("id,label,site_id").order("label"),
+        supabase.from("sites").select("id,name"),
+      ]);
+      const siteName = new Map((sites ?? []).map((s) => [s.id, s.name]));
+      return (rows ?? []).map((p) => ({
+        id: p.id,
+        label: siteName.get(p.site_id) ? `${p.label} · ${siteName.get(p.site_id)}` : p.label,
+      }));
+    },
+  });
+
   const feeds = useQuery({ queryKey: ["feeds"], queryFn: async () => (await supabase.from("feeds").select("id,name,dm_percent")).data ?? [] });
   const treatments = useQuery({
     queryKey: ["treatments", trialId], enabled: !!trialId,
