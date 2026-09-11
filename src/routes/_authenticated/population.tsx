@@ -99,13 +99,11 @@ function PopulationPage() {
     void qc.invalidateQueries({ queryKey: ["population-events", trialId] });
   };
 
-  if (!trial.isLoading && !trial.data) {
+  if (!!siteId && !trial.isLoading && !trial.data) {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-bold">Population</h1>
-        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
-          No trial is active. <Link to="/trial" className="text-primary underline">Set up and start a trial.</Link>
-        </div>
+        <NoActiveTrial siteName={siteName} />
       </div>
     );
   }
@@ -113,9 +111,10 @@ function PopulationPage() {
   return (
     <div className="space-y-4">
       <header>
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">Population</div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">Population · {siteName}</div>
         <h1 className="text-2xl font-bold">Deaths, escapes, removals and additions.</h1>
       </header>
+
 
       {trialId && (
         <AddEventForm
@@ -166,12 +165,14 @@ function PopulationPage() {
       {trialId && (
         <Reconciliation
           trialId={trialId}
+          siteName={siteName}
           pens={trialPens}
           events={allEvents}
           biomass={biomass.data ?? []}
           onSaved={refresh}
         />
       )}
+
     </div>
   );
 }
