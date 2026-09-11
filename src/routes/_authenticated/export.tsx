@@ -224,7 +224,8 @@ async function buildRows(name: ExportName): Promise<Row[]> {
         .map((a) => ({ pen_id: a['pen_id'] as string, treatment_id: a['treatment_id'] as string }));
       const assignedPens = pens
         .filter((p) => trialAssignments.some((a) => a.pen_id === p['id']))
-        .map((p) => ({ id: p['id'] as string, label: p['label'] as string }));
+        .map((p) => ({ id: p['id'] as string, label: penLabel.get(p['id'] as string) ?? (p['label'] as string) }));
+
 
       const includeAcclimation = readIncludeAcclimation();
       const acclimationEnd = addDays(trial['start_date'] as string, (trial['acclimation_days'] as number) ?? 0);
