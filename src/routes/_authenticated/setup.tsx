@@ -313,7 +313,11 @@ function FeedsSection() {
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-      <h2 className="font-semibold mb-3">Feeds</h2>
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <h2 className="font-semibold">Feeds</h2>
+        <span className="text-xs text-muted-foreground">{siteName || "—"}</span>
+      </div>
+
       <ul className="space-y-3 mb-4">
         {feeds.data?.map((f) => (
           <li key={f.id} className="rounded-lg border border-border p-3">
