@@ -189,6 +189,13 @@ function AmPage() {
   const photosNeeded = trialPens.length;
   const allPhotos = photosNeeded > 0 && photosDone === photosNeeded;
 
+  const [checklistDone, setChecklistDone] = useState(0);
+  const [checklistAll, setChecklistAll] = useState(false);
+  const onChecklistProgress = useCallback((done: number, all: boolean) => {
+    setChecklistDone(done);
+    setChecklistAll(all);
+  }, []);
+
   const overrides = AM_STEPS.map((_, i) =>
     i === AM_PHOTO_STEP_INDEX
       ? {
