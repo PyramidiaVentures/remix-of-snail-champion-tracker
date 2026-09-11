@@ -358,6 +358,7 @@ function AddEventForm({
   });
   const [v, setV] = useState<FormValues>(empty);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const photoViewUrl = useSignedPhotoUrl(photoUrl);
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -459,8 +460,8 @@ function AddEventForm({
           {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
           <span>{photoUrl ? "Photo attached" : uploading ? "Uploading…" : "Photo (optional)"}</span>
         </button>
-        {photoUrl && (
-          <img src={photoUrl} alt="Event" loading="lazy" decoding="async"
+        {photoViewUrl && (
+          <img src={photoViewUrl} alt="Event" loading="lazy" decoding="async"
             className="h-12 w-12 rounded-md border border-border object-cover" />
         )}
       </div>
