@@ -277,11 +277,8 @@ function AmPage() {
       />
       <ChecklistBlocker started={checklistDone > 0} allDone={checklistAll} />
 
-      {!trial.isLoading && !trial.data && (
-        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
-          No trial is active. <Link to="/trial" className="text-primary underline">Set up and start a trial.</Link>
-        </div>
-      )}
+      {!!siteId && !trial.isLoading && !trial.data && <NoActiveTrial siteName={siteName} />}
+
 
       {trial.data && (
         <>
