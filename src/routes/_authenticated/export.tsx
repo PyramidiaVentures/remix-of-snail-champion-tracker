@@ -105,8 +105,17 @@ async function buildRows(name: ExportName): Promise<Row[]> {
       return feeds;
     case "trials":
       return trials;
-    case "session_photos":
-      return all("session_photos");
+    case "session_photos": {
+      const rows = await all("session_photos");
+      const signed = await signPhotoRefs(
+        rows.flatMap((r) => [r['photo_am_url'] as string, r['photo_pm_url'] as string]).filter(Boolean),
+      );
+      return rows.map((r) => ({
+        ...r,
+        photo_am_url: signed.get(r['photo_am_url'] as string) ?? "",
+        photo_pm_url: signed.get(r['photo_pm_url'] as string) ?? "",
+      }));
+    }
     case "pens": {
       const d = today();
       return pens.map((p) => ({
