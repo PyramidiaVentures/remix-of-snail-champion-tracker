@@ -136,6 +136,10 @@ function HomePage() {
         </section>
       )}
 
+      <OtherSites currentSiteId={siteId} date={t} />
+
+
+
       {advisories.length > 0 && (
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
