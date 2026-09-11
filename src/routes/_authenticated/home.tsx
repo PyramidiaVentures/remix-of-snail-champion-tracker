@@ -31,12 +31,9 @@ const longDate = (d: string) =>
 function HomePage() {
   const t = today();
   const yesterday = shift(t, -1);
+  const { siteName, siteId } = useSiteScope();
 
-  const trial = useQuery({
-    queryKey: ["active-trial"],
-    queryFn: async () =>
-      (await supabase.from("trials").select("*").eq("status", "active").limit(1)).data?.[0] ?? null,
-  });
+  const trial = useSiteTrial();
   const trialId = trial.data?.id;
 
   const assignments = useQuery({
@@ -44,6 +41,7 @@ function HomePage() {
     queryFn: async () =>
       (await supabase.from("pen_assignments").select("pen_id").eq("trial_id", trialId!)).data ?? [],
   });
+
 
   const daily = useQuery({
     queryKey: ["home-daily", trialId, t], enabled: !!trialId,
