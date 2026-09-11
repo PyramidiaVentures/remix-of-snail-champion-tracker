@@ -79,13 +79,17 @@ function PensSection() {
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-      <h2 className="font-semibold mb-3">Pens</h2>
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <h2 className="font-semibold">Pens</h2>
+        <span className="text-xs text-muted-foreground">{siteName || "—"}</span>
+      </div>
       {trialActive && (
         <p className="mb-3 text-xs text-muted-foreground">
           A trial is running. Snail numbers change through the{" "}
           <Link to="/population" className="text-primary underline">population screen</Link>.
         </p>
       )}
+
       <ul className="space-y-2 mb-4">
         {pens.data?.map((p) => (
           <li key={p.id} className="rounded-lg border border-border p-2 space-y-2">
