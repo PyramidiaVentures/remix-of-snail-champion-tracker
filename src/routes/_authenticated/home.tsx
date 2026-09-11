@@ -97,21 +97,19 @@ function HomePage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold">SNOVA Growth Tracker</h1>
-        <p className="text-sm text-muted-foreground">{longDate(t)}</p>
+        <p className="text-sm text-muted-foreground">{longDate(t)} · {siteName || "—"}</p>
       </div>
 
-      {!trial.isLoading && !trial.data ? (
-        <div className="rounded-2xl border border-border bg-card p-4 text-sm">
-          No trial is active.{" "}
-          <Link to="/trial" className="text-primary underline">Set up and start a trial.</Link>
-        </div>
+      {!!siteId && !trial.isLoading && !trial.data ? (
+        <NoActiveTrial siteName={siteName} />
       ) : (
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
           <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Active trial</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Active trial · {siteName}</div>
             <div className="mt-1 text-xl font-semibold">{trial.data?.name ?? "…"}</div>
             {dayNumber != null && <div className="text-sm text-muted-foreground">Day {dayNumber}</div>}
           </div>
+
 
           {inAcclimation && (
             <p className="rounded-lg bg-earth/15 px-3 py-2 text-sm">
