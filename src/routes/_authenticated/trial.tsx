@@ -143,9 +143,12 @@ function TrialPage() {
   return (
     <div className="space-y-6">
       <header>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">{siteName || "—"}</div>
         <h1 className="text-2xl font-bold">Trial</h1>
         <p className="text-sm text-muted-foreground">
-          {activeTrial ? "Running trial overview." : "Set up a trial in three steps."}
+          {activeTrial
+            ? `Running trial at ${siteName || "this site"}.`
+            : `Set up a trial for ${siteName || "this site"} in three steps.`}
         </p>
       </header>
 
@@ -166,7 +169,8 @@ function TrialPage() {
         />
       ) : (
         <>
-          <StepOne trial={setupTrial} onSaved={invalidate} />
+          <StepOne trial={setupTrial} siteId={siteId} siteName={siteName} onSaved={invalidate} />
+
           <StepTwo trial={setupTrial} feeds={feeds.data ?? []} treatments={tList} onChanged={invalidate} />
           <StepThree
             trial={setupTrial}
