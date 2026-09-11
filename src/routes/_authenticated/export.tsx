@@ -35,6 +35,25 @@ async function all(table: string): Promise<Row[]> {
   return (data ?? []) as Row[];
 }
 
+import { PHOTO_BUCKET, storagePathFromUrl } from "@/lib/photoUpload";
+
+/** Batch-sign photo references (stored public-style URLs or bare paths) so CSV
+ *  links open while the bucket is private. Valid for 7 days. */
+async function signPhotoRefs(values: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(values.filter(Boolean))];
+  const out = new Map<string, string>();
+  if (unique.length === 0) return out;
+  const paths = unique.map((v) => storagePathFromUrl(v));
+  const { data, error } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .createSignedUrls(paths, 7 * 24 * 3600);
+  if (error) return out;
+  data?.forEach((d, i) => {
+    if (d?.signedUrl) out.set(unique[i]!, d.signedUrl);
+  });
+  return out;
+}
+
 const EXPORTS = [
   "feeds",
   "pens",
