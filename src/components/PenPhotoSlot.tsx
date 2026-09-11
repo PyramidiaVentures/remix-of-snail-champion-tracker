@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { Upload, AlertTriangle, Loader2, CheckCircle2, RefreshCw } from "lucide-react";
 import { uploadTrialPenPhoto, type PhotoKind } from "@/lib/photoUpload";
 import { runUpload, useUploads } from "@/lib/photoUploads.store";
+import { useSignedPhotoUrl } from "@/lib/useSignedPhotoUrl";
 
 export function penPhotoKey(trial_id: string, pen_id: string, obs_date: string, kind: PhotoKind) {
   return `${trial_id}|${pen_id}|${obs_date}|${kind}`;
@@ -25,7 +26,8 @@ export function PenPhotoSlot({ trial_id, pen_id, obs_date, kind, label, existing
   const entry = useUploads().get(key);
 
   const status = entry?.status ?? (existingUrl ? "saved" : "empty");
-  const url = entry?.url ?? existingUrl;
+  const stored = entry?.url ?? existingUrl;
+  const url = useSignedPhotoUrl(stored);
 
   const start = (file: File) =>
     runUpload(key, () => uploadTrialPenPhoto({ trial_id, pen_id, obs_date, kind, file }), (u) => onSaved?.(u));

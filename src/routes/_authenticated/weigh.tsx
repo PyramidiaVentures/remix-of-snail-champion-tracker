@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { upsertRow, BIOMASS_EVENTS_KEY } from "@/lib/upsertRow";
 import { uploadWeighPhoto } from "@/lib/photoUpload";
+import { useSignedPhotoUrl } from "@/lib/useSignedPhotoUrl";
 import { runUpload, useUploads } from "@/lib/photoUploads.store";
 import { today } from "@/lib/date";
 import { liveCount, hasAddition } from "@/lib/liveCount";
@@ -266,6 +267,7 @@ function PenCard({
   const key = weighPhotoKey(trialId, pen.id, date);
   const entry = uploads.get(key);
   const photoUrl = entry?.url ?? row?.photo_url ?? null;
+  const photoViewUrl = useSignedPhotoUrl(photoUrl);
 
   const num = (s: string) => (s.trim() === "" ? null : Number(s));
   const liveN = num(liveCount);
@@ -457,9 +459,9 @@ function PenCard({
               : <Upload className="h-4 w-4" />}
             <span>{photoUrl ? "Replace photo" : entry?.status === "uploading" ? "Uploading…" : "Upload photo"}</span>
           </button>
-          {photoUrl && (
-            <button type="button" onClick={() => window.open(photoUrl, "_blank")} className="shrink-0">
-              <img src={photoUrl} alt="Scale display" loading="lazy" decoding="async"
+          {photoViewUrl && (
+            <button type="button" onClick={() => window.open(photoViewUrl, "_blank")} className="shrink-0">
+              <img src={photoViewUrl} alt="Scale display" loading="lazy" decoding="async"
                 className="h-14 w-14 rounded-md border border-border object-cover" />
             </button>
           )}

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { writeWithRetry } from "@/lib/upsertRow";
 import { uploadPopulationPhoto } from "@/lib/photoUpload";
+import { useSignedPhotoUrl } from "@/lib/useSignedPhotoUrl";
 import { today } from "@/lib/date";
 import { liveCount, cumulativeMortality } from "@/lib/liveCount";
 import type { Database } from "@/integrations/supabase/types";
@@ -358,6 +359,7 @@ function AddEventForm({
   });
   const [v, setV] = useState<FormValues>(empty);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const photoViewUrl = useSignedPhotoUrl(photoUrl);
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -459,8 +461,8 @@ function AddEventForm({
           {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
           <span>{photoUrl ? "Photo attached" : uploading ? "Uploading…" : "Photo (optional)"}</span>
         </button>
-        {photoUrl && (
-          <img src={photoUrl} alt="Event" loading="lazy" decoding="async"
+        {photoViewUrl && (
+          <img src={photoViewUrl} alt="Event" loading="lazy" decoding="async"
             className="h-12 w-12 rounded-md border border-border object-cover" />
         )}
       </div>
