@@ -394,7 +394,10 @@ function StepTwo({
               <Plus className="h-4 w-4 inline mr-1" /> Add treatment
             </button>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">Add as many treatment arms as you need — there is no limit.</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Add as many treatment arms as you need — there is no limit. Only feeds belonging to this site can be used.
+          </p>
+
         </>
       )}
     </section>
