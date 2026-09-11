@@ -36,9 +36,27 @@ async function compressImage(file: File, maxDim = 1600, quality = 0.8): Promise<
   }
 }
 
-/** Returns the permanent public URL of a stored object. */
+/** Returns the stored reference for an object (kept as a public-style URL for
+ *  backward compatibility with rows written before the bucket became private). */
 export function publicPhotoUrl(path: string): string {
   return supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+/** Extracts the in-bucket object path from a stored URL (public or signed) or path. */
+export function storagePathFromUrl(value: string): string {
+  const marker = `/${PHOTO_BUCKET}/`;
+  const i = value.indexOf(marker);
+  const raw = i === -1 ? value : value.slice(i + marker.length);
+  return decodeURIComponent(raw.split("?")[0]!.replace(/^\/+/, ""));
+}
+
+/** Creates a short-lived signed URL for a stored object (bucket is private). */
+export async function signedPhotoUrl(value: string, expiresIn = 3600): Promise<string | null> {
+  const path = storagePathFromUrl(value);
+  if (!path) return null;
+  const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(path, expiresIn);
+  if (error) return null;
+  return data?.signedUrl ?? null;
 }
 
 export interface TrialPhotoArgs {
