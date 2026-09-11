@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import { today } from "@/lib/date";
 import { daysBetween } from "@/lib/metrics";
+import { NoActiveTrial, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+
 
 export const Route = createFileRoute("/_authenticated/home")({
   component: HomePage,
@@ -31,12 +33,9 @@ const longDate = (d: string) =>
 function HomePage() {
   const t = today();
   const yesterday = shift(t, -1);
+  const { siteName, siteId } = useSiteScope();
 
-  const trial = useQuery({
-    queryKey: ["active-trial"],
-    queryFn: async () =>
-      (await supabase.from("trials").select("*").eq("status", "active").limit(1)).data?.[0] ?? null,
-  });
+  const trial = useSiteTrial();
   const trialId = trial.data?.id;
 
   const assignments = useQuery({
@@ -44,6 +43,7 @@ function HomePage() {
     queryFn: async () =>
       (await supabase.from("pen_assignments").select("pen_id").eq("trial_id", trialId!)).data ?? [],
   });
+
 
   const daily = useQuery({
     queryKey: ["home-daily", trialId, t], enabled: !!trialId,
@@ -99,21 +99,19 @@ function HomePage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold">SNOVA Growth Tracker</h1>
-        <p className="text-sm text-muted-foreground">{longDate(t)}</p>
+        <p className="text-sm text-muted-foreground">{longDate(t)} · {siteName || "—"}</p>
       </div>
 
-      {!trial.isLoading && !trial.data ? (
-        <div className="rounded-2xl border border-border bg-card p-4 text-sm">
-          No trial is active.{" "}
-          <Link to="/trial" className="text-primary underline">Set up and start a trial.</Link>
-        </div>
+      {!!siteId && !trial.isLoading && !trial.data ? (
+        <NoActiveTrial siteName={siteName} />
       ) : (
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
           <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Active trial</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Active trial · {siteName}</div>
             <div className="mt-1 text-xl font-semibold">{trial.data?.name ?? "…"}</div>
             {dayNumber != null && <div className="text-sm text-muted-foreground">Day {dayNumber}</div>}
           </div>
+
 
           {inAcclimation && (
             <p className="rounded-lg bg-earth/15 px-3 py-2 text-sm">
@@ -139,6 +137,10 @@ function HomePage() {
           )}
         </section>
       )}
+
+      <OtherSites currentSiteId={siteId} date={t} />
+
+
 
       {advisories.length > 0 && (
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
@@ -178,7 +180,63 @@ function HomePage() {
   );
 }
 
+/** One compact line per other site: trial day and today's feeding completion. */
+function OtherSites({ currentSiteId, date }: { currentSiteId: string | null; date: string }) {
+  const { sites } = useSiteScope();
+  const otherIds = sites.filter((s) => s.id !== currentSiteId).map((s) => s.id);
+
+  const summary = useQuery({
+    queryKey: ["other-site-status", otherIds, date],
+    enabled: otherIds.length > 0,
+    queryFn: async () => {
+      const { data: trials } = await supabase
+        .from("trials")
+        .select("id,site_id,start_date")
+        .eq("status", "active")
+        .in("site_id", otherIds);
+      const list = trials ?? [];
+      if (list.length === 0) return [] as { siteId: string; day: number | null; fed: number; expected: number }[];
+      const ids = list.map((t) => t.id);
+      const [{ data: pa }, { data: obs }] = await Promise.all([
+        supabase.from("pen_assignments").select("trial_id,pen_id").in("trial_id", ids),
+        supabase.from("observations").select("trial_id,pen_id,offered_g").in("trial_id", ids).eq("obs_date", date),
+      ]);
+      return list.map((t) => ({
+        siteId: t.site_id,
+        day: t.start_date ? daysBetween(t.start_date, date) + 1 : null,
+        expected: new Set((pa ?? []).filter((r) => r.trial_id === t.id).map((r) => r.pen_id)).size,
+        fed: new Set(
+          (obs ?? []).filter((r) => r.trial_id === t.id && r.offered_g != null).map((r) => r.pen_id),
+        ).size,
+      }));
+    },
+  });
+
+  if (otherIds.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground space-y-1">
+      {sites
+        .filter((s) => s.id !== currentSiteId)
+        .map((s) => {
+          const row = summary.data?.find((r) => r.siteId === s.id);
+          return (
+            <div key={s.id}>
+              <span className="font-medium text-foreground">{s.name}</span>{" "}
+              {row
+                ? `· Day ${row.day ?? "—"} · fed ${row.fed}/${row.expected} today`
+                : summary.isPending
+                  ? "· loading…"
+                  : "· no active trial"}
+            </div>
+          );
+        })}
+    </div>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
+
   return (
     <div className="rounded-lg border border-border px-2 py-2">
       <dd className="text-lg font-semibold">{value}</dd>

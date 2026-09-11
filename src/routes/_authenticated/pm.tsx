@@ -10,6 +10,8 @@ import { PenStepper, type PenCompletion, type StepperPen } from "@/components/Pe
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { useUploads } from "@/lib/photoUploads.store";
 import { upsertRow, OBSERVATIONS_TRIAL_KEY } from "@/lib/upsertRow";
+import { NoActiveTrial, useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+
 import type { Database } from "@/integrations/supabase/types";
 import { BookOpen, Save, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 
@@ -57,16 +59,12 @@ function PmPage() {
   const [date, setDate] = useState(today());
   const uploads = useUploads();
 
-  const trial = useQuery({
-    queryKey: ["active-trial"],
-    queryFn: async () => (await supabase.from("trials").select("*").eq("status", "active").maybeSingle()).data,
-  });
+  const { siteName, siteId } = useSiteScope();
+  const trial = useSiteTrial();
   const trialId = trial.data?.id;
 
-  const pens = useQuery({
-    queryKey: ["pens"],
-    queryFn: async () => (await supabase.from("pens").select("id,label")).data?.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })) ?? [],
-  });
+  const pens = useSitePens();
+
 
   const assignments = useQuery({
     queryKey: ["pen-assignments", trialId],
@@ -81,10 +79,8 @@ function PmPage() {
     queryFn: async () => (await supabase.from("treatments").select("id,feed_id,label").eq("trial_id", trialId!)).data ?? [],
   });
 
-  const feeds = useQuery({
-    queryKey: ["feeds"],
-    queryFn: async () => (await supabase.from("feeds").select("id,name")).data ?? [],
-  });
+  const feeds = useSiteFeeds();
+
 
   const obs = useQuery({
     queryKey: ["trial-obs", trialId, date],
@@ -228,11 +224,8 @@ function PmPage() {
       />
       <ChecklistBlocker started={checklistDone > 0} allDone={checklistAll} />
 
-      {!trial.isLoading && !trial.data && (
-        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
-          No trial is active. <Link to="/trial" className="text-primary underline">Set up and start a trial.</Link>
-        </div>
-      )}
+      {!!siteId && !trial.isLoading && !trial.data && <NoActiveTrial siteName={siteName} />}
+
 
       {trial.data && (
         <PenStepper

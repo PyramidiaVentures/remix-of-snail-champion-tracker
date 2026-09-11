@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { Plus, Trash2, AlertTriangle, CheckCircle2, Lock } from "lucide-react";
 import { usePensWithData, TREATMENT_LOCK_MESSAGE } from "@/lib/penDataLock";
+import { useSiteFeeds, useSitePens, useSiteScope, useSiteTrials } from "@/lib/siteScope";
+
 
 import { today } from "@/lib/date";
 import { liveCount } from "@/lib/liveCount";
@@ -42,28 +44,17 @@ function TrialPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
 
-  const trials = useQuery({
-    queryKey: ["trials"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("trials").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as Trial[];
-    },
-  });
+  const { siteName, siteId } = useSiteScope();
 
-  const activeTrial = trials.data?.find((t) => t.status === "active") ?? null;
-  const setupTrial = trials.data?.find((t) => t.status === "setup") ?? null;
+  const trials = useSiteTrials();
+
+  const activeTrial = (trials.data?.find((t) => t.status === "active") ?? null) as Trial | null;
+  const setupTrial = (trials.data?.find((t) => t.status === "setup") ?? null) as Trial | null;
   const current = activeTrial ?? setupTrial;
 
-  const feeds = useQuery({
-    queryKey: ["feeds"],
-    queryFn: async () => ((await supabase.from("feeds").select("id,name").order("name")).data ?? []) as Feed[],
-  });
-  const pens = useQuery({
-    queryKey: ["pens"],
-    queryFn: async () =>
-      (await supabase.from("pens").select("id,label,initial_snail_count,area_m2")).data?.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })) ?? [],
-  });
+  const feeds = useSiteFeeds();
+  const pens = useSitePens();
+
   const popEvents = useQuery({
     queryKey: ["population-events", current?.id],
     enabled: !!current,
@@ -152,9 +143,12 @@ function TrialPage() {
   return (
     <div className="space-y-6">
       <header>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">{siteName || "—"}</div>
         <h1 className="text-2xl font-bold">Trial</h1>
         <p className="text-sm text-muted-foreground">
-          {activeTrial ? "Running trial overview." : "Set up a trial in three steps."}
+          {activeTrial
+            ? `Running trial at ${siteName || "this site"}.`
+            : `Set up a trial for ${siteName || "this site"} in three steps.`}
         </p>
       </header>
 
@@ -175,7 +169,8 @@ function TrialPage() {
         />
       ) : (
         <>
-          <StepOne trial={setupTrial} onSaved={invalidate} />
+          <StepOne trial={setupTrial} siteId={siteId} siteName={siteName} onSaved={invalidate} />
+
           <StepTwo trial={setupTrial} feeds={feeds.data ?? []} treatments={tList} onChanged={invalidate} />
           <StepThree
             trial={setupTrial}
@@ -235,7 +230,9 @@ function TrialPage() {
 
 /* ---------- Step 1 ---------- */
 
-function StepOne({ trial, onSaved }: { trial: Trial | null; onSaved: () => void }) {
+function StepOne({
+  trial, siteId, siteName, onSaved,
+}: { trial: Trial | null; siteId: string | null; siteName: string; onSaved: () => void }) {
   const [name, setName] = useState(trial?.name ?? "");
   const [start, setStart] = useState(trial?.start_date ?? today());
   const [plannedEnd, setPlannedEnd] = useState(trial?.planned_end_date ?? "");
@@ -257,7 +254,8 @@ function StepOne({ trial, onSaved }: { trial: Trial | null; onSaved: () => void 
         const { error } = await supabase.from("trials").update(payload).eq("id", trial.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("trials").insert({ ...payload, status: "setup" });
+        if (!siteId) throw new Error("No site selected");
+        const { error } = await supabase.from("trials").insert({ ...payload, status: "setup", site_id: siteId });
         if (error) throw error;
       }
     },
@@ -267,6 +265,10 @@ function StepOne({ trial, onSaved }: { trial: Trial | null; onSaved: () => void 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <StepHeader n={1} title="Trial details" done={!!trial} />
+      <p className="mb-3 text-xs text-muted-foreground">
+        This trial belongs to <span className="font-medium text-foreground">{siteName || "the selected site"}</span>.
+      </p>
+
       <div className="grid grid-cols-2 gap-3">
         <Field className="col-span-2" label="Name">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Palatability trial 1" className="inp" />
@@ -392,7 +394,10 @@ function StepTwo({
               <Plus className="h-4 w-4 inline mr-1" /> Add treatment
             </button>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">Add as many treatment arms as you need — there is no limit.</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Add as many treatment arms as you need — there is no limit. Only feeds belonging to this site can be used.
+          </p>
+
         </>
       )}
     </section>

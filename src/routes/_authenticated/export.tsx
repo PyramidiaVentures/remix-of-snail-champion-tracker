@@ -85,12 +85,21 @@ const DESCRIPTIONS: Record<ExportName, string> = {
 };
 
 async function buildRows(name: ExportName): Promise<Row[]> {
-  const [pens, feeds, trials, treatments, assignments, popEvents] = await Promise.all([
+  const [pens, feeds, trials, treatments, assignments, popEvents, sites] = await Promise.all([
     all("pens"), all("feeds"), all("trials"), all("treatments"), all("pen_assignments"), all("population_events"),
+    all("sites"),
   ]);
-  const penLabel = new Map(pens.map((p) => [p['id'] as string, p['label'] as string]));
+  // "Pen 1" exists at more than one site, so every pen is named with its site.
+  const siteName = new Map(sites.map((s) => [s['id'] as string, s['name'] as string]));
+  const penLabel = new Map(
+    pens.map((p) => {
+      const site = siteName.get(p['site_id'] as string);
+      return [p['id'] as string, site ? `${p['label']} · ${site}` : (p['label'] as string)];
+    }),
+  );
   const feedName = new Map(feeds.map((f) => [f['id'] as string, f['name'] as string]));
   const treatmentLabel = new Map(treatments.map((t) => [t['id'] as string, t['label'] as string]));
+
   const treatmentByPen = new Map(
     assignments.map((a) => [`${a['trial_id']}|${a['pen_id']}`, a['treatment_id'] as string]),
   );
@@ -215,7 +224,8 @@ async function buildRows(name: ExportName): Promise<Row[]> {
         .map((a) => ({ pen_id: a['pen_id'] as string, treatment_id: a['treatment_id'] as string }));
       const assignedPens = pens
         .filter((p) => trialAssignments.some((a) => a.pen_id === p['id']))
-        .map((p) => ({ id: p['id'] as string, label: p['label'] as string }));
+        .map((p) => ({ id: p['id'] as string, label: penLabel.get(p['id'] as string) ?? (p['label'] as string) }));
+
 
       const includeAcclimation = readIncludeAcclimation();
       const acclimationEnd = addDays(trial['start_date'] as string, (trial['acclimation_days'] as number) ?? 0);

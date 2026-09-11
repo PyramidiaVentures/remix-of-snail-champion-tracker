@@ -7,6 +7,8 @@ import type { Database } from "@/integrations/supabase/types";
 import { useState } from "react";
 import { Plus, Trash2, Pencil, X, Check, Lock } from "lucide-react";
 import { usePensWithData, INITIAL_COUNT_LOCK_MESSAGE } from "@/lib/penDataLock";
+import { useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+
 
 
 export const Route = createFileRoute("/_authenticated/setup")({
@@ -31,14 +33,9 @@ function SetupPage() {
 function PensSection() {
   const qc = useQueryClient();
   const t = today();
-  const pens = useQuery({
-    queryKey: ["pens"],
-    queryFn: async () => (await supabase.from("pens").select("*")).data?.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })) ?? [],
-  });
-  const trial = useQuery({
-    queryKey: ["active-trial"],
-    queryFn: async () => (await supabase.from("trials").select("id").eq("status", "active").maybeSingle()).data,
-  });
+  const { siteName, siteId } = useSiteScope();
+  const pens = useSitePens();
+  const trial = useSiteTrial();
   const trialActive = !!trial.data;
 
   const popEvents = useQuery({
@@ -61,11 +58,13 @@ function PensSection() {
 
   const add = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("pens").insert({ label, initial_snail_count: count });
+      if (!siteId) throw new Error("No site selected");
+      const { error } = await supabase.from("pens").insert({ label, initial_snail_count: count, site_id: siteId });
       if (error) throw error;
     },
     onSuccess: () => { setLabel(""); setCount(0); refresh(); },
   });
+
 
   const del = useMutation({
     mutationFn: async (id: string) => { await supabase.from("pens").delete().eq("id", id); },
@@ -82,13 +81,17 @@ function PensSection() {
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-      <h2 className="font-semibold mb-3">Pens</h2>
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <h2 className="font-semibold">Pens</h2>
+        <span className="text-xs text-muted-foreground">{siteName || "—"}</span>
+      </div>
       {trialActive && (
         <p className="mb-3 text-xs text-muted-foreground">
           A trial is running. Snail numbers change through the{" "}
           <Link to="/population" className="text-primary underline">population screen</Link>.
         </p>
       )}
+
       <ul className="space-y-2 mb-4">
         {pens.data?.map((p) => (
           <li key={p.id} className="rounded-lg border border-border p-2 space-y-2">
@@ -137,7 +140,9 @@ function PensSection() {
             )}
           </li>
         ))}
-        {pens.data?.length === 0 && <li className="text-sm text-muted-foreground">No pens yet.</li>}
+        {pens.data?.length === 0 && (
+          <li className="text-sm text-muted-foreground">No pens at {siteName || "this site"} yet.</li>
+        )}
       </ul>
       <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
         <label className="text-xs col-span-full sm:col-span-1">
@@ -149,10 +154,14 @@ function PensSection() {
           <span className="block mb-1 text-muted-foreground">Initial snail count</span>
           <input type="number" value={count} onChange={(e) => setCount(Number(e.target.value))} className="w-20 rounded-md border border-input bg-background px-3 py-2" />
         </label>
-        <button disabled={!label} onClick={() => add.mutate()} className="rounded-md bg-primary px-3 py-2 text-primary-foreground text-sm font-medium disabled:opacity-50">
+        <button disabled={!label || !siteId} onClick={() => add.mutate()} className="rounded-md bg-primary px-3 py-2 text-primary-foreground text-sm font-medium disabled:opacity-50">
           <Plus className="h-4 w-4" />
         </button>
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        New pens are added at <span className="font-medium text-foreground">{siteName || "the selected site"}</span>.
+      </p>
+
       {trialActive && (
         <p className="mt-2 text-xs text-muted-foreground">
           A new pen can join a running trial — give it a treatment on the{" "}
@@ -227,10 +236,8 @@ type TablesRow<T extends keyof Database["public"]["Tables"]> = Database["public"
 
 function FeedsSection() {
   const qc = useQueryClient();
-  const feeds = useQuery({
-    queryKey: ["feeds"],
-    queryFn: async () => (await supabase.from("feeds").select("*").order("created_at", { ascending: false })).data ?? [],
-  });
+  const { siteName, siteId } = useSiteScope();
+  const feeds = useSiteFeeds();
 
   const [addValues, setAddValues] = useState<FeedFormValues>(emptyFeedForm());
   const [addError, setAddError] = useState<string | null>(null);
@@ -241,7 +248,8 @@ function FeedsSection() {
 
   const add = useMutation({
     mutationFn: async (values: FeedFormValues) => {
-      const { error } = await supabase.from("feeds").insert(formToFeedInsert(values));
+      if (!siteId) throw new Error("No site selected");
+      const { error } = await supabase.from("feeds").insert({ ...formToFeedInsert(values), site_id: siteId });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -251,6 +259,7 @@ function FeedsSection() {
     },
     onError: (err: Error) => setAddError(err.message),
   });
+
 
   const update = useMutation({
     mutationFn: async ({ id, values }: { id: string; values: FeedFormValues }) => {
@@ -306,7 +315,11 @@ function FeedsSection() {
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-      <h2 className="font-semibold mb-3">Feeds</h2>
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <h2 className="font-semibold">Feeds</h2>
+        <span className="text-xs text-muted-foreground">{siteName || "—"}</span>
+      </div>
+
       <ul className="space-y-3 mb-4">
         {feeds.data?.map((f) => (
           <li key={f.id} className="rounded-lg border border-border p-3">
@@ -362,20 +375,26 @@ function FeedsSection() {
             )}
           </li>
         ))}
-        {feeds.data?.length === 0 && <li className="text-sm text-muted-foreground">No feeds yet.</li>}
+        {feeds.data?.length === 0 && (
+          <li className="text-sm text-muted-foreground">No feeds at {siteName || "this site"} yet.</li>
+        )}
       </ul>
 
       <div className="rounded-xl border border-border bg-background/50 p-3 space-y-3">
         <h3 className="text-sm font-semibold">Add new feed</h3>
+        <p className="text-xs text-muted-foreground">
+          Saved for <span className="font-medium text-foreground">{siteName || "the selected site"}</span>.
+        </p>
         <FeedForm values={addValues} onChange={setAddValues} error={addError} />
         <button
           onClick={submitAdd}
-          disabled={add.isPending}
+          disabled={add.isPending || !siteId}
           className="w-full rounded-md bg-primary py-2 text-primary-foreground text-sm font-medium disabled:opacity-50"
         >
           <Plus className="h-4 w-4 inline mr-1" /> Add feed
         </button>
       </div>
+
     </section>
   );
 }

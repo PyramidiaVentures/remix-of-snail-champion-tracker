@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { writeWithRetry } from "@/lib/upsertRow";
+import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+
 import { uploadPopulationPhoto } from "@/lib/photoUpload";
 import { useSignedPhotoUrl } from "@/lib/useSignedPhotoUrl";
 import { today } from "@/lib/date";
@@ -51,18 +53,13 @@ function PopulationPage() {
   const qc = useQueryClient();
   const t = today();
   const [penFilter, setPenFilter] = useState<string>("all");
+  const { siteName, siteId } = useSiteScope();
 
-  const trial = useQuery({
-    queryKey: ["active-trial"],
-    queryFn: async () => (await supabase.from("trials").select("*").eq("status", "active").maybeSingle()).data,
-  });
+  const trial = useSiteTrial();
   const trialId = trial.data?.id;
 
-  const pens = useQuery({
-    queryKey: ["pens"],
-    queryFn: async () =>
-      (await supabase.from("pens").select("id,label,initial_snail_count")).data?.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })) ?? [],
-  });
+  const pens = useSitePens();
+
 
   const assignments = useQuery({
     queryKey: ["pen-assignments", trialId],
@@ -102,13 +99,11 @@ function PopulationPage() {
     void qc.invalidateQueries({ queryKey: ["population-events", trialId] });
   };
 
-  if (!trial.isLoading && !trial.data) {
+  if (!!siteId && !trial.isLoading && !trial.data) {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-bold">Population</h1>
-        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
-          No trial is active. <Link to="/trial" className="text-primary underline">Set up and start a trial.</Link>
-        </div>
+        <NoActiveTrial siteName={siteName} />
       </div>
     );
   }
@@ -116,9 +111,10 @@ function PopulationPage() {
   return (
     <div className="space-y-4">
       <header>
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">Population</div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">Population · {siteName}</div>
         <h1 className="text-2xl font-bold">Deaths, escapes, removals and additions.</h1>
       </header>
+
 
       {trialId && (
         <AddEventForm
@@ -169,12 +165,14 @@ function PopulationPage() {
       {trialId && (
         <Reconciliation
           trialId={trialId}
+          siteName={siteName}
           pens={trialPens}
           events={allEvents}
           biomass={biomass.data ?? []}
           onSaved={refresh}
         />
       )}
+
     </div>
   );
 }
@@ -198,9 +196,10 @@ interface MismatchRow {
 }
 
 function Reconciliation({
-  trialId, pens, events, biomass, onSaved,
+  trialId, siteName, pens, events, biomass, onSaved,
 }: {
   trialId: string;
+  siteName: string;
   pens: { id: string; label: string; initial_snail_count: number }[];
   events: PopRow[];
   biomass: { pen_id: string; event_date: string; live_count: number }[];
@@ -215,11 +214,14 @@ function Reconciliation({
       if (!last) return null;
       const derived = liveCount(p, events, last.event_date);
       const diff = last.live_count - derived;
+      // The pen is named with its site: "Pen 1" exists at more than one site.
+      const label = siteName ? `${p.label} · ${siteName}` : p.label;
       return diff === 0
         ? null
-        : { penId: p.id, label: p.label, date: last.event_date, derived, weighed: last.live_count, diff };
+        : { penId: p.id, label, date: last.event_date, derived, weighed: last.live_count, diff };
     })
     .filter(Boolean) as MismatchRow[];
+
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-2">
