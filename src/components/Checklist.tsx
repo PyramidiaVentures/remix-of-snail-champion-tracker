@@ -15,11 +15,14 @@ export function Checklist({
   title,
   items,
   overrides,
+  onProgress,
 }: {
   storageKey: string;
   title: string;
   items: string[];
   overrides?: (ChecklistItemOverride | undefined)[];
+  /** Reports (number ticked, all ticked) whenever progress changes. */
+  onProgress?: (doneCount: number, allDone: boolean) => void;
 }) {
   const [done, setDone] = useState<boolean[]>(() => items.map(() => false));
 
