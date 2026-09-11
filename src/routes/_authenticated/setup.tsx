@@ -138,7 +138,9 @@ function PensSection() {
             )}
           </li>
         ))}
-        {pens.data?.length === 0 && <li className="text-sm text-muted-foreground">No pens yet.</li>}
+        {pens.data?.length === 0 && (
+          <li className="text-sm text-muted-foreground">No pens at {siteName || "this site"} yet.</li>
+        )}
       </ul>
       <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
         <label className="text-xs col-span-full sm:col-span-1">
@@ -150,10 +152,14 @@ function PensSection() {
           <span className="block mb-1 text-muted-foreground">Initial snail count</span>
           <input type="number" value={count} onChange={(e) => setCount(Number(e.target.value))} className="w-20 rounded-md border border-input bg-background px-3 py-2" />
         </label>
-        <button disabled={!label} onClick={() => add.mutate()} className="rounded-md bg-primary px-3 py-2 text-primary-foreground text-sm font-medium disabled:opacity-50">
+        <button disabled={!label || !siteId} onClick={() => add.mutate()} className="rounded-md bg-primary px-3 py-2 text-primary-foreground text-sm font-medium disabled:opacity-50">
           <Plus className="h-4 w-4" />
         </button>
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        New pens are added at <span className="font-medium text-foreground">{siteName || "the selected site"}</span>.
+      </p>
+
       {trialActive && (
         <p className="mt-2 text-xs text-muted-foreground">
           A new pen can join a running trial — give it a treatment on the{" "}
