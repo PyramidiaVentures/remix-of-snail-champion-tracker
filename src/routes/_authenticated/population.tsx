@@ -196,9 +196,10 @@ interface MismatchRow {
 }
 
 function Reconciliation({
-  trialId, pens, events, biomass, onSaved,
+  trialId, siteName, pens, events, biomass, onSaved,
 }: {
   trialId: string;
+  siteName: string;
   pens: { id: string; label: string; initial_snail_count: number }[];
   events: PopRow[];
   biomass: { pen_id: string; event_date: string; live_count: number }[];
@@ -213,11 +214,14 @@ function Reconciliation({
       if (!last) return null;
       const derived = liveCount(p, events, last.event_date);
       const diff = last.live_count - derived;
+      // The pen is named with its site: "Pen 1" exists at more than one site.
+      const label = siteName ? `${p.label} · ${siteName}` : p.label;
       return diff === 0
         ? null
-        : { penId: p.id, label: p.label, date: last.event_date, derived, weighed: last.live_count, diff };
+        : { penId: p.id, label, date: last.event_date, derived, weighed: last.live_count, diff };
     })
     .filter(Boolean) as MismatchRow[];
+
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-2">
