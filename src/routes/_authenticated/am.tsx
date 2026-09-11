@@ -263,7 +263,14 @@ function AmPage() {
           className="mt-1 rounded-lg border border-input bg-card px-3 py-2" />
       </label>
 
-      <Checklist storageKey={`am-checklist-${date}`} title="AM steps" items={AM_STEPS} overrides={overrides} />
+      <Checklist
+        storageKey={`am-checklist-${date}`}
+        title="AM steps"
+        items={AM_STEPS}
+        overrides={overrides}
+        onProgress={onChecklistProgress}
+      />
+      <ChecklistBlocker started={checklistDone > 0} allDone={checklistAll} />
 
       {!trial.isLoading && !trial.data && (
         <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
