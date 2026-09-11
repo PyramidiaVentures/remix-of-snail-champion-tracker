@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { today } from "@/lib/date";
 import { Checklist } from "@/components/Checklist";
+import { ChecklistBlocker } from "@/components/ChecklistBlocker";
 import { NumberField } from "@/components/NumberField";
 import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
@@ -176,6 +177,13 @@ function PmPage() {
   const photosNeeded = trialPens.length;
   const allPhotos = photosNeeded > 0 && photosDone === photosNeeded;
 
+  const [checklistDone, setChecklistDone] = useState(0);
+  const [checklistAll, setChecklistAll] = useState(false);
+  const onChecklistProgress = useCallback((done: number, all: boolean) => {
+    setChecklistDone(done);
+    setChecklistAll(all);
+  }, []);
+
   const overrides = PM_STEPS.map((_, i) =>
     i === PM_PHOTO_STEP_INDEX
       ? {
@@ -211,7 +219,14 @@ function PmPage() {
           className="mt-1 rounded-lg border border-input bg-card px-3 py-2" />
       </label>
 
-      <Checklist storageKey={`pm-checklist-${date}`} title="PM steps" items={PM_STEPS} overrides={overrides} />
+      <Checklist
+        storageKey={`pm-checklist-${date}`}
+        title="PM steps"
+        items={PM_STEPS}
+        overrides={overrides}
+        onProgress={onChecklistProgress}
+      />
+      <ChecklistBlocker started={checklistDone > 0} allDone={checklistAll} />
 
       {!trial.isLoading && !trial.data && (
         <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">

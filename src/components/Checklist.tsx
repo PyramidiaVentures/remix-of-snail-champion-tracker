@@ -15,11 +15,14 @@ export function Checklist({
   title,
   items,
   overrides,
+  onProgress,
 }: {
   storageKey: string;
   title: string;
   items: string[];
   overrides?: (ChecklistItemOverride | undefined)[];
+  /** Reports (number ticked, all ticked) whenever progress changes. */
+  onProgress?: (doneCount: number, allDone: boolean) => void;
 }) {
   const [done, setDone] = useState<boolean[]>(() => items.map(() => false));
 
@@ -57,6 +60,10 @@ export function Checklist({
   });
   const completeCount = effective.filter(Boolean).length;
   const allDone = completeCount === items.length;
+
+  useEffect(() => {
+    onProgress?.(completeCount, allDone);
+  }, [completeCount, allDone, onProgress]);
 
   return (
     <section className="rounded-xl border border-border bg-card shadow-sm">
