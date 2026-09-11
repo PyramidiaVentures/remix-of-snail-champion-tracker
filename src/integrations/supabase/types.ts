@@ -86,6 +86,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          site_id: string
         }
         Insert: {
           cost_per_kg?: number | null
@@ -95,6 +96,7 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          site_id?: string
         }
         Update: {
           cost_per_kg?: number | null
@@ -104,8 +106,17 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          site_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "feeds_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       observations: {
         Row: {
@@ -240,6 +251,7 @@ export type Database = {
           initial_snail_count: number
           label: string
           notes: string | null
+          site_id: string
         }
         Insert: {
           area_m2?: number | null
@@ -248,6 +260,7 @@ export type Database = {
           initial_snail_count?: number
           label: string
           notes?: string | null
+          site_id?: string
         }
         Update: {
           area_m2?: number | null
@@ -256,8 +269,17 @@ export type Database = {
           initial_snail_count?: number
           label?: string
           notes?: string | null
+          site_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pens_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       population_events: {
         Row: {
@@ -364,6 +386,27 @@ export type Database = {
           },
         ]
       }
+      sites: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+        }
+        Relationships: []
+      }
       treatments: {
         Row: {
           created_at: string
@@ -415,6 +458,7 @@ export type Database = {
           name: string
           notes: string | null
           planned_end_date: string | null
+          site_id: string
           start_date: string
           status: Database["public"]["Enums"]["trial_status"]
           weighing_interval_days: number
@@ -427,6 +471,7 @@ export type Database = {
           name: string
           notes?: string | null
           planned_end_date?: string | null
+          site_id?: string
           start_date: string
           status?: Database["public"]["Enums"]["trial_status"]
           weighing_interval_days?: number
@@ -439,11 +484,46 @@ export type Database = {
           name?: string
           notes?: string | null
           planned_end_date?: string | null
+          site_id?: string
           start_date?: string
           status?: Database["public"]["Enums"]["trial_status"]
           weighing_interval_days?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "trials_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_site_preferences: {
+        Row: {
+          default_site_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          default_site_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          default_site_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_site_preferences_default_site_id_fkey"
+            columns: ["default_site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       welfare_checks: {
         Row: {
