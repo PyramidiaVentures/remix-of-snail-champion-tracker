@@ -180,7 +180,63 @@ function HomePage() {
   );
 }
 
+/** One compact line per other site: trial day and today's feeding completion. */
+function OtherSites({ currentSiteId, date }: { currentSiteId: string | null; date: string }) {
+  const { sites } = useSiteScope();
+  const otherIds = sites.filter((s) => s.id !== currentSiteId).map((s) => s.id);
+
+  const summary = useQuery({
+    queryKey: ["other-site-status", otherIds, date],
+    enabled: otherIds.length > 0,
+    queryFn: async () => {
+      const { data: trials } = await supabase
+        .from("trials")
+        .select("id,site_id,start_date")
+        .eq("status", "active")
+        .in("site_id", otherIds);
+      const list = trials ?? [];
+      if (list.length === 0) return [] as { siteId: string; day: number | null; fed: number; expected: number }[];
+      const ids = list.map((t) => t.id);
+      const [{ data: pa }, { data: obs }] = await Promise.all([
+        supabase.from("pen_assignments").select("trial_id,pen_id").in("trial_id", ids),
+        supabase.from("observations").select("trial_id,pen_id,offered_g").in("trial_id", ids).eq("obs_date", date),
+      ]);
+      return list.map((t) => ({
+        siteId: t.site_id,
+        day: t.start_date ? daysBetween(t.start_date, date) + 1 : null,
+        expected: new Set((pa ?? []).filter((r) => r.trial_id === t.id).map((r) => r.pen_id)).size,
+        fed: new Set(
+          (obs ?? []).filter((r) => r.trial_id === t.id && r.offered_g != null).map((r) => r.pen_id),
+        ).size,
+      }));
+    },
+  });
+
+  if (otherIds.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground space-y-1">
+      {sites
+        .filter((s) => s.id !== currentSiteId)
+        .map((s) => {
+          const row = summary.data?.find((r) => r.siteId === s.id);
+          return (
+            <div key={s.id}>
+              <span className="font-medium text-foreground">{s.name}</span>{" "}
+              {row
+                ? `· Day ${row.day ?? "—"} · fed ${row.fed}/${row.expected} today`
+                : summary.isPending
+                  ? "· loading…"
+                  : "· no active trial"}
+            </div>
+          );
+        })}
+    </div>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
+
   return (
     <div className="rounded-lg border border-border px-2 py-2">
       <dd className="text-lg font-semibold">{value}</dd>
