@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { upsertRow, BIOMASS_EVENTS_KEY } from "@/lib/upsertRow";
+import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+
 import { uploadWeighPhoto } from "@/lib/photoUpload";
 import { useSignedPhotoUrl } from "@/lib/useSignedPhotoUrl";
 import { runUpload, useUploads } from "@/lib/photoUploads.store";
@@ -56,16 +58,12 @@ function WeighPage() {
   const [date, setDate] = useState(today());
   const uploads = useUploads();
 
-  const trial = useQuery({
-    queryKey: ["active-trial"],
-    queryFn: async () => (await supabase.from("trials").select("*").eq("status", "active").maybeSingle()).data,
-  });
+  const { siteName, siteId } = useSiteScope();
+  const trial = useSiteTrial();
   const trialId = trial.data?.id;
 
-  const pens = useQuery({
-    queryKey: ["pens"],
-    queryFn: async () => (await supabase.from("pens").select("id,label,initial_snail_count")).data?.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })) ?? [],
-  });
+  const pens = useSitePens();
+
 
   const assignments = useQuery({
     queryKey: ["pen-assignments", trialId],
@@ -201,11 +199,8 @@ function WeighPage() {
 
       <Checklist storageKey={`weigh-checklist-${date}`} title="Weighing steps" items={WEIGH_STEPS} overrides={overrides} />
 
-      {!trial.isLoading && !trial.data && (
-        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
-          No trial is active. <Link to="/trial" className="text-primary underline">Set up and start a trial.</Link>
-        </div>
-      )}
+      {!!siteId && !trial.isLoading && !trial.data && <NoActiveTrial siteName={siteName} />}
+
 
       {trial.data && (
         <PenStepper
