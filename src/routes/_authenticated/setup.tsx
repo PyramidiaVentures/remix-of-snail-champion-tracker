@@ -7,6 +7,8 @@ import type { Database } from "@/integrations/supabase/types";
 import { useState } from "react";
 import { Plus, Trash2, Pencil, X, Check, Lock } from "lucide-react";
 import { usePensWithData, INITIAL_COUNT_LOCK_MESSAGE } from "@/lib/penDataLock";
+import { useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+
 
 
 export const Route = createFileRoute("/_authenticated/setup")({
@@ -373,20 +375,26 @@ function FeedsSection() {
             )}
           </li>
         ))}
-        {feeds.data?.length === 0 && <li className="text-sm text-muted-foreground">No feeds yet.</li>}
+        {feeds.data?.length === 0 && (
+          <li className="text-sm text-muted-foreground">No feeds at {siteName || "this site"} yet.</li>
+        )}
       </ul>
 
       <div className="rounded-xl border border-border bg-background/50 p-3 space-y-3">
         <h3 className="text-sm font-semibold">Add new feed</h3>
+        <p className="text-xs text-muted-foreground">
+          Saved for <span className="font-medium text-foreground">{siteName || "the selected site"}</span>.
+        </p>
         <FeedForm values={addValues} onChange={setAddValues} error={addError} />
         <button
           onClick={submitAdd}
-          disabled={add.isPending}
+          disabled={add.isPending || !siteId}
           className="w-full rounded-md bg-primary py-2 text-primary-foreground text-sm font-medium disabled:opacity-50"
         >
           <Plus className="h-4 w-4 inline mr-1" /> Add feed
         </button>
       </div>
+
     </section>
   );
 }
