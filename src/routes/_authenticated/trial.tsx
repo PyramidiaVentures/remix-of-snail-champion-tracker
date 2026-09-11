@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { Plus, Trash2, AlertTriangle, CheckCircle2, Lock } from "lucide-react";
 import { usePensWithData, TREATMENT_LOCK_MESSAGE } from "@/lib/penDataLock";
+import { useSiteFeeds, useSitePens, useSiteScope, useSiteTrials } from "@/lib/siteScope";
+
 
 import { today } from "@/lib/date";
 import { liveCount } from "@/lib/liveCount";
@@ -42,28 +44,17 @@ function TrialPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
 
-  const trials = useQuery({
-    queryKey: ["trials"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("trials").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as Trial[];
-    },
-  });
+  const { siteName, siteId } = useSiteScope();
 
-  const activeTrial = trials.data?.find((t) => t.status === "active") ?? null;
-  const setupTrial = trials.data?.find((t) => t.status === "setup") ?? null;
+  const trials = useSiteTrials();
+
+  const activeTrial = (trials.data?.find((t) => t.status === "active") ?? null) as Trial | null;
+  const setupTrial = (trials.data?.find((t) => t.status === "setup") ?? null) as Trial | null;
   const current = activeTrial ?? setupTrial;
 
-  const feeds = useQuery({
-    queryKey: ["feeds"],
-    queryFn: async () => ((await supabase.from("feeds").select("id,name").order("name")).data ?? []) as Feed[],
-  });
-  const pens = useQuery({
-    queryKey: ["pens"],
-    queryFn: async () =>
-      (await supabase.from("pens").select("id,label,initial_snail_count,area_m2")).data?.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })) ?? [],
-  });
+  const feeds = useSiteFeeds();
+  const pens = useSitePens();
+
   const popEvents = useQuery({
     queryKey: ["population-events", current?.id],
     enabled: !!current,
