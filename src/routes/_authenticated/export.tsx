@@ -147,12 +147,15 @@ async function buildRows(name: ExportName): Promise<Row[]> {
     }
     case "observations": {
       const [obs, photos] = await Promise.all([all("observations"), all("session_photos")]);
+      const signed = await signPhotoRefs(
+        photos.flatMap((p) => [p['photo_am_url'] as string, p['photo_pm_url'] as string]).filter(Boolean),
+      );
       const idx = new Map<string, { am: string; pm: string }>();
       for (const p of photos) {
         if (p['pen_id'] == null) continue;
         idx.set(`${p['trial_id']}|${p['pen_id']}|${p['obs_date']}`, {
-          am: (p['photo_am_url'] as string) ?? "",
-          pm: (p['photo_pm_url'] as string) ?? "",
+          am: signed.get(p['photo_am_url'] as string) ?? "",
+          pm: signed.get(p['photo_pm_url'] as string) ?? "",
         });
       }
       return obs.map((o) => {
