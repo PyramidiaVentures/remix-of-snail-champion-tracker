@@ -1,0 +1,1 @@
+- [ ] Mandatory AM/PM SOP checklists: popup on leaving with "I will come back to the task" / "I will check it now"
