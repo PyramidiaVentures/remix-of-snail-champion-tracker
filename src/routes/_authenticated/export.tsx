@@ -35,6 +35,25 @@ async function all(table: string): Promise<Row[]> {
   return (data ?? []) as Row[];
 }
 
+import { PHOTO_BUCKET, storagePathFromUrl } from "@/lib/photoUpload";
+
+/** Batch-sign photo references (stored public-style URLs or bare paths) so CSV
+ *  links open while the bucket is private. Valid for 7 days. */
+async function signPhotoRefs(values: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(values.filter(Boolean))];
+  const out = new Map<string, string>();
+  if (unique.length === 0) return out;
+  const paths = unique.map((v) => storagePathFromUrl(v));
+  const { data, error } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .createSignedUrls(paths, 7 * 24 * 3600);
+  if (error) return out;
+  data?.forEach((d, i) => {
+    if (d?.signedUrl) out.set(unique[i]!, d.signedUrl);
+  });
+  return out;
+}
+
 const EXPORTS = [
   "feeds",
   "pens",
@@ -86,8 +105,17 @@ async function buildRows(name: ExportName): Promise<Row[]> {
       return feeds;
     case "trials":
       return trials;
-    case "session_photos":
-      return all("session_photos");
+    case "session_photos": {
+      const rows = await all("session_photos");
+      const signed = await signPhotoRefs(
+        rows.flatMap((r) => [r['photo_am_url'] as string, r['photo_pm_url'] as string]).filter(Boolean),
+      );
+      return rows.map((r) => ({
+        ...r,
+        photo_am_url: signed.get(r['photo_am_url'] as string) ?? "",
+        photo_pm_url: signed.get(r['photo_pm_url'] as string) ?? "",
+      }));
+    }
     case "pens": {
       const d = today();
       return pens.map((p) => ({
@@ -119,12 +147,15 @@ async function buildRows(name: ExportName): Promise<Row[]> {
     }
     case "observations": {
       const [obs, photos] = await Promise.all([all("observations"), all("session_photos")]);
+      const signed = await signPhotoRefs(
+        photos.flatMap((p) => [p['photo_am_url'] as string, p['photo_pm_url'] as string]).filter(Boolean),
+      );
       const idx = new Map<string, { am: string; pm: string }>();
       for (const p of photos) {
         if (p['pen_id'] == null) continue;
         idx.set(`${p['trial_id']}|${p['pen_id']}|${p['obs_date']}`, {
-          am: (p['photo_am_url'] as string) ?? "",
-          pm: (p['photo_pm_url'] as string) ?? "",
+          am: signed.get(p['photo_am_url'] as string) ?? "",
+          pm: signed.get(p['photo_pm_url'] as string) ?? "",
         });
       }
       return obs.map((o) => {
@@ -141,11 +172,13 @@ async function buildRows(name: ExportName): Promise<Row[]> {
     }
     case "biomass_events": {
       const rows = await all("biomass_events");
+      const signed = await signPhotoRefs(rows.map((b) => b['photo_url'] as string).filter(Boolean));
       return rows.map((b) => {
         const n = (b['live_count'] as number) ?? 0;
         const net = (b['net_biomass_g'] as number) ?? 0;
         return {
           ...b,
+          photo_url: signed.get(b['photo_url'] as string) ?? "",
           mean_weight_g: n > 0 ? net / n : "",
           pen_label: penLabel.get(b['pen_id'] as string) ?? "",
           treatment_label: labelOfTreatmentForPen(b['trial_id'], b['pen_id']),
