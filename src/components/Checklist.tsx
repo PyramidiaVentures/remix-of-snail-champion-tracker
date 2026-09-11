@@ -61,6 +61,10 @@ export function Checklist({
   const completeCount = effective.filter(Boolean).length;
   const allDone = completeCount === items.length;
 
+  useEffect(() => {
+    onProgress?.(completeCount, allDone);
+  }, [completeCount, allDone, onProgress]);
+
   return (
     <section className="rounded-xl border border-border bg-card shadow-sm">
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
