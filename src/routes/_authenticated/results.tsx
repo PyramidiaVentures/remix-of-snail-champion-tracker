@@ -569,7 +569,7 @@ function Charts({
   const acclimationEnd = addDays(startDate, acclimationDays ?? 0);
   const dateIncluded = (d: string) => includeAcclimation || d >= acclimationEnd;
   const extrasFor = (pen: PenMetrics, iv: { from: string; to: string }) =>
-    intervalExtras(iv, observations.filter((o) => o.pen_id === pen.penId), dateIncluded);
+    intervalExtras(iv, observations.filter((o) => o.pen_id === pen.penId), dateIncluded, isOperating);
 
   const perInterval = spanSeriesFor(metrics, view, (p) =>
     p.intervals.map((i) => ({ from: i.from, to: i.to, y: i.offeredPerKgGain })));
@@ -774,7 +774,7 @@ function PenDetail({
       const rows = [...pen.intervals]
         .sort((a, b) => a.from.localeCompare(b.from))
         .map((iv) => {
-          const extras = intervalExtras(iv, penObs, dateIncluded);
+          const extras = intervalExtras(iv, penObs, dateIncluded, isOperating);
           const usable = iv.gain_g != null && iv.gain_g > 0;
           return {
             iv,
