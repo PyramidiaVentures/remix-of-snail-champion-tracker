@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
-import { Check, Lock } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, Lock, CloudOff } from "lucide-react";
+import {
+  fetchChecklist,
+  normalizeSteps,
+  readLocal,
+  saveChecklist,
+  writeLocal,
+  type SopSession,
+} from "@/lib/sopChecklist";
 
 export interface ChecklistItemOverride {
   /** Force this item complete (or not) regardless of user toggle. */
