@@ -4,6 +4,7 @@ import { toCsv, downloadCsv } from "@/lib/csv";
 import { useState } from "react";
 import { Download } from "lucide-react";
 import { computeMetrics, daysBetween, intervalExtras, roundOut } from "@/lib/metrics";
+import { makeCalendar } from "@/lib/operatingDays";
 
 const out = (v: number | null | undefined, dp: number): number | "" => roundOut(v, dp) ?? "";
 import { liveCount } from "@/lib/liveCount";
@@ -198,6 +199,15 @@ async function buildRows(name: ExportName): Promise<Row[]> {
       const trial = trials.find((t) => t['status'] === "active") ?? null;
       if (!trial) return [];
       const trialId = trial['id'] as string;
+      // Closed days are not expected to carry a feeding, so they never count
+      // as a missing feeding day.
+      const trialSiteId = trial['site_id'] as string | null;
+      const trialSite = sites.find((x) => x['id'] === trialSiteId);
+      const closures = (await all("site_closures")).filter((c) => c['site_id'] === trialSiteId);
+      const calendar = makeCalendar(
+        (trialSite?.['non_operating_weekdays'] as number[] | undefined) ?? [],
+        closures.map((c) => ({ closure_date: c['closure_date'] as string, reason: (c['reason'] as string) ?? null })),
+      );
       const [obs, biomass] = await Promise.all([all("observations"), all("biomass_events")]);
       // Breeder pens have no feed, so they never enter the analysis sheet.
       const trialObs = obs
@@ -258,7 +268,7 @@ async function buildRows(name: ExportName): Promise<Row[]> {
         const treatment = trialTreatments.find((t) => t.id === treatmentId);
         const penObs = trialObs.filter((o) => o.pen_id === pen.penId);
         for (const iv of pen.intervals) {
-          const extras = intervalExtras(iv, penObs, dateIncluded);
+          const extras = intervalExtras(iv, penObs, dateIncluded, calendar.isOperating);
           const usable = iv.gain_g != null && iv.gain_g > 0;
           rows.push({
             pen_label: pen.label,

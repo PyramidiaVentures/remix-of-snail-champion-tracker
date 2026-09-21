@@ -6,6 +6,8 @@ import { useMemo, useState } from "react";
 import { Plus, Trash2, AlertTriangle, CheckCircle2, Lock } from "lucide-react";
 import { usePensWithData, TREATMENT_LOCK_MESSAGE } from "@/lib/penDataLock";
 import { useSiteFeeds, useSitePens, useSiteScope, useSiteTrials } from "@/lib/siteScope";
+import { useSiteCalendar } from "@/lib/operatingDays";
+import { OperatingDaysEditor } from "@/components/OperatingDaysEditor";
 import { buildSchedule, overdueAdvisory, type SchedulePen } from "@/lib/weighSchedule";
 
 
@@ -185,6 +187,8 @@ function TrialPage() {
           />
         </>
       )}
+
+      <OperatingDaysEditor />
 
       <DesignIntegrityPanel
         pens={penList}
@@ -971,6 +975,7 @@ function WeighingSchedule({
   onChanged: () => void;
 }) {
   const t = today();
+  const { calendar } = useSiteCalendar();
   const [trialInterval, setTrialInterval] = useState(String(trial.weighing_interval_days));
 
   const startDateByPen = useMemo(() => {
@@ -987,8 +992,10 @@ function WeighingSchedule({
         startDateByPen,
         events,
         today: t,
+        isOperating: calendar.isOperating,
+        nextOperatingDay: calendar.nextOperatingDay,
       }),
-    [pens, trial.weighing_interval_days, startDateByPen, events, t],
+    [pens, trial.weighing_interval_days, startDateByPen, events, t, calendar],
   );
 
   const saveTrialDefault = useMutation({

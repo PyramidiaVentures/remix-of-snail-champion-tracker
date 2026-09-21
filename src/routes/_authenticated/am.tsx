@@ -10,8 +10,12 @@ import { ChecklistBlocker } from "@/components/ChecklistBlocker";
 import { NumberField } from "@/components/NumberField";
 import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
+import { ClosedDayNotice } from "@/components/ClosedDayNotice";
 import { useUploads } from "@/lib/photoUploads.store";
 import { liveCount } from "@/lib/liveCount";
+import { addDays } from "@/lib/metrics";
+import { useSiteCalendar } from "@/lib/operatingDays";
+
 import type { Database } from "@/integrations/supabase/types";
 import { BookOpen, AlertTriangle, CheckCircle2, Loader2, Save, Plus, Trash2 } from "lucide-react";
 
@@ -97,6 +101,8 @@ function AmPage() {
   const uploads = useUploads();
 
   const { siteName, siteId } = useSiteScope();
+  const { calendar } = useSiteCalendar();
+
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
 
@@ -295,6 +301,12 @@ function AmPage() {
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
           className="mt-1 rounded-lg border border-input bg-card px-3 py-2" />
       </label>
+
+      {/* The check for this date happens the next morning, so the closure that
+          matters is the one on date + 1. */}
+      <ClosedDayNotice calendar={calendar} date={addDays(date, 1)} siteName={siteName} session="AM" />
+
+
 
       <Checklist
         storageKey={`am-checklist-${date}`}

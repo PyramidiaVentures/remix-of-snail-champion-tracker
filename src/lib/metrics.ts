@@ -112,20 +112,32 @@ function maxOf(values: (number | null | undefined)[]): number | null {
   return Math.max(...xs);
 }
 
-/** Lengths of each consecutive run of dish_action = 'topped_up'. */
-export function carryOverRuns(actionsByDate: { date: string; action: string | null }[]): number[] {
+const EMPTYING_ACTIONS = new Set(["emptied_refilled", "emptied_spoiled"]);
+
+/**
+ * Carry-over age per recorded date: the number of CALENDAR DAYS since the dish
+ * was last emptied. Counting days, not entries, is what keeps a closed day
+ * honest — feed put in on Saturday is still sitting there on Monday even
+ * though nobody recorded anything on Sunday.
+ *
+ * A date is omitted when the dish has never been emptied before it, since its
+ * age is unknown.
+ */
+export function carryOverDaysSeries(
+  actionsByDate: { date: string; action: string | null }[],
+): { date: string; days: number }[] {
   const sorted = [...actionsByDate].sort((a, b) => a.date.localeCompare(b.date));
-  const runs: number[] = [];
-  let run = 0;
+  const out: { date: string; days: number }[] = [];
+  let lastEmptied: string | null = null;
   for (const row of sorted) {
-    if (row.action === "topped_up") run += 1;
-    else if (run > 0) {
-      runs.push(run);
-      run = 0;
+    if (row.action != null && EMPTYING_ACTIONS.has(row.action)) {
+      lastEmptied = row.date;
+      out.push({ date: row.date, days: 0 });
+    } else if (lastEmptied) {
+      out.push({ date: row.date, days: daysBetween(lastEmptied, row.date) });
     }
   }
-  if (run > 0) runs.push(run);
-  return runs;
+  return out;
 }
 
 export interface IntervalExtras {
@@ -139,34 +151,48 @@ export interface IntervalExtras {
  * Dish and feeding-day figures for one weighing interval.
  * Shared by the Results pen detail table and the interval_summary export so
  * the two can never drift apart.
+ *
+ * `isOperating` excludes the site's closed days from the expected feeding
+ * days — a planned closure is not a missed feeding.
  */
 export function intervalExtras(
   interval: { from: string; to: string },
   penObservations: { obs_date: string; offered_g: number | null; dish_action: string | null }[],
   dateIncluded: (d: string) => boolean,
+  isOperating: (d: string) => boolean = () => true,
 ): IntervalExtras {
   const inRange = penObservations.filter(
     (o) => o.obs_date > interval.from && o.obs_date <= interval.to && dateIncluded(o.obs_date),
   );
+
+  // Carry-over reads the pen's whole history so a dish emptied before the
+  // interval still dates the feed sitting inside it.
+  const allByDate = new Map<string, string | null>();
+  for (const o of penObservations) if (o.dish_action != null) allByDate.set(o.obs_date, o.dish_action);
+  const ages = carryOverDaysSeries(Array.from(allByDate, ([date, action]) => ({ date, action })))
+    .filter((r) => r.date > interval.from && r.date <= interval.to && dateIncluded(r.date))
+    .map((r) => r.days);
+
   const byDate = new Map<string, string | null>();
   for (const o of inRange) if (o.dish_action != null) byDate.set(o.obs_date, o.dish_action);
-  const runs = carryOverRuns(Array.from(byDate, ([date, action]) => ({ date, action })));
   const spoiled = Array.from(byDate.values()).filter((a) => a === "emptied_spoiled").length;
 
   const fedDates = new Set(inRange.filter((o) => o.offered_g != null).map((o) => o.obs_date));
   let missing = 0;
   for (let d = addDays(interval.from, 1); d <= interval.to; d = addDays(d, 1)) {
     if (!dateIncluded(d)) continue;
+    if (!isOperating(d)) continue;
     if (!fedDates.has(d)) missing += 1;
   }
 
   return {
     missingFeedingDays: missing,
-    meanCarryOverDays: byDate.size ? (runs.length ? runs.reduce((a, b) => a + b, 0) / runs.length : 0) : null,
-    maxCarryOverDays: byDate.size ? (runs.length ? Math.max(...runs) : 0) : null,
+    meanCarryOverDays: ages.length ? ages.reduce((a, b) => a + b, 0) / ages.length : null,
+    maxCarryOverDays: ages.length ? Math.max(...ages) : null,
     spoilageRate: byDate.size ? (spoiled / byDate.size) * 100 : null,
   };
 }
+
 
 export function computeMetrics(input: MetricsInput): TrialMetrics {
   const {
@@ -295,11 +321,15 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
         : null;
 
     // Carry-over and spoilage, from the recorded dish actions.
+    // Carry-over is days since the dish was last emptied, not entries counted.
     const actionRows = penObs.filter((o) => o.dish_action != null);
     const byDate = new Map<string, string | null>();
     for (const o of penObs) if (o.dish_action != null) byDate.set(o.obs_date, o.dish_action);
-    const runs = carryOverRuns(Array.from(byDate, ([date, action]) => ({ date, action })));
+    const ages = carryOverDaysSeries(
+      Array.from(byDate, ([date, action]) => ({ date, action })),
+    ).map((r) => r.days);
     const spoiled = actionRows.filter((o) => o.dish_action === "emptied_spoiled").length;
+
 
     let running = 0;
     const offeredSeries = Array.from(
@@ -323,8 +353,9 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
       meanSgr: meanOf(intervals.map((i) => i.sgr)),
       survival,
       meanFeedingRate: meanOf(intervals.map((i) => i.feedingRate)),
-      meanCarryOverDays: byDate.size ? (runs.length ? runs.reduce((a, b) => a + b, 0) / runs.length : 0) : null,
-      maxCarryOverDays: byDate.size ? (runs.length ? Math.max(...runs) : 0) : null,
+      meanCarryOverDays: ages.length ? ages.reduce((a, b) => a + b, 0) / ages.length : null,
+      maxCarryOverDays: ages.length ? Math.max(...ages) : null,
+
       spoilageRate: byDate.size ? (spoiled / byDate.size) * 100 : null,
       weightSeries,
       offeredSeries,

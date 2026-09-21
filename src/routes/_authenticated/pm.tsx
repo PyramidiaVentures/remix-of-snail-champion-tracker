@@ -8,9 +8,14 @@ import { ChecklistBlocker } from "@/components/ChecklistBlocker";
 import { NumberField } from "@/components/NumberField";
 import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
+import { ClosedDayNotice } from "@/components/ClosedDayNotice";
+
 import { useUploads } from "@/lib/photoUploads.store";
 import { upsertRow, OBSERVATIONS_TRIAL_KEY } from "@/lib/upsertRow";
 import { NoActiveTrial, useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+import { daysBetween } from "@/lib/metrics";
+import { useSiteCalendar } from "@/lib/operatingDays";
+
 
 import type { Database } from "@/integrations/supabase/types";
 import { BookOpen, Save, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
@@ -62,6 +67,8 @@ function PmPage() {
   const uploads = useUploads();
 
   const { siteName, siteId } = useSiteScope();
+  const { calendar } = useSiteCalendar();
+
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
 
@@ -144,26 +151,22 @@ function PmPage() {
   const stepperPens = useMemo(() => [...trialPens, ...breederPens], [trialPens, breederPens]);
   const isBreeder = (penId: string) => breederPens.some((p) => p.id === penId);
 
+  // Carry-over age = calendar days since the dish was last emptied, so a
+  // closed day in between still counts — the feed is physically still there.
   const carryOverByPen = useMemo(() => {
     const map = new Map<string, number>();
-    const byPen = new Map<string, { obs_date: string; dish_action: DishAction | null }[]>();
+    const lastEmptied = new Map<string, string>();
     for (const r of history.data ?? []) {
-      const list = byPen.get(r.pen_id) ?? [];
-      list.push({ obs_date: r.obs_date, dish_action: r.dish_action });
-      byPen.set(r.pen_id, list);
+      if (r.dish_action !== "emptied_refilled" && r.dish_action !== "emptied_spoiled") continue;
+      const prev = lastEmptied.get(r.pen_id);
+      if (!prev || r.obs_date > prev) lastEmptied.set(r.pen_id, r.obs_date);
     }
-    for (const [penId, rows] of byPen) {
-      let count = 0;
-      let expected = addDays(date, -1);
-      for (const r of rows) {
-        if (r.obs_date !== expected || r.dish_action !== "topped_up") break;
-        count++;
-        expected = addDays(expected, -1);
-      }
-      map.set(penId, count);
+    for (const [penId, emptiedOn] of lastEmptied) {
+      map.set(penId, daysBetween(emptiedOn, date));
     }
     return map;
   }, [history.data, date]);
+
 
   const rowFor = (penId: string) => (obs.data ?? []).find((o) => o.pen_id === penId);
   const photoUrlFor = (penId: string) => (photos.data ?? []).find((r) => r.pen_id === penId)?.photo_pm_url ?? null;
@@ -241,6 +244,9 @@ function PmPage() {
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
           className="mt-1 rounded-lg border border-input bg-card px-3 py-2" />
       </label>
+
+      <ClosedDayNotice calendar={calendar} date={date} siteName={siteName} session="PM" />
+
 
       <Checklist
         storageKey={`pm-checklist-${date}`}
@@ -354,8 +360,11 @@ function PenCard({
           Assigned feed: <span className="font-medium text-foreground">{feed.name}</span>
         </div>
         <div className={`mt-1 text-xs ${carryOver > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
-          {carryOver === 0 ? "Fresh dish" : `Carry-over day ${carryOver} — check against the discard criteria`}
+          {carryOver === 0
+            ? "Fresh dish"
+            : `${carryOver} day${carryOver === 1 ? "" : "s"} since the dish was last emptied — check against the discard criteria`}
         </div>
+
       </div>
 
       <div className="space-y-1">

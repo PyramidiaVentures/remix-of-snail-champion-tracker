@@ -15,6 +15,13 @@
       "when": 1789977410603,
       "tag": "0001_pen_weighing_interval",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789979976123,
+      "tag": "0002_non_operating_days",
+      "breakpoints": true
     }
   ]
 }

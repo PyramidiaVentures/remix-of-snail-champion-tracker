@@ -9,6 +9,7 @@ import { addDays, roundOut } from "@/lib/metrics";
 import { cumulativeMortality, liveCount } from "@/lib/liveCount";
 import { buildSchedule, type SchedulePen } from "@/lib/weighSchedule";
 import { NoActiveTrial, useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+import { useSiteCalendar } from "@/lib/operatingDays";
 import DashboardTrends from "@/components/DashboardTrends";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -108,7 +109,7 @@ type Exception = {
   key: string;
   group: string;
   text: string;
-  to: "/pm" | "/am" | "/weigh" | "/population";
+  to?: "/pm" | "/am" | "/weigh" | "/population";
   penId?: string;
 };
 
@@ -118,6 +119,13 @@ function DashboardPage() {
   const search = Route.useSearch();
   const date = search.date || today();
   const { siteId, siteName } = useSiteScope();
+  const { calendar } = useSiteCalendar();
+
+  // A closed day is never expected to carry a session. The morning check for a
+  // date happens the next morning, so it is expected only when date + 1 is open.
+  const pmExpected = calendar.pmExpected(date);
+  const amExpected = calendar.amExpected(date);
+  const closedReason = calendar.closedBecause(date);
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
@@ -232,13 +240,25 @@ function DashboardPage() {
         startDateByPen,
         events: (d?.biomass ?? []).filter((b) => b.event_date <= date),
         today: date,
+        isOperating: calendar.isOperating,
+        nextOperatingDay: calendar.nextOperatingDay,
       }),
-    [allPens, trial.data?.weighing_interval_days, startDateByPen, d?.biomass, date],
+    [allPens, trial.data?.weighing_interval_days, startDateByPen, d?.biomass, date, calendar],
   );
 
   /* -------------------------------------------------------- exceptions */
 
   const exceptions: Exception[] = [];
+
+  // On a closed day the site is not expected to do anything — one line, rather
+  // than every pen listed as missing.
+  if (closedReason) {
+    exceptions.push({
+      key: "closed",
+      group: "Closed",
+      text: `${closedReason} — no operations at ${siteName || "this site"}`,
+    });
+  }
 
   // Population events logged on the day.
   for (const e of (d?.pop ?? []).filter((r) => r.event_date === date)) {
@@ -273,8 +293,8 @@ function DashboardPage() {
     }
   }
 
-  // Missing and partial sessions.
-  for (const p of watched) {
+  // Missing and partial sessions — only for sessions that were expected.
+  for (const p of pmExpected ? watched : []) {
     const miss = pmMissing(p.id);
     if (miss.length === pmTotal(p.id)) {
       exceptions.push({ key: `pm-none-${p.id}`, group: "PM session", text: `${p.label} — no PM entry`, to: "/pm", penId: p.id });
@@ -282,7 +302,7 @@ function DashboardPage() {
       exceptions.push({ key: `pm-part-${p.id}`, group: "PM session", text: `${p.label} — partial PM entry, missing ${miss.join(", ")}`, to: "/pm", penId: p.id });
     }
   }
-  for (const p of watched) {
+  for (const p of amExpected ? watched : []) {
     const miss = amMissing(p.id);
     if (miss.length === amTotal(p.id)) {
       exceptions.push({ key: `am-none-${p.id}`, group: "AM session", text: `${p.label} — no AM entry`, to: "/am", penId: p.id });
@@ -293,12 +313,12 @@ function DashboardPage() {
 
   // SOP steps still unticked.
   const pmTicks = readChecklist(`pm-checklist-${date}`, PM_STEPS.length);
-  PM_STEPS.forEach((step, i) => {
+  (pmExpected ? PM_STEPS : []).forEach((step, i) => {
     const done = i === PM_PHOTO_STEP_INDEX ? pmPhotosAll : pmTicks[i];
     if (!done) exceptions.push({ key: `pmstep-${i}`, group: "PM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/pm" });
   });
   const amTicks = readChecklist(`am-checklist-${date}`, AM_STEPS.length);
-  AM_STEPS.forEach((step, i) => {
+  (amExpected ? AM_STEPS : []).forEach((step, i) => {
     const done = i === AM_PHOTO_STEP_INDEX ? amPhotosAll : amTicks[i];
     if (!done) exceptions.push({ key: `amstep-${i}`, group: "AM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/am" });
   });
@@ -306,11 +326,14 @@ function DashboardPage() {
   // Consecutive refusal runs ending on the selected date.
   const runLength = (penId: string, score: string) => {
     const byDate = new Map((d?.obs ?? []).filter((o) => o.pen_id === penId).map((o) => [o.obs_date, o.refusal_score]));
+    // Consecutive OPERATING days: a closure neither breaks a run nor counts
+    // towards one.
     let n = 0;
     let cursor = date;
+    while (calendar.isNonOperating(cursor)) cursor = addDays(cursor, -1);
     while (byDate.get(cursor) === score) {
       n += 1;
-      cursor = addDays(cursor, -1);
+      cursor = calendar.previousOperatingDay(cursor);
     }
     return n;
   };
@@ -470,6 +493,14 @@ function DashboardPage() {
               <ul className="divide-y divide-border text-sm">
                 {exceptions.map((e) => (
                   <li key={e.key} className="py-2">
+                    {!e.to ? (
+                      <span className="flex items-start gap-2">
+                        <span className="mr-2 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                          {e.group}
+                        </span>
+                        {e.text}
+                      </span>
+                    ) : (
                     <Link
                       to={e.to}
                       search={e.penId ? { pen: e.penId } : { pen: "" }}
@@ -483,6 +514,7 @@ function DashboardPage() {
                       </span>
                       <span className="shrink-0 text-xs text-primary underline">open</span>
                     </Link>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -495,14 +527,14 @@ function DashboardPage() {
               <ClipboardList className="h-4 w-4" /> Completeness
             </h2>
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <Figure label="Trial pens · PM" value={`${pmComplete(trialPens)}/${trialPens.length}`} />
-              <Figure label="Trial pens · AM" value={`${amComplete(trialPens)}/${trialPens.length}`} />
-              <Figure label="Breeder pens · PM" value={`${pmComplete(breederPens)}/${breederPens.length}`} />
-              <Figure label="Breeder pens · AM" value={`${amComplete(breederPens)}/${breederPens.length}`} />
+              <Figure label="Trial pens · PM" value={pmExpected ? `${pmComplete(trialPens)}/${trialPens.length}` : "not expected"} />
+              <Figure label="Trial pens · AM" value={amExpected ? `${amComplete(trialPens)}/${trialPens.length}` : "not expected"} />
+              <Figure label="Breeder pens · PM" value={pmExpected ? `${pmComplete(breederPens)}/${breederPens.length}` : "not expected"} />
+              <Figure label="Breeder pens · AM" value={amExpected ? `${amComplete(breederPens)}/${breederPens.length}` : "not expected"} />
             </div>
             <ul className="divide-y divide-border text-sm">
               {watched
-                .map((p) => ({ p, pm: pmMissing(p.id), am: amMissing(p.id) }))
+                .map((p) => ({ p, pm: pmExpected ? pmMissing(p.id) : [], am: amExpected ? amMissing(p.id) : [] }))
                 .filter((r) => r.pm.length > 0 || r.am.length > 0)
                 .map(({ p, pm, am }) => (
                   <li key={p.id} className="py-2">
@@ -516,8 +548,21 @@ function DashboardPage() {
                     </div>
                   </li>
                 ))}
-              {watched.every((p) => pmMissing(p.id).length === 0 && amMissing(p.id).length === 0) && (
-                <li className="py-2 text-sm text-primary">Every pen is complete for both sessions.</li>
+              {!pmExpected && !amExpected ? (
+                <li className="py-2 text-sm text-muted-foreground">
+                  {closedReason} — no feeding or check expected at {siteName || "this site"}.
+                </li>
+              ) : (
+                watched.every(
+                  (p) =>
+                    (!pmExpected || pmMissing(p.id).length === 0) &&
+                    (!amExpected || amMissing(p.id).length === 0),
+                ) && <li className="py-2 text-sm text-primary">Every expected entry is complete.</li>
+              )}
+              {pmExpected && !amExpected && (
+                <li className="py-2 text-xs text-muted-foreground">
+                  No morning check is expected for this date — {calendar.closedBecause(addDays(date, 1))} tomorrow.
+                </li>
               )}
             </ul>
           </section>

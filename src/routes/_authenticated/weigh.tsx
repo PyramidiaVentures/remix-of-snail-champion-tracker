@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { upsertRow, BIOMASS_EVENTS_KEY } from "@/lib/upsertRow";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+import { useSiteCalendar } from "@/lib/operatingDays";
 import { buildSchedule, overdueSummary, type PenSchedule, type SchedulePen } from "@/lib/weighSchedule";
 
 import { uploadWeighPhoto } from "@/lib/photoUpload";
@@ -64,6 +65,7 @@ function WeighPage() {
   const uploads = useUploads();
 
   const { siteName, siteId } = useSiteScope();
+  const { calendar } = useSiteCalendar();
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
 
@@ -131,8 +133,10 @@ function WeighPage() {
         startDateByPen,
         events: events.data ?? [],
         today: today(),
+        isOperating: calendar.isOperating,
+        nextOperatingDay: calendar.nextOperatingDay,
       }),
-    [pens.data, trial.data?.weighing_interval_days, startDateByPen, events.data],
+    [pens.data, trial.data?.weighing_interval_days, startDateByPen, events.data, calendar],
   );
   const scheduleFor = (penId: string) => scheduleRows.find((r) => r.penId === penId) ?? null;
   const dueCount = scheduleRows.filter((r) => r.dueToday).length;

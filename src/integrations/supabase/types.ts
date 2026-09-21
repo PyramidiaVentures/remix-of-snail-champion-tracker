@@ -392,23 +392,58 @@ export type Database = {
           },
         ]
       }
+      site_closures: {
+        Row: {
+          closure_date: string
+          created_at: string
+          id: string
+          reason: string | null
+          site_id: string
+        }
+        Insert: {
+          closure_date: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          site_id: string
+        }
+        Update: {
+          closure_date?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          site_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_closures_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sites: {
         Row: {
           created_at: string
           id: string
           name: string
+          non_operating_weekdays: number[]
           notes: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          non_operating_weekdays?: number[]
           notes?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          non_operating_weekdays?: number[]
           notes?: string | null
         }
         Relationships: []
