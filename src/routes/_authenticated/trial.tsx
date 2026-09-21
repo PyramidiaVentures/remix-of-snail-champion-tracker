@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { Plus, Trash2, AlertTriangle, CheckCircle2, Lock } from "lucide-react";
 import { usePensWithData, TREATMENT_LOCK_MESSAGE } from "@/lib/penDataLock";
 import { useSiteFeeds, useSitePens, useSiteScope, useSiteTrials } from "@/lib/siteScope";
+import { useSiteCalendar } from "@/lib/operatingDays";
 import { buildSchedule, overdueAdvisory, type SchedulePen } from "@/lib/weighSchedule";
 
 

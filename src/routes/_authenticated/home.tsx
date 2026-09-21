@@ -9,6 +9,7 @@ import {
 import { today } from "@/lib/date";
 import { daysBetween } from "@/lib/metrics";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+import { useSiteCalendar } from "@/lib/operatingDays";
 import { buildSchedule, overdueAdvisory, type SchedulePen } from "@/lib/weighSchedule";
 
 
@@ -37,6 +38,7 @@ function HomePage() {
   const t = today();
   const yesterday = shift(t, -1);
   const { siteName, siteId } = useSiteScope();
+  const { calendar } = useSiteCalendar();
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;

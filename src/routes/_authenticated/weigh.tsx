@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { upsertRow, BIOMASS_EVENTS_KEY } from "@/lib/upsertRow";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+import { useSiteCalendar } from "@/lib/operatingDays";
 import { buildSchedule, overdueSummary, type PenSchedule, type SchedulePen } from "@/lib/weighSchedule";
 
 import { uploadWeighPhoto } from "@/lib/photoUpload";
@@ -64,6 +65,7 @@ function WeighPage() {
   const uploads = useUploads();
 
   const { siteName, siteId } = useSiteScope();
+  const { calendar } = useSiteCalendar();
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
 
