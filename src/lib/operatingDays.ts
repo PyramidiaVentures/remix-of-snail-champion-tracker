@@ -24,7 +24,14 @@ export const WEEKDAY_NAMES = [
 ] as const;
 
 /** Postgres date-part dow: 0 = Sunday. */
+/** Today's date in the browser's local timezone, as YYYY-MM-DD. */
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function weekdayOf(date: string): number {
+
   return new Date(`${date}T00:00:00Z`).getUTCDay();
 }
 
@@ -49,8 +56,11 @@ export interface OperatingCalendar {
   nextOperatingDay: (date: string) => string;
   /** A PM feeding is expected on this date. */
   pmExpected: (date: string) => boolean;
-  /** An AM check is expected for this date (it happens the next morning). */
+  /** The morning the dish from this feeding is actually checked. */
+  checkDayFor: (date: string) => string;
+  /** An AM check is expected for this feeding (once its check morning has come). */
   amExpected: (date: string) => boolean;
+
   /** The previous operating day before the given date. */
   previousOperatingDay: (date: string) => string;
 }
@@ -86,7 +96,10 @@ export function makeCalendar(
     return d;
   };
 
+  const checkDayFor = (date: string) => nextOperatingDay(addDays(date, 1));
+
   return {
+
     nonOperatingWeekdays: Array.from(weekdays).sort(),
     closureReason: (date) => byDate.get(date) ?? null,
     isOperating,
@@ -94,11 +107,13 @@ export function makeCalendar(
     closedBecause,
     nextOperatingDay,
     pmExpected: isOperating,
-    // The check belongs to the feeding of date D, so it needs D itself to be
-    // an operating day as well as the morning after it.
-    amExpected: (date) => isOperating(date) && isOperating(addDays(date, 1)),
+    checkDayFor,
+    // The check belongs to the feeding of date D and happens on the next
+    // operating morning — so it is only expected once that morning has arrived.
+    amExpected: (date) => isOperating(date) && checkDayFor(date) <= localToday(),
 
     previousOperatingDay,
+
   };
 }
 

@@ -398,9 +398,10 @@ function DashboardPage() {
               )}
               {pmExpected && !amExpected && (
                 <li className="py-2 text-xs text-muted-foreground">
-                  No morning check is expected for this date — {calendar.closedBecause(addDays(date, 1))} tomorrow.
+                  The morning check for this feeding is done on {calendar.checkDayFor(date)} — not yet due.
                 </li>
               )}
+
             </ul>
           </section>
 
