@@ -438,6 +438,7 @@ function DashboardPage() {
             treatmentByPen={treatmentByPen}
             treatments={(treatments.data ?? []).map((t) => ({ id: t.id, label: t.label }))}
             breederPenIds={breederPenIds}
+            calendar={calendar}
           />
         </>
       )}
