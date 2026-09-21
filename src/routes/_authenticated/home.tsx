@@ -43,7 +43,10 @@ const longDate = (d: string) =>
 
 function HomePage() {
   const t = today();
-  const yesterday = shift(t, -1);
+  // The morning check done today completes the feeding from the previous
+  // operating day — Saturday's feed when Sunday is closed, never yesterday
+  // if it was a closed day.
+  const feedDay = calendar.previousOperatingDay(t);
   const { siteName, siteId } = useSiteScope();
   const { calendar } = useSiteCalendar();
 
