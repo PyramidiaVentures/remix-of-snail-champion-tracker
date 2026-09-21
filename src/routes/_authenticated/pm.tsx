@@ -272,6 +272,9 @@ function PmPage() {
           summaryFooter={
             <SessionCompleteButton
               label="Complete PM Feed"
+              session="pm"
+              trialId={trialId}
+              date={date}
               enabled={
                 stepperPens.length > 0 &&
                 stepperPens.every((p) => stateFor(p.id) === "complete") &&
