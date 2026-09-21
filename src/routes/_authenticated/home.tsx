@@ -62,11 +62,11 @@ function HomePage() {
 
 
   const daily = useQuery({
-    queryKey: ["home-daily", trialId, t], enabled: !!trialId,
+    queryKey: ["home-daily", trialId, t, feedDay], enabled: !!trialId,
     queryFn: async () => {
       const [obs, welfare, photos, biomass] = await Promise.all([
         supabase.from("observations").select("pen_id,obs_date,offered_g").eq("trial_id", trialId!),
-        supabase.from("welfare_checks").select("pen_id,obs_date").eq("trial_id", trialId!).eq("obs_date", yesterday),
+        supabase.from("welfare_checks").select("pen_id,obs_date").eq("trial_id", trialId!).eq("obs_date", feedDay),
         supabase.from("session_photos").select("pen_id,obs_date,photo_am_url,photo_pm_url").eq("trial_id", trialId!),
         supabase.from("biomass_events").select("pen_id,event_date").eq("trial_id", trialId!),
       ]);
