@@ -117,15 +117,34 @@ type Exception = {
 
 function DashboardPage() {
   const search = Route.useSearch();
-  const date = search.date || today();
   const { siteId, siteName } = useSiteScope();
   const { calendar } = useSiteCalendar();
+
+  // The last completed day: the most recent operating day before today. Today
+  // itself is a half-told story — its evening feeding has not happened yet.
+  const lastCompleted = calendar.previousOperatingDay(today());
+  const date = search.date || lastCompleted;
+  const isToday = date === today();
+  const isLastCompleted = date === lastCompleted;
+
+  const setDate = (v: string) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("date", v);
+    window.location.search = params.toString();
+  };
 
   // A closed day is never expected to carry a session. The morning check for a
   // date happens the next morning, so it is expected only when date + 1 is open.
   const pmExpected = calendar.pmExpected(date);
   const amExpected = calendar.amExpected(date);
   const closedReason = calendar.closedBecause(date);
+
+  // The most recent cycle is still running: the morning check for the last
+  // completed day may be happening right now, and today's evening feeding has
+  // not happened at all yet. Those gaps are "in progress", not exceptions.
+  const amInProgress = amExpected && (isLastCompleted || isToday);
+  const pmInProgress = pmExpected && isToday;
+
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
@@ -293,35 +312,50 @@ function DashboardPage() {
     }
   }
 
-  // Missing and partial sessions — only for sessions that were expected.
+  // Missing and partial sessions — only for sessions that were expected and
+  // whose window has closed. A session still under way is listed as in progress.
+  const inProgress: Exception[] = [];
   for (const p of pmExpected ? watched : []) {
     const miss = pmMissing(p.id);
-    if (miss.length === pmTotal(p.id)) {
-      exceptions.push({ key: `pm-none-${p.id}`, group: "PM session", text: `${p.label} — no PM entry`, to: "/pm", penId: p.id });
-    } else if (miss.length > 0) {
-      exceptions.push({ key: `pm-part-${p.id}`, group: "PM session", text: `${p.label} — partial PM entry, missing ${miss.join(", ")}`, to: "/pm", penId: p.id });
-    }
+    if (miss.length === 0) continue;
+    const whole = miss.length === pmTotal(p.id);
+    const text = whole
+      ? `${p.label} — no PM entry`
+      : `${p.label} — partial PM entry, missing ${miss.join(", ")}`;
+    const pending = whole
+      ? `${p.label} — evening feeding not yet recorded`
+      : `${p.label} — evening entry in progress, still to record ${miss.join(", ")}`;
+    (pmInProgress ? inProgress : exceptions).push({
+      key: `pm-${p.id}`, group: "PM session", text: pmInProgress ? pending : text, to: "/pm", penId: p.id,
+    });
   }
   for (const p of amExpected ? watched : []) {
     const miss = amMissing(p.id);
-    if (miss.length === amTotal(p.id)) {
-      exceptions.push({ key: `am-none-${p.id}`, group: "AM session", text: `${p.label} — no AM entry`, to: "/am", penId: p.id });
-    } else if (miss.length > 0) {
-      exceptions.push({ key: `am-part-${p.id}`, group: "AM session", text: `${p.label} — partial AM entry, missing ${miss.join(", ")}`, to: "/am", penId: p.id });
-    }
+    if (miss.length === 0) continue;
+    const whole = miss.length === amTotal(p.id);
+    const text = whole
+      ? `${p.label} — no AM entry`
+      : `${p.label} — partial AM entry, missing ${miss.join(", ")}`;
+    const pending = whole
+      ? `${p.label} — morning check not yet recorded`
+      : `${p.label} — morning entry in progress, still to record ${miss.join(", ")}`;
+    (amInProgress ? inProgress : exceptions).push({
+      key: `am-${p.id}`, group: "AM session", text: amInProgress ? pending : text, to: "/am", penId: p.id,
+    });
   }
 
   // SOP steps still unticked.
   const pmTicks = readChecklist(`pm-checklist-${date}`, PM_STEPS.length);
-  (pmExpected ? PM_STEPS : []).forEach((step, i) => {
+  (pmExpected && !pmInProgress ? PM_STEPS : []).forEach((step, i) => {
     const done = i === PM_PHOTO_STEP_INDEX ? pmPhotosAll : pmTicks[i];
     if (!done) exceptions.push({ key: `pmstep-${i}`, group: "PM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/pm" });
   });
   const amTicks = readChecklist(`am-checklist-${date}`, AM_STEPS.length);
-  (amExpected ? AM_STEPS : []).forEach((step, i) => {
+  (amExpected && !amInProgress ? AM_STEPS : []).forEach((step, i) => {
     const done = i === AM_PHOTO_STEP_INDEX ? amPhotosAll : amTicks[i];
     if (!done) exceptions.push({ key: `amstep-${i}`, group: "AM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/am" });
   });
+
 
   // Consecutive refusal runs ending on the selected date.
   const runLength = (penId: string, score: string) => {
@@ -453,26 +487,46 @@ function DashboardPage() {
       <header className="space-y-2">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">{siteName || "—"}</div>
         <h1 className="text-2xl font-bold">Daily dashboard</h1>
-        <p className="text-sm text-muted-foreground">{longDate(date)}</p>
+        <p className="text-base font-medium">Showing {longDate(date)}</p>
+        <p className="text-sm text-muted-foreground">
+          {isToday
+            ? "Today is still under way — this evening's feeding has not happened yet."
+            : isLastCompleted
+              ? "The last completed day. This morning's check may still be in progress."
+              : "A past day."}
+        </p>
         <Link to="/photos" search={{ date }} className="inline-block text-sm text-primary underline">
           Photo review — look at the evidence
         </Link>
-        <label className="block">
-          <span className="text-xs text-muted-foreground">Date</span>
-          <input
-            type="date"
-            value={date}
-            max={today()}
-            onChange={(e) => {
-              const v = e.currentTarget.value;
-              const params = new URLSearchParams(window.location.search);
-              params.set("date", v);
-              window.location.search = params.toString();
-            }}
-            className="mt-1 block rounded-lg border border-input bg-card px-3 py-2 text-sm"
-          />
-        </label>
+        <div className="flex flex-wrap items-end gap-2">
+          <button
+            type="button"
+            onClick={() => setDate(addDays(date, -1))}
+            className="rounded-lg border border-input bg-card px-3 py-2 text-sm"
+          >
+            ← Previous day
+          </button>
+          <label className="block">
+            <span className="text-xs text-muted-foreground">Date</span>
+            <input
+              type="date"
+              value={date}
+              max={today()}
+              onChange={(e) => setDate(e.currentTarget.value)}
+              className="mt-1 block rounded-lg border border-input bg-card px-3 py-2 text-sm"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={isToday}
+            onClick={() => setDate(addDays(date, 1))}
+            className="rounded-lg border border-input bg-card px-3 py-2 text-sm disabled:opacity-40"
+          >
+            Next day →
+          </button>
+        </div>
       </header>
+
 
       {!!siteId && !trial.isLoading && !trial.data ? (
         <NoActiveTrial siteName={siteName} />
@@ -521,6 +575,35 @@ function DashboardPage() {
             )}
           </section>
 
+          {/* 1b — IN PROGRESS */}
+          {!loading && inProgress.length > 0 && (
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide">In progress</h2>
+              <p className="text-xs text-muted-foreground">
+                {pmInProgress
+                  ? "This evening's feeding has not happened yet — nothing here is late."
+                  : "The morning check for this feeding happens this morning — nothing here is late."}
+              </p>
+              <ul className="divide-y divide-border text-sm">
+                {inProgress.map((e) => (
+                  <li key={e.key} className="py-2">
+                    <Link to={e.to!} search={e.penId ? { pen: e.penId } : { pen: "" }} className="flex items-start justify-between gap-3">
+                      <span>
+                        <span className="mr-2 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                          {e.group}
+                        </span>
+                        {e.text}
+                      </span>
+                      <span className="shrink-0 text-xs text-primary underline">open</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+
+
           {/* 2 — COMPLETENESS */}
           <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
@@ -543,9 +626,10 @@ function DashboardPage() {
                       {p.role === "breeder" && <span className="ml-1 text-xs font-normal text-muted-foreground">breeder</span>}
                     </span>
                     <div className="text-xs text-amber-600">
-                      {pm.length > 0 && <div>PM missing: {pm.join(", ")}</div>}
-                      {am.length > 0 && <div>AM missing: {am.join(", ")}</div>}
+                      {pm.length > 0 && <div>{pmInProgress ? "PM not yet recorded:" : "PM missing:"} {pm.join(", ")}</div>}
+                      {am.length > 0 && <div>{amInProgress ? "AM not yet recorded:" : "AM missing:"} {am.join(", ")}</div>}
                     </div>
+
                   </li>
                 ))}
               {!pmExpected && !amExpected ? (
