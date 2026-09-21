@@ -795,7 +795,18 @@ function BreederCard({
         </div>
       </div>
 
+      <PhotoCompare
+        trialId={trialId}
+        penId={pen.id}
+        date={date}
+        fedLabel={fedLabel}
+        offeredG={null}
+        pmUrl={pmPhotoUrl}
+        amUrl={photoUrl}
+      />
+
       <PenPhotoSlot
+
         trial_id={trialId}
         pen_id={pen.id}
         obs_date={date}
