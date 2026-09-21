@@ -65,6 +65,8 @@ function PmPage() {
   const uploads = useUploads();
 
   const { siteName, siteId } = useSiteScope();
+  const { calendar } = useSiteCalendar();
+
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
 
