@@ -92,9 +92,25 @@ function WeighPage() {
   );
 
   const trialPens: StepperPen[] = useMemo(
-    () => (pens.data ?? []).filter((p) => assignedPenIds.has(p.id)).map((p) => ({ id: p.id, label: p.label })),
+    () =>
+      (pens.data ?? [])
+        .filter((p) => p.role !== "breeder" && assignedPenIds.has(p.id))
+        .map((p) => ({ id: p.id, label: p.label, role: "trial" as const })),
     [pens.data, assignedPenIds],
   );
+
+  // Breeder pens may be weighed, but never have to be: they are listed so the
+  // option exists, and they are never counted as a missing weighing.
+  const breederPens: StepperPen[] = useMemo(
+    () =>
+      (pens.data ?? [])
+        .filter((p) => p.role === "breeder")
+        .map((p) => ({ id: p.id, label: p.label, role: "breeder" as const })),
+    [pens.data],
+  );
+
+  const stepperPens = useMemo(() => [...trialPens, ...breederPens], [trialPens, breederPens]);
+  const isBreeder = (penId: string) => breederPens.some((p) => p.id === penId);
 
   const rowFor = (penId: string) => (events.data ?? []).find((e) => e.pen_id === penId && e.event_date === date);
   const previousFor = (penId: string) =>
@@ -118,6 +134,8 @@ function WeighPage() {
 
   const missingFor = (penId: string) => {
     const row = rowFor(penId);
+    // Weighing a breeder pen is optional, so an empty one is never "missing".
+    if (isBreeder(penId) && !row) return [];
     const missing: string[] = [];
     if (row?.live_count == null) missing.push("live count");
     if (row?.net_biomass_g == null) missing.push("snail weight");
@@ -204,7 +222,7 @@ function WeighPage() {
 
       {trial.data && (
         <PenStepper
-          pens={trialPens}
+          pens={stepperPens}
           stateFor={stateFor}
           missingFor={missingFor}
           paramName="pen"

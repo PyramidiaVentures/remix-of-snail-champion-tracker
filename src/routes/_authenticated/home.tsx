@@ -63,16 +63,31 @@ function HomePage() {
     },
   });
 
+  // Trial pens and breeder pens are always counted apart, so a completion
+  // figure never silently mixes the two kinds of pen.
+  const breederIds = useMemo(
+    () => new Set((pens.data ?? []).filter((p) => p.role === "breeder").map((p) => p.id)),
+    [pens.data],
+  );
+  const trialOnly = <T extends { pen_id: string }>(rows: T[]) => rows.filter((r) => !breederIds.has(r.pen_id));
+
   const expected = assignments.data?.length ?? 0;
+  const breederExpected = breederIds.size;
   const fedToday = new Set(
-    (daily.data?.obs ?? []).filter((o) => o.obs_date === t && o.offered_g != null).map((o) => o.pen_id),
+    trialOnly((daily.data?.obs ?? []).filter((o) => o.obs_date === t && o.offered_g != null)).map((o) => o.pen_id),
   ).size;
-  const checked = new Set((daily.data?.welfare ?? []).map((w) => w.pen_id)).size;
+  const checked = new Set(trialOnly(daily.data?.welfare ?? []).map((w) => w.pen_id)).size;
   const pmPhotos = new Set(
-    (daily.data?.photos ?? []).filter((p) => p.obs_date === t && p.photo_pm_url).map((p) => p.pen_id),
+    trialOnly((daily.data?.photos ?? []).filter((p) => p.obs_date === t && p.photo_pm_url)).map((p) => p.pen_id),
   ).size;
   const amPhotos = new Set(
-    (daily.data?.photos ?? []).filter((p) => p.obs_date === yesterday && p.photo_am_url).map((p) => p.pen_id),
+    trialOnly((daily.data?.photos ?? []).filter((p) => p.obs_date === yesterday && p.photo_am_url)).map((p) => p.pen_id),
+  ).size;
+  const breederPmPhotos = new Set(
+    (daily.data?.photos ?? []).filter((p) => p.obs_date === t && p.photo_pm_url && breederIds.has(p.pen_id)).map((p) => p.pen_id),
+  ).size;
+  const breederAmPhotos = new Set(
+    (daily.data?.photos ?? []).filter((p) => p.obs_date === yesterday && p.photo_am_url && breederIds.has(p.pen_id)).map((p) => p.pen_id),
   ).size;
 
   const start = trial.data?.start_date as string | undefined;
@@ -91,7 +106,11 @@ function HomePage() {
     if (expected > 0 && fedToday < expected) advisories.push(`${expected - fedToday} pen(s) not yet fed today.`);
     if (expected > 0 && pmPhotos < expected) advisories.push(`${expected - pmPhotos} evening photo(s) missing for today.`);
     if (expected > 0 && checked < expected) advisories.push(`${expected - checked} morning check(s) missing for ${yesterday}.`);
-    const weighedPens = new Set((daily.data?.biomass ?? []).map((b) => b.pen_id)).size;
+    if (breederExpected > 0 && breederPmPhotos < breederExpected)
+      advisories.push(`${breederExpected - breederPmPhotos} breeder pen evening photo(s) missing for today.`);
+    if (breederExpected > 0 && breederAmPhotos < breederExpected)
+      advisories.push(`${breederExpected - breederAmPhotos} breeder pen morning photo(s) missing for ${yesterday}.`);
+    const weighedPens = new Set(trialOnly(daily.data?.biomass ?? []).map((b) => b.pen_id)).size;
     if (expected > 0 && weighedPens < expected) advisories.push(`${expected - weighedPens} pen(s) have never been weighed.`);
   }
 
