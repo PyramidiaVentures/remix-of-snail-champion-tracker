@@ -9,8 +9,15 @@ import {
 import { today } from "@/lib/date";
 import { daysBetween } from "@/lib/metrics";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
-import { useSiteCalendar } from "@/lib/operatingDays";
+import { useAllSiteCalendars, useSiteCalendar } from "@/lib/operatingDays";
 import { buildSchedule, overdueAdvisory, type SchedulePen } from "@/lib/weighSchedule";
+import {
+  computeDayReview,
+  fetchDayInputs,
+  lastCompletedDay,
+  summarizeExceptions,
+  type DayReviewPen,
+} from "@/lib/dayExceptions";
 
 
 export const Route = createFileRoute("/_authenticated/home")({
@@ -68,6 +75,31 @@ function HomePage() {
       };
     },
   });
+
+  // The exceptions summary reports the same date the dashboard defaults to —
+  // the last completed operating day — computed by the same shared function so
+  // the two screens can never disagree.
+  const reportDate = lastCompletedDay(calendar);
+  const dayInputs = useQuery({
+    queryKey: ["home-exceptions", trialId, reportDate],
+    enabled: !!trialId,
+    queryFn: () => fetchDayInputs(trialId!, reportDate),
+  });
+  const review = useMemo(
+    () =>
+      dayInputs.data && pens.data
+        ? computeDayReview({
+            pens: pens.data as DayReviewPen[],
+            assignments: assignments.data ?? [],
+            trialInterval: trial.data?.weighing_interval_days,
+            data: dayInputs.data,
+            calendar,
+            date: reportDate,
+            siteName: siteName || "",
+          })
+        : null,
+    [dayInputs.data, pens.data, assignments.data, trial.data?.weighing_interval_days, calendar, reportDate, siteName],
+  );
 
   // Trial pens and breeder pens are always counted apart, so a completion
   // figure never silently mixes the two kinds of pen.
