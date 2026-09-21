@@ -293,8 +293,8 @@ function AmPage() {
         <span className="font-semibold">Completing PM from {date}</span>
         <div className="text-xs text-muted-foreground mt-0.5">
           {isDefault
-            ? "Defaults to yesterday. Use the date picker below to catch up on a missed day."
-            : <>Manual date. <button type="button" className="text-primary underline" onClick={() => setDate(defaultDate)}>reset to yesterday</button></>}
+            ? `Defaults to the last feeding day at ${siteName} (${defaultDate}). Use the date picker below to catch up on a missed day.`
+            : <>Manual date. <button type="button" className="text-primary underline" onClick={() => setManualDate(null)}>reset to {defaultDate}</button></>}
         </div>
         {trial.data && obs.data && !anyPmForDate && (
           <div className="mt-2 text-xs text-amber-700">No PM entry found for {date}. Pick a different date if catching up.</div>
