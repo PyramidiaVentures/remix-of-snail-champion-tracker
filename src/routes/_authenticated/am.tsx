@@ -372,6 +372,11 @@ function AmPage() {
             stateFor={stateFor}
             missingFor={missingFor}
             paramName="pen"
+            summaryComplete={
+              stepperPens.length > 0 &&
+              stepperPens.every((p) => stateFor(p.id) === "complete") &&
+              checklistAll
+            }
             summaryFooter={
               <SessionCompleteButton
                 label="Complete AM Check"
