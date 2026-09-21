@@ -205,6 +205,8 @@ function AmPage() {
   const obsFor = (penId: string) => (obs.data ?? []).find((o) => o.pen_id === penId);
   const welfareFor = (penId: string) => (welfare.data ?? []).find((w) => w.pen_id === penId);
   const photoUrlFor = (penId: string) => (photos.data ?? []).find((r) => r.pen_id === penId)?.photo_am_url ?? null;
+  const pmPhotoUrlFor = (penId: string) => (photos.data ?? []).find((r) => r.pen_id === penId)?.photo_pm_url ?? null;
+
   const photoSaved = (penId: string) =>
     !!photoUrlFor(penId) || uploads.get(penPhotoKey(trialId ?? "", penId, date, "am"))?.status === "saved";
 
