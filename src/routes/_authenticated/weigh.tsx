@@ -109,8 +109,41 @@ function WeighPage() {
     [pens.data],
   );
 
-  const stepperPens = useMemo(() => [...trialPens, ...breederPens], [trialPens, breederPens]);
   const isBreeder = (penId: string) => breederPens.some((p) => p.id === penId);
+
+  // Per-pen weighing schedule. Scheduling only — no growth figure uses it.
+  const startDateByPen = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of assignments.data ?? []) if (!m.has(a.pen_id)) m.set(a.pen_id, a.start_date);
+    return m;
+  }, [assignments.data]);
+
+  const scheduleRows = useMemo(
+    () =>
+      buildSchedule({
+        pens: (pens.data ?? []) as SchedulePen[],
+        trialInterval: trial.data?.weighing_interval_days,
+        startDateByPen,
+        events: events.data ?? [],
+        today: today(),
+      }),
+    [pens.data, trial.data?.weighing_interval_days, startDateByPen, events.data],
+  );
+  const scheduleFor = (penId: string) => scheduleRows.find((r) => r.penId === penId) ?? null;
+  const dueCount = scheduleRows.filter((r) => r.dueToday).length;
+  const overdue = overdueSummary(scheduleRows);
+
+  const stepperPens = useMemo(
+    () =>
+      [...trialPens, ...breederPens].map((p) => {
+        const s = scheduleRows.find((r) => r.penId === p.id);
+        return {
+          ...p,
+          dueState: s?.overdueDays ? ("overdue" as const) : s?.dueToday ? ("due" as const) : undefined,
+        };
+      }),
+    [trialPens, breederPens, scheduleRows],
+  );
 
   const rowFor = (penId: string) => (events.data ?? []).find((e) => e.pen_id === penId && e.event_date === date);
   const previousFor = (penId: string) =>
