@@ -196,7 +196,7 @@ function HomePage() {
 
           <dl className="grid grid-cols-3 gap-2 text-center">
             <Stat label="Fed today" value={`${fedToday}/${expected}`} />
-            <Stat label={`Checks (${yesterday.slice(5)})`} value={`${checked}/${expected}`} />
+            <Stat label={`Checks (${feedDay.slice(5)})`} value={`${checked}/${expected}`} />
             <Stat label="Photos today" value={`${pmPhotos + amPhotos}/${expected * 2}`} />
           </dl>
 
