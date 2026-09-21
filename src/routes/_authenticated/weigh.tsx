@@ -11,6 +11,8 @@ import { uploadWeighPhoto } from "@/lib/photoUpload";
 import { useSignedPhotoUrl } from "@/lib/useSignedPhotoUrl";
 import { runUpload, useUploads } from "@/lib/photoUploads.store";
 import { today } from "@/lib/date";
+import { specificGrowthRate } from "@/lib/metrics";
+
 import { liveCount, hasAddition } from "@/lib/liveCount";
 import { Checklist } from "@/components/Checklist";
 import { NumberField } from "@/components/NumberField";
