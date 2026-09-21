@@ -375,6 +375,9 @@ function AmPage() {
             summaryFooter={
               <SessionCompleteButton
                 label="Complete AM Check"
+                session="am"
+                trialId={trialId}
+                date={date}
                 enabled={
                   stepperPens.length > 0 &&
                   stepperPens.every((p) => stateFor(p.id) === "complete") &&

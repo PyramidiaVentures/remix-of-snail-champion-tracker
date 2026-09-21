@@ -228,14 +228,15 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
         >
           <ChevronLeft className="h-5 w-5" /> Previous
         </button>
-        <button
-          type="button"
-          onClick={() => go(index + 1)}
-          disabled={index === n}
-          className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-4 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-        >
-          Next <ChevronRight className="h-5 w-5" />
-        </button>
+        {index < n && (
+          <button
+            type="button"
+            onClick={() => go(index + 1)}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-4 text-sm font-semibold text-primary-foreground"
+          >
+            Next <ChevronRight className="h-5 w-5" />
+          </button>
+        )}
       </div>
     </div>
   );
