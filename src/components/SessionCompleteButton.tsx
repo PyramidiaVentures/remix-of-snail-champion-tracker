@@ -40,8 +40,27 @@ function ConfettiOverlay() {
   );
 }
 
-function storageKey(session: string, trialId: string | null | undefined, date: string) {
+export function storageKey(session: string, trialId: string | null | undefined, date: string) {
   return `session-complete-${session}-${trialId ?? "none"}-${date}`;
+}
+
+/**
+ * True once the Complete button has actually been clicked for this
+ * trial/date/session (remembered on this device). The Summary pill uses it
+ * so it only turns green after completion, never merely when things look done.
+ */
+export function useSessionCompleted(
+  session: "pm" | "am",
+  trialId: string | null | undefined,
+  date: string,
+) {
+  const [completed, setCompleted] = useState(false);
+  useEffect(() => {
+    setCompleted(
+      typeof window !== "undefined" && !!window.localStorage.getItem(storageKey(session, trialId, date)),
+    );
+  }, [session, trialId, date]);
+  return completed;
 }
 
 /**
@@ -65,13 +84,7 @@ export function SessionCompleteButton({
 }) {
   const navigate = useNavigate();
   const [celebrating, setCelebrating] = useState(false);
-  const [completed, setCompleted] = useState(false);
-
-  useEffect(() => {
-    setCompleted(
-      typeof window !== "undefined" && !!window.localStorage.getItem(storageKey(session, trialId, date)),
-    );
-  }, [session, trialId, date]);
+  const completed = useSessionCompleted(session, trialId, date);
 
   useEffect(() => {
     if (!celebrating) return;

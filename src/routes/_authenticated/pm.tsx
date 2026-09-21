@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { today } from "@/lib/date";
 import { Checklist } from "@/components/Checklist";
 import { ChecklistBlocker } from "@/components/ChecklistBlocker";
-import { SessionCompleteButton } from "@/components/SessionCompleteButton";
+import { SessionCompleteButton, useSessionCompleted } from "@/components/SessionCompleteButton";
 import { NumberField } from "@/components/NumberField";
 import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
@@ -72,6 +72,8 @@ function PmPage() {
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
+  // The Summary pill goes green only once the Complete button was actually clicked.
+  const sessionCompleted = useSessionCompleted("pm", trialId, date);
 
   const pens = useSitePens();
 
@@ -269,11 +271,7 @@ function PmPage() {
           stateFor={stateFor}
           missingFor={missingFor}
           paramName="pen"
-          summaryComplete={
-            stepperPens.length > 0 &&
-            stepperPens.every((p) => stateFor(p.id) === "complete") &&
-            checklistAll
-          }
+          summaryComplete={sessionCompleted}
           summaryFooter={
             <SessionCompleteButton
               label="Complete PM Feed"
