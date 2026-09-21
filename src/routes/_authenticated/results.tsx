@@ -865,7 +865,8 @@ function PenDetail({
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <h2 className="font-semibold">Pen detail</h2>
       <p className="text-xs text-muted-foreground mb-2">
-        One row for each weighing interval, for every selected pen.
+        One row for each weighing interval, for every selected pen.{" "}
+        <Link to="/photos" className="text-primary underline">Photo review</Link>
       </p>
 
       <div className="mb-3">
