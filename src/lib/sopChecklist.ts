@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type SopSession = "pm" | "am";
+export type SopSession = "pm" | "am" | "weigh";
 
 /** Pad or trim a stored tick array to the current number of steps. */
 export function normalizeSteps(steps: boolean[] | null | undefined, length: number): boolean[] {
