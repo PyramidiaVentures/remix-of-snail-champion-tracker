@@ -102,10 +102,11 @@ function ResultsPage() {
     queryFn: async () => (await supabase.from("biomass_events").select("pen_id,event_date,net_biomass_g,live_count").eq("trial_id", trialId!)).data ?? [],
   });
 
+  // Breeder pens are never part of a treatment mean, so Results never sees them.
   const assignedPens = useMemo(
     () =>
       (pens.data ?? [])
-        .filter((p) => (assignments.data ?? []).some((a) => a.pen_id === p.id))
+        .filter((p) => p.role !== "breeder" && (assignments.data ?? []).some((a) => a.pen_id === p.id))
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })),
     [pens.data, assignments.data],
   );
