@@ -22,6 +22,20 @@
       "when": 1789979976123,
       "tag": "0002_non_operating_days",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789987474586,
+      "tag": "0003_create_sop_checklists",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789987546917,
+      "tag": "0004_allow_weigh_sop_session",
+      "breakpoints": true
     }
   ]
 }

@@ -309,7 +309,9 @@ function AmPage() {
 
 
       <Checklist
-        storageKey={`am-checklist-${date}`}
+        trialId={trialId}
+        date={date}
+        session="am"
         title="AM steps"
         items={AM_STEPS}
         overrides={overrides}

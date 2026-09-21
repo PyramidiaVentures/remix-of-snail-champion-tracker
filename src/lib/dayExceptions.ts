@@ -60,21 +60,8 @@ export const AM_STEPS = [
 ];
 export const AM_PHOTO_STEP_INDEX = 0;
 
-/** Ticked steps as the Checklist component stores them (today's ticks only). */
-function readChecklist(storageKey: string, length: number): boolean[] {
-  const empty = Array.from({ length }, () => false);
-  if (typeof window === "undefined") return empty;
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return empty;
-    const parsed = JSON.parse(raw) as { date: string; done: boolean[] };
-    const stamp = new Date().toISOString().slice(0, 10);
-    if (parsed.date !== stamp || parsed.done.length !== length) return empty;
-    return parsed.done;
-  } catch {
-    return empty;
-  }
-}
+// SOP ticks live in the database (table sop_checklists), so a step ticked on a
+// field phone is visible to everyone. They arrive through DayInputs.checklists.
 
 export type DayException = {
   key: string;
@@ -112,11 +99,12 @@ export type DayInputs = {
     cause: string | null;
   }[];
   biomass: { pen_id: string; event_date: string; net_biomass_g: number; live_count: number }[];
+  checklists: { session: string; steps: boolean[] | null }[];
 };
 
 /** Fetch every dataset the day review reads, for one trial and date. */
 export async function fetchDayInputs(trialId: string, date: string): Promise<DayInputs> {
-  const [obs, welfare, photos, pop, biomass] = await Promise.all([
+  const [obs, welfare, photos, pop, biomass, checklists] = await Promise.all([
     supabase.from("observations")
       .select("pen_id,obs_date,offered_g,dish_action,refusal_score,feed_id")
       .eq("trial_id", trialId).lte("obs_date", date),
@@ -129,6 +117,8 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
       .eq("trial_id", trialId),
     supabase.from("biomass_events").select("pen_id,event_date,net_biomass_g,live_count")
       .eq("trial_id", trialId),
+    supabase.from("sop_checklists").select("session,steps")
+      .eq("trial_id", trialId).eq("obs_date", date),
   ]);
   return {
     obs: obs.data ?? [],
@@ -136,6 +126,7 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
     photos: photos.data ?? [],
     pop: (pop.data ?? []) as DayInputs["pop"],
     biomass: biomass.data ?? [],
+    checklists: checklists.data ?? [],
   };
 }
 
@@ -315,12 +306,16 @@ export function computeDayReview(args: {
   }
 
   // SOP steps still unticked.
-  const pmTicks = readChecklist(`pm-checklist-${date}`, PM_STEPS.length);
+  const ticksFor = (session: string, length: number) => {
+    const steps = d.checklists.find((c) => c.session === session)?.steps ?? null;
+    return Array.from({ length }, (_, i) => Boolean(steps?.[i]));
+  };
+  const pmTicks = ticksFor("pm", PM_STEPS.length);
   (pmExpected && !pmInProgress ? PM_STEPS : []).forEach((step, i) => {
     const done = i === PM_PHOTO_STEP_INDEX ? pmPhotosAll : pmTicks[i];
     if (!done) exceptions.push({ key: `pmstep-${i}`, group: "PM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/pm" });
   });
-  const amTicks = readChecklist(`am-checklist-${date}`, AM_STEPS.length);
+  const amTicks = ticksFor("am", AM_STEPS.length);
   (amExpected && !amInProgress ? AM_STEPS : []).forEach((step, i) => {
     const done = i === AM_PHOTO_STEP_INDEX ? amPhotosAll : amTicks[i];
     if (!done) exceptions.push({ key: `amstep-${i}`, group: "AM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/am" });
