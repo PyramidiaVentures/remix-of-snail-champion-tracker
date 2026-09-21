@@ -20,46 +20,63 @@ export interface ChecklistItemOverride {
 }
 
 export function Checklist({
-  storageKey,
+  trialId,
+  date,
+  session,
   title,
   items,
   overrides,
   onProgress,
 }: {
-  storageKey: string;
+  /** Ticks are saved against the trial, so the whole team sees the same list. */
+  trialId: string | null | undefined;
+  date: string;
+  session: SopSession;
   title: string;
   items: string[];
   overrides?: (ChecklistItemOverride | undefined)[];
   /** Reports (number ticked, all ticked) whenever progress changes. */
   onProgress?: (doneCount: number, allDone: boolean) => void;
 }) {
-  const [done, setDone] = useState<boolean[]>(() => items.map(() => false));
+  const qc = useQueryClient();
+  const [pending, setPending] = useState<boolean[] | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
 
+  const saved = useQuery({
+    queryKey: ["sop-checklist", trialId, date, session],
+    enabled: !!trialId,
+    queryFn: () => fetchChecklist(trialId!, date, session),
+  });
+
+  // Whichever we have: the optimistic value being saved, the shared value from
+  // the database, or the local mirror while the connection is down.
+  const done = normalizeSteps(
+    pending ?? saved.data ?? readLocal(trialId ?? "", date, session, items.length),
+    items.length,
+  );
+
+  // Reset the optimistic value when the date or session changes.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { date: string; done: boolean[] };
-        const today = new Date().toISOString().slice(0, 10);
-        if (parsed.date === today && parsed.done.length === items.length) {
-          setDone(parsed.done);
-        }
-      }
-    } catch {}
-  }, [storageKey, items.length]);
+    setPending(null);
+    setSaveFailed(false);
+  }, [trialId, date, session]);
+
+  const save = useMutation({
+    mutationFn: (next: boolean[]) => saveChecklist(trialId!, date, session, next),
+    onSuccess: async () => {
+      setSaveFailed(false);
+      await qc.invalidateQueries({ queryKey: ["sop-checklist", trialId, date, session] });
+      setPending(null);
+    },
+    onError: () => setSaveFailed(true),
+  });
 
   const toggle = (i: number) => {
-    if (overrides?.[i]?.locked) return;
-    setDone((prev) => {
-      const next = prev.map((v, idx) => (idx === i ? !v : v));
-      try {
-        localStorage.setItem(
-          storageKey,
-          JSON.stringify({ date: new Date().toISOString().slice(0, 10), done: next }),
-        );
-      } catch {}
-      return next;
-    });
+    if (overrides?.[i]?.locked || !trialId) return;
+    const next = done.map((v, idx) => (idx === i ? !v : v));
+    setPending(next);
+    writeLocal(trialId, date, session, next);
+    save.mutate(next);
   };
 
   const effective = items.map((_, i) => {
