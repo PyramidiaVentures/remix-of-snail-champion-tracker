@@ -117,6 +117,8 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
       .eq("trial_id", trialId),
     supabase.from("biomass_events").select("pen_id,event_date,net_biomass_g,live_count")
       .eq("trial_id", trialId),
+    supabase.from("sop_checklists").select("session,steps")
+      .eq("trial_id", trialId).eq("obs_date", date),
   ]);
   return {
     obs: obs.data ?? [],
@@ -124,6 +126,7 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
     photos: photos.data ?? [],
     pop: (pop.data ?? []) as DayInputs["pop"],
     biomass: biomass.data ?? [],
+    checklists: checklists.data ?? [],
   };
 }
 
