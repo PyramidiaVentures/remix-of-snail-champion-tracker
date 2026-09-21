@@ -24,7 +24,14 @@ export const WEEKDAY_NAMES = [
 ] as const;
 
 /** Postgres date-part dow: 0 = Sunday. */
+/** Today's date in the browser's local timezone, as YYYY-MM-DD. */
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function weekdayOf(date: string): number {
+
   return new Date(`${date}T00:00:00Z`).getUTCDay();
 }
 
