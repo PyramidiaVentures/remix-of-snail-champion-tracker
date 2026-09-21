@@ -255,6 +255,7 @@ function WeighPage() {
               row={rowFor(pen.id)}
               previous={previousFor(pen.id)}
               ledger={ledgerFor(pen.id)}
+              schedule={scheduleFor(pen.id)}
               onSaved={refresh}
             />
           )}
