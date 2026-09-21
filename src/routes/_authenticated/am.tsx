@@ -11,6 +11,8 @@ import { SessionCompleteButton, useSessionCompleted } from "@/components/Session
 import { NumberField } from "@/components/NumberField";
 import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
+import { PhotoCompare } from "@/components/PhotoCompare";
+
 import { ClosedDayNotice } from "@/components/ClosedDayNotice";
 import { useUploads } from "@/lib/photoUploads.store";
 import { liveCount } from "@/lib/liveCount";
