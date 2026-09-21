@@ -353,8 +353,9 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
       meanSgr: meanOf(intervals.map((i) => i.sgr)),
       survival,
       meanFeedingRate: meanOf(intervals.map((i) => i.feedingRate)),
-      meanCarryOverDays: byDate.size ? (runs.length ? runs.reduce((a, b) => a + b, 0) / runs.length : 0) : null,
-      maxCarryOverDays: byDate.size ? (runs.length ? Math.max(...runs) : 0) : null,
+      meanCarryOverDays: ages.length ? ages.reduce((a, b) => a + b, 0) / ages.length : null,
+      maxCarryOverDays: ages.length ? Math.max(...ages) : null,
+
       spoilageRate: byDate.size ? (spoiled / byDate.size) * 100 : null,
       weightSeries,
       offeredSeries,
