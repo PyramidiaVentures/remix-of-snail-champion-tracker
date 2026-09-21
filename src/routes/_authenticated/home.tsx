@@ -351,9 +351,11 @@ function OtherSites({ currentSiteId, date }: { currentSiteId: string | null; dat
               <span className="font-medium text-foreground">{s.name}</span>{" "}
               {row
                 ? `· Day ${row.day ?? "—"} · fed ${row.fed}/${row.expected} today · ${
-                    row.exceptions === 0
-                      ? "clean"
-                      : `${row.exceptions} exception${row.exceptions === 1 ? "" : "s"}`
+                    row.exceptions === null
+                      ? `trial starts ${longDate(row.startDate!)}`
+                      : row.exceptions === 0
+                        ? "clean"
+                        : `${row.exceptions} exception${row.exceptions === 1 ? "" : "s"}`
                   }`
                 : summary.isPending
                   ? "· loading…"
