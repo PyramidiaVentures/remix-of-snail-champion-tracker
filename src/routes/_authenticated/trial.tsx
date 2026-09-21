@@ -95,7 +95,9 @@ function TrialPage() {
     qc.invalidateQueries({ queryKey: ["pen_assignments"] });
   };
 
-  const penList: Pen[] = (pens.data ?? []).map((p) => ({
+  // Breeder pens sit outside the trial, so they are never offered for
+  // treatment assignment and never hold up starting the trial.
+  const penList: Pen[] = (pens.data ?? []).filter((p) => p.role !== "breeder").map((p) => ({
     ...p,
     live_count: liveCount(p, popEvents.data ?? [], today()),
   }));
