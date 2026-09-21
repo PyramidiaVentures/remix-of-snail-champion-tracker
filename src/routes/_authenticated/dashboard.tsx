@@ -312,35 +312,50 @@ function DashboardPage() {
     }
   }
 
-  // Missing and partial sessions — only for sessions that were expected.
+  // Missing and partial sessions — only for sessions that were expected and
+  // whose window has closed. A session still under way is listed as in progress.
+  const inProgress: Exception[] = [];
   for (const p of pmExpected ? watched : []) {
     const miss = pmMissing(p.id);
-    if (miss.length === pmTotal(p.id)) {
-      exceptions.push({ key: `pm-none-${p.id}`, group: "PM session", text: `${p.label} — no PM entry`, to: "/pm", penId: p.id });
-    } else if (miss.length > 0) {
-      exceptions.push({ key: `pm-part-${p.id}`, group: "PM session", text: `${p.label} — partial PM entry, missing ${miss.join(", ")}`, to: "/pm", penId: p.id });
-    }
+    if (miss.length === 0) continue;
+    const whole = miss.length === pmTotal(p.id);
+    const text = whole
+      ? `${p.label} — no PM entry`
+      : `${p.label} — partial PM entry, missing ${miss.join(", ")}`;
+    const pending = whole
+      ? `${p.label} — evening feeding not yet recorded`
+      : `${p.label} — evening entry in progress, still to record ${miss.join(", ")}`;
+    (pmInProgress ? inProgress : exceptions).push({
+      key: `pm-${p.id}`, group: "PM session", text: pmInProgress ? pending : text, to: "/pm", penId: p.id,
+    });
   }
   for (const p of amExpected ? watched : []) {
     const miss = amMissing(p.id);
-    if (miss.length === amTotal(p.id)) {
-      exceptions.push({ key: `am-none-${p.id}`, group: "AM session", text: `${p.label} — no AM entry`, to: "/am", penId: p.id });
-    } else if (miss.length > 0) {
-      exceptions.push({ key: `am-part-${p.id}`, group: "AM session", text: `${p.label} — partial AM entry, missing ${miss.join(", ")}`, to: "/am", penId: p.id });
-    }
+    if (miss.length === 0) continue;
+    const whole = miss.length === amTotal(p.id);
+    const text = whole
+      ? `${p.label} — no AM entry`
+      : `${p.label} — partial AM entry, missing ${miss.join(", ")}`;
+    const pending = whole
+      ? `${p.label} — morning check not yet recorded`
+      : `${p.label} — morning entry in progress, still to record ${miss.join(", ")}`;
+    (amInProgress ? inProgress : exceptions).push({
+      key: `am-${p.id}`, group: "AM session", text: amInProgress ? pending : text, to: "/am", penId: p.id,
+    });
   }
 
   // SOP steps still unticked.
   const pmTicks = readChecklist(`pm-checklist-${date}`, PM_STEPS.length);
-  (pmExpected ? PM_STEPS : []).forEach((step, i) => {
+  (pmExpected && !pmInProgress ? PM_STEPS : []).forEach((step, i) => {
     const done = i === PM_PHOTO_STEP_INDEX ? pmPhotosAll : pmTicks[i];
     if (!done) exceptions.push({ key: `pmstep-${i}`, group: "PM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/pm" });
   });
   const amTicks = readChecklist(`am-checklist-${date}`, AM_STEPS.length);
-  (amExpected ? AM_STEPS : []).forEach((step, i) => {
+  (amExpected && !amInProgress ? AM_STEPS : []).forEach((step, i) => {
     const done = i === AM_PHOTO_STEP_INDEX ? amPhotosAll : amTicks[i];
     if (!done) exceptions.push({ key: `amstep-${i}`, group: "AM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/am" });
   });
+
 
   // Consecutive refusal runs ending on the selected date.
   const runLength = (penId: string, score: string) => {
