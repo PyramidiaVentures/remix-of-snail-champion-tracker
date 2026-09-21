@@ -10,6 +10,8 @@ export interface StepperPen {
   label: string;
   /** Breeder pens are monitored but sit outside the trial. Defaults to "trial". */
   role?: PenRole;
+  /** Weighing schedule marker, used on Weigh Day only. */
+  dueState?: "due" | "overdue";
 }
 
 interface Props {
