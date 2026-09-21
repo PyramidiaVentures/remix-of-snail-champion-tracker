@@ -294,7 +294,10 @@ function OtherSites({ currentSiteId, date }: { currentSiteId: string | null; dat
         .in("site_id", otherIds);
       const list = trials ?? [];
       if (list.length === 0)
-        return [] as { siteId: string; day: number | null; fed: number; expected: number; exceptions: number }[];
+        return [] as {
+          siteId: string; day: number | null; fed: number; expected: number;
+          exceptions: number | null; startDate: string | null;
+        }[];
       const ids = list.map((t) => t.id);
       const [{ data: pa }, { data: obs }, { data: sitePens }] = await Promise.all([
         supabase.from("pen_assignments").select("trial_id,pen_id,start_date").in("trial_id", ids),
@@ -305,26 +308,32 @@ function OtherSites({ currentSiteId, date }: { currentSiteId: string | null; dat
         list.map(async (t) => {
           const calendar = calendarFor(t.site_id);
           const reportDate = lastCompletedDay(calendar);
-          const inputs = await fetchDayInputs(t.id, reportDate);
-          const review = computeDayReview({
-            pens: (sitePens ?? []).filter((p) => p.site_id === t.site_id) as DayReviewPen[],
-            assignments: (pa ?? []).filter((r) => r.trial_id === t.id),
-            trialInterval: t.weighing_interval_days,
-            data: inputs,
-            calendar,
-            date: reportDate,
-            siteName: sites.find((s) => s.id === t.site_id)?.name ?? "",
-          });
+          // Never screen a day that falls before this site's trial began.
+          const beforeStart = !!t.start_date && reportDate < t.start_date;
+          const review = beforeStart
+            ? null
+            : computeDayReview({
+                pens: (sitePens ?? []).filter((p) => p.site_id === t.site_id) as DayReviewPen[],
+                assignments: (pa ?? []).filter((r) => r.trial_id === t.id),
+                trialInterval: t.weighing_interval_days,
+                data: await fetchDayInputs(t.id, reportDate),
+                calendar,
+                date: reportDate,
+                siteName: sites.find((s) => s.id === t.site_id)?.name ?? "",
+              });
           return {
             siteId: t.site_id,
+            startDate: t.start_date ?? null,
             day: t.start_date ? daysBetween(t.start_date, date) + 1 : null,
             expected: new Set((pa ?? []).filter((r) => r.trial_id === t.id).map((r) => r.pen_id)).size,
             fed: new Set(
               (obs ?? []).filter((r) => r.trial_id === t.id && r.offered_g != null).map((r) => r.pen_id),
             ).size,
-            exceptions: review.exceptions.length,
+            exceptions: review ? review.exceptions.length : null,
           };
         }),
+      );
+
       );
     },
   });
