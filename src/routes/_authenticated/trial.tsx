@@ -951,6 +951,198 @@ function DesignIntegrityPanel({
   );
 }
 
+/* ---------- Per-pen weighing schedule ---------- */
+
+function WeighingSchedule({
+  trial,
+  pens,
+  treatments,
+  assignmentByPen,
+  assignments,
+  events,
+  onChanged,
+}: {
+  trial: Trial;
+  pens: SchedulePen[];
+  treatments: Treatment[];
+  assignmentByPen: Map<string, string>;
+  assignments: Assignment[];
+  events: { pen_id: string; event_date: string }[];
+  onChanged: () => void;
+}) {
+  const t = today();
+  const [trialInterval, setTrialInterval] = useState(String(trial.weighing_interval_days));
+
+  const startDateByPen = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of assignments) if (!m.has(a.pen_id)) m.set(a.pen_id, a.start_date);
+    return m;
+  }, [assignments]);
+
+  const rows = useMemo(
+    () =>
+      buildSchedule({
+        pens,
+        trialInterval: trial.weighing_interval_days,
+        startDateByPen,
+        events,
+        today: t,
+      }),
+    [pens, trial.weighing_interval_days, startDateByPen, events, t],
+  );
+
+  const saveTrialDefault = useMutation({
+    mutationFn: async (days: number) => {
+      const { error } = await supabase.from("trials").update({ weighing_interval_days: days }).eq("id", trial.id);
+      if (error) throw error;
+    },
+    onSuccess: onChanged,
+  });
+
+  const savePenInterval = useMutation({
+    mutationFn: async (p: { penId: string; days: number | null }) => {
+      const { error } = await supabase.from("pens").update({ weighing_interval_days: p.days }).eq("id", p.penId);
+      if (error) throw error;
+    },
+    onSuccess: onChanged,
+  });
+
+  const advisory = overdueAdvisory(rows);
+  const treatmentFor = (penId: string) =>
+    treatments.find((x) => x.id === assignmentByPen.get(penId))?.label ?? "—";
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <h2 className="font-semibold">Weighing schedule</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Each pen can be weighed on its own rhythm. Changing an interval only affects future due dates — nothing already
+        recorded changes. Weighing a pen off-schedule is always fine.
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-border p-3">
+        <Field label="Trial default interval (days)">
+          <input
+            type="number"
+            min={1}
+            value={trialInterval}
+            onChange={(e) => setTrialInterval(e.target.value)}
+            className="inp w-28"
+          />
+        </Field>
+        <button
+          disabled={saveTrialDefault.isPending || !Number(trialInterval)}
+          onClick={() => saveTrialDefault.mutate(Number(trialInterval))}
+          className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
+          Save default
+        </button>
+        <span className="text-xs text-muted-foreground">Applies to every pen without its own interval.</span>
+      </div>
+
+      {advisory && <div className="mt-3"><Warn>{advisory}</Warn></div>}
+
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-muted-foreground">
+              <th className="py-1 pr-2">Pen</th>
+              <th className="py-1 pr-2">Treatment</th>
+              <th className="py-1 pr-2">Interval</th>
+              <th className="py-1 pr-2">Last weighed</th>
+              <th className="py-1 pr-2">Next due</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {rows.map((r) => (
+              <tr key={r.penId}>
+                <td className="py-2 pr-2 font-medium">
+                  {r.label}
+                  {r.isBreeder && <span className="ml-1 text-xs font-normal text-muted-foreground">breeder</span>}
+                </td>
+                <td className="py-2 pr-2 text-xs text-muted-foreground">
+                  {r.isBreeder ? "—" : treatmentFor(r.penId)}
+                </td>
+                <td className="py-2 pr-2">
+                  <IntervalCell
+                    value={pens.find((p) => p.id === r.penId)?.weighing_interval_days ?? null}
+                    trialDefault={trial.weighing_interval_days}
+                    breeder={r.isBreeder}
+                    onSave={(days) => savePenInterval.mutate({ penId: r.penId, days })}
+                  />
+                </td>
+                <td className="py-2 pr-2 text-xs">{r.lastWeighed ?? "—"}</td>
+                <td className="py-2 pr-2 text-xs">
+                  {r.nextDue == null ? (
+                    <span className="text-muted-foreground">No schedule</span>
+                  ) : r.overdueDays > 0 ? (
+                    <span className="font-medium text-destructive">
+                      {r.nextDue} · overdue by {r.overdueDays} day{r.overdueDays === 1 ? "" : "s"}
+                      {r.isBaseline ? " (baseline)" : ""}
+                    </span>
+                  ) : r.dueToday ? (
+                    <span className="font-medium text-primary">Due today{r.isBaseline ? " (baseline)" : ""}</span>
+                  ) : (
+                    <span>{r.nextDue}{r.isBaseline ? " (baseline)" : ""}</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-2 text-sm text-muted-foreground">No pens yet — add them in Setup.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function IntervalCell({
+  value,
+  trialDefault,
+  breeder,
+  onSave,
+}: {
+  value: number | null;
+  trialDefault: number;
+  breeder: boolean;
+  onSave: (days: number | null) => void;
+}) {
+  const [draft, setDraft] = useState(value == null ? "" : String(value));
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="number"
+        min={1}
+        value={draft}
+        placeholder={breeder ? "none" : `${trialDefault}`}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          const next = draft.trim() === "" ? null : Number(draft);
+          if (next !== value) onSave(next && next > 0 ? next : null);
+        }}
+        className="inp w-20"
+      />
+      {value != null ? (
+        <button
+          type="button"
+          onClick={() => { setDraft(""); onSave(null); }}
+          className="text-[11px] text-primary underline"
+        >
+          use trial default
+        </button>
+      ) : (
+        <span className="text-[11px] text-muted-foreground">
+          {breeder ? "not scheduled" : `trial default (${trialDefault})`}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function Warn({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
