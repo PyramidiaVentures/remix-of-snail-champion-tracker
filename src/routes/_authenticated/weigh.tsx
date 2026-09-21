@@ -222,14 +222,15 @@ function WeighPage() {
           className="mt-1 rounded-lg border border-input bg-card px-3 py-2" />
       </label>
 
-      {schedule && (
-        <div className={`rounded-lg border p-3 text-sm ${schedule.scheduled ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
-          <span className="font-semibold">{schedule.text}</span>
-          {!schedule.scheduled && (
-            <div className="mt-0.5 text-xs text-muted-foreground">
-              Pens may be weighed on a staggered rota — record whichever pens you weighed today.
-            </div>
-          )}
+      {trial.data && (
+        <div className={`rounded-lg border p-3 text-sm ${overdue.count > 0 ? "border-destructive/40 bg-destructive/5" : "border-border bg-card"}`}>
+          <span className="font-semibold">
+            {dueCount} pen{dueCount === 1 ? "" : "s"} due today, {overdue.count} overdue
+          </span>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            Every pen runs on its own interval. Weighing a pen off-schedule is always welcome — record whichever pens
+            you weighed today.
+          </div>
         </div>
       )}
 
