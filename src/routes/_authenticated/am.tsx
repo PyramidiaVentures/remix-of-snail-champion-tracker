@@ -461,7 +461,7 @@ function OptionRow<T extends string>({
 }
 
 function PenCard({
-  trialId, pen, feedId, date, obsRow, welfareRow, photoUrl, sessionTemp, sessionHumidity,
+  trialId, pen, feedId, date, obsRow, welfareRow, photoUrl, pmPhotoUrl, fedLabel, sessionTemp, sessionHumidity,
   penEvents, liveCountValue, onSaved,
 }: {
   trialId: string;
@@ -471,6 +471,9 @@ function PenCard({
   obsRow: ObsRow | undefined;
   welfareRow: WelfareRow | undefined;
   photoUrl: string | null;
+  pmPhotoUrl: string | null;
+  fedLabel: string;
+
   sessionTemp: number | null;
   sessionHumidity: number | null;
   penEvents: { id: string; event_type: PopulationEventType; count: number }[];
