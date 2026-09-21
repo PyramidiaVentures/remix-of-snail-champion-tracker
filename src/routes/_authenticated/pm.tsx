@@ -249,7 +249,9 @@ function PmPage() {
 
 
       <Checklist
-        storageKey={`pm-checklist-${date}`}
+        trialId={trialId}
+        date={date}
+        session="pm"
         title="PM steps"
         items={PM_STEPS}
         overrides={overrides}
