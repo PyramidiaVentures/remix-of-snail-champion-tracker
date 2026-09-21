@@ -372,6 +372,16 @@ function AmPage() {
             stateFor={stateFor}
             missingFor={missingFor}
             paramName="pen"
+            summaryFooter={
+              <SessionCompleteButton
+                label="Complete AM Check"
+                enabled={
+                  stepperPens.length > 0 &&
+                  stepperPens.every((p) => stateFor(p.id) === "complete") &&
+                  checklistAll
+                }
+              />
+            }
             renderPen={(pen) =>
               pen.role === "breeder" ? (
                 <BreederCard
