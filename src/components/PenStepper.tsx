@@ -175,10 +175,13 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
         <button
           type="button"
           onClick={() => go(n)}
-          className={`shrink-0 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground ${
-            index === n ? "ring-2 ring-ring ring-offset-1 ring-offset-background" : ""
-          }`}
+          className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
+            summaryComplete
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-card text-muted-foreground"
+          } ${index === n ? "ring-2 ring-ring ring-offset-1 ring-offset-background" : ""}`}
         >
+          {summaryComplete && <CheckCircle2 className="h-3.5 w-3.5" />}
           Summary
         </button>
       </div>
