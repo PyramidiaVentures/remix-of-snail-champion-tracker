@@ -11,6 +11,8 @@ import { SessionCompleteButton, useSessionCompleted } from "@/components/Session
 import { NumberField } from "@/components/NumberField";
 import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
+import { PhotoCompare } from "@/components/PhotoCompare";
+
 import { ClosedDayNotice } from "@/components/ClosedDayNotice";
 import { useUploads } from "@/lib/photoUploads.store";
 import { liveCount } from "@/lib/liveCount";
@@ -167,7 +169,7 @@ function AmPage() {
     queryKey: ["trial-photos", trialId, date],
     enabled: !!trialId,
     queryFn: async () =>
-      (await supabase.from("session_photos").select("pen_id,photo_am_url").eq("trial_id", trialId!).eq("obs_date", date)).data ?? [],
+      (await supabase.from("session_photos").select("pen_id,photo_am_url,photo_pm_url").eq("trial_id", trialId!).eq("obs_date", date)).data ?? [],
   });
 
   const feedByPen = useMemo(() => {
@@ -205,6 +207,8 @@ function AmPage() {
   const obsFor = (penId: string) => (obs.data ?? []).find((o) => o.pen_id === penId);
   const welfareFor = (penId: string) => (welfare.data ?? []).find((w) => w.pen_id === penId);
   const photoUrlFor = (penId: string) => (photos.data ?? []).find((r) => r.pen_id === penId)?.photo_am_url ?? null;
+  const pmPhotoUrlFor = (penId: string) => (photos.data ?? []).find((r) => r.pen_id === penId)?.photo_pm_url ?? null;
+
   const photoSaved = (penId: string) =>
     !!photoUrlFor(penId) || uploads.get(penPhotoKey(trialId ?? "", penId, date, "am"))?.status === "saved";
 
@@ -397,6 +401,8 @@ function AmPage() {
                   date={date}
                   welfareRow={welfareFor(pen.id)}
                   photoUrl={photoUrlFor(pen.id)}
+                  pmPhotoUrl={pmPhotoUrlFor(pen.id)}
+                  fedLabel={displayDate(date)}
                   sessionTemp={temp}
                   sessionHumidity={humidity}
                   penEvents={eventsForPenDate(pen.id)}
@@ -413,12 +419,15 @@ function AmPage() {
                 obsRow={obsFor(pen.id)}
                 welfareRow={welfareFor(pen.id)}
                 photoUrl={photoUrlFor(pen.id)}
+                pmPhotoUrl={pmPhotoUrlFor(pen.id)}
+                fedLabel={displayDate(date)}
                 sessionTemp={temp}
                 sessionHumidity={humidity}
                 penEvents={eventsForPenDate(pen.id)}
                 liveCountValue={liveCountFor(pen.id)}
                 onSaved={refresh}
               />
+
               )
             }
           />
@@ -454,7 +463,7 @@ function OptionRow<T extends string>({
 }
 
 function PenCard({
-  trialId, pen, feedId, date, obsRow, welfareRow, photoUrl, sessionTemp, sessionHumidity,
+  trialId, pen, feedId, date, obsRow, welfareRow, photoUrl, pmPhotoUrl, fedLabel, sessionTemp, sessionHumidity,
   penEvents, liveCountValue, onSaved,
 }: {
   trialId: string;
@@ -464,6 +473,9 @@ function PenCard({
   obsRow: ObsRow | undefined;
   welfareRow: WelfareRow | undefined;
   photoUrl: string | null;
+  pmPhotoUrl: string | null;
+  fedLabel: string;
+
   sessionTemp: number | null;
   sessionHumidity: number | null;
   penEvents: { id: string; event_type: PopulationEventType; count: number }[];
@@ -566,7 +578,18 @@ function PenCard({
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-4">
       <div className="text-lg font-bold">{pen.label}</div>
 
+      <PhotoCompare
+        trialId={trialId}
+        penId={pen.id}
+        date={date}
+        fedLabel={fedLabel}
+        offeredG={obsRow?.offered_g != null ? Number(obsRow.offered_g) : null}
+        pmUrl={pmPhotoUrl}
+        amUrl={photoUrl}
+      />
+
       <PenPhotoSlot
+
         trial_id={trialId}
         pen_id={pen.id}
         obs_date={date}
@@ -685,7 +708,7 @@ function PenCard({
  * and no feed, while substrate, health, deaths and notes are all still logged.
  */
 function BreederCard({
-  trialId, pen, date, welfareRow, photoUrl, sessionTemp, sessionHumidity,
+  trialId, pen, date, welfareRow, photoUrl, pmPhotoUrl, fedLabel, sessionTemp, sessionHumidity,
   penEvents, liveCountValue, onSaved,
 }: {
   trialId: string;
@@ -693,6 +716,9 @@ function BreederCard({
   date: string;
   welfareRow: WelfareRow | undefined;
   photoUrl: string | null;
+  pmPhotoUrl: string | null;
+  fedLabel: string;
+
   sessionTemp: number | null;
   sessionHumidity: number | null;
   penEvents: { id: string; event_type: PopulationEventType; count: number }[];
@@ -782,7 +808,18 @@ function BreederCard({
         </div>
       </div>
 
+      <PhotoCompare
+        trialId={trialId}
+        penId={pen.id}
+        date={date}
+        fedLabel={fedLabel}
+        offeredG={null}
+        pmUrl={pmPhotoUrl}
+        amUrl={photoUrl}
+      />
+
       <PenPhotoSlot
+
         trial_id={trialId}
         pen_id={pen.id}
         obs_date={date}
