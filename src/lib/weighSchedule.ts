@@ -37,6 +37,8 @@ export function buildSchedule({
   startDateByPen,
   events,
   today,
+  isOperating = () => true,
+  nextOperatingDay,
 }: {
   pens: SchedulePen[];
   trialInterval: number | null | undefined;
@@ -44,12 +46,22 @@ export function buildSchedule({
   startDateByPen: Map<string, string>;
   events: { pen_id: string; event_date: string }[];
   today: string;
+  /** Site operating calendar: a pen due on a closed day rolls to the next open one. */
+  isOperating?: (d: string) => boolean;
+  nextOperatingDay?: (d: string) => string;
 }): PenSchedule[] {
   const lastByPen = new Map<string, string>();
   for (const e of events) {
     const prev = lastByPen.get(e.pen_id);
     if (!prev || e.event_date > prev) lastByPen.set(e.pen_id, e.event_date);
   }
+
+  const roll = (d: string) => {
+    if (nextOperatingDay) return nextOperatingDay(d);
+    let cursor = d;
+    for (let i = 0; i < 366 && !isOperating(cursor); i++) cursor = addDays(cursor, 1);
+    return cursor;
+  };
 
   return pens.map((p) => {
     const isBreeder = p.role === "breeder";
@@ -69,6 +81,9 @@ export function buildSchedule({
         isBaseline = true;
       }
     }
+    // A pen due on a non-operating day is due on the next operating day, and
+    // is not overdue until then.
+    if (nextDue) nextDue = roll(nextDue);
 
     const overdueDays = nextDue && nextDue < today ? daysBetween(nextDue, today) : 0;
     return {
@@ -85,6 +100,7 @@ export function buildSchedule({
     };
   });
 }
+
 
 export function overdueSummary(rows: PenSchedule[]) {
   const overdue = rows.filter((r) => r.overdueDays > 0);
