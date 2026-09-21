@@ -254,23 +254,35 @@ function PmPage() {
 
       {trial.data && (
         <PenStepper
-          pens={trialPens}
+          pens={stepperPens}
           stateFor={stateFor}
           missingFor={missingFor}
           paramName="pen"
-          renderPen={(pen) => (
-            <PenCard
-              key={pen.id}
-              trial={trial.data!}
-              pen={pen}
-              feed={feedByPen.get(pen.id)!}
-              date={date}
-              row={rowFor(pen.id)}
-              carryOver={carryOverByPen.get(pen.id) ?? 0}
-              photoUrl={photoUrlFor(pen.id)}
-              onSaved={refresh}
-            />
-          )}
+          renderPen={(pen) =>
+            pen.role === "breeder" ? (
+              <BreederCard
+                key={pen.id}
+                trial={trial.data!}
+                pen={pen}
+                date={date}
+                row={rowFor(pen.id)}
+                photoUrl={photoUrlFor(pen.id)}
+                onSaved={refresh}
+              />
+            ) : (
+              <PenCard
+                key={pen.id}
+                trial={trial.data!}
+                pen={pen}
+                feed={feedByPen.get(pen.id)!}
+                date={date}
+                row={rowFor(pen.id)}
+                carryOver={carryOverByPen.get(pen.id) ?? 0}
+                photoUrl={photoUrlFor(pen.id)}
+                onSaved={refresh}
+              />
+            )
+          }
         />
       )}
 
