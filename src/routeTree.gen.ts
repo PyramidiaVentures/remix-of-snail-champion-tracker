@@ -18,6 +18,7 @@ import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedResultsRouteImport } from './routes/_authenticated/results'
 import { Route as AuthenticatedPopulationRouteImport } from './routes/_authenticated/population'
 import { Route as AuthenticatedPmRouteImport } from './routes/_authenticated/pm'
+import { Route as AuthenticatedPhotosRouteImport } from './routes/_authenticated/photos'
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
 import { Route as AuthenticatedGuideRouteImport } from './routes/_authenticated/guide'
 import { Route as AuthenticatedExportRouteImport } from './routes/_authenticated/export'
@@ -68,6 +69,11 @@ const AuthenticatedPmRoute = AuthenticatedPmRouteImport.update({
   path: '/pm',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPhotosRoute = AuthenticatedPhotosRouteImport.update({
+  id: '/photos',
+  path: '/photos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
   id: '/home',
   path: '/home',
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/export': typeof AuthenticatedExportRoute
   '/guide': typeof AuthenticatedGuideRoute
   '/home': typeof AuthenticatedHomeRoute
+  '/photos': typeof AuthenticatedPhotosRoute
   '/pm': typeof AuthenticatedPmRoute
   '/population': typeof AuthenticatedPopulationRoute
   '/results': typeof AuthenticatedResultsRoute
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/export': typeof AuthenticatedExportRoute
   '/guide': typeof AuthenticatedGuideRoute
   '/home': typeof AuthenticatedHomeRoute
+  '/photos': typeof AuthenticatedPhotosRoute
   '/pm': typeof AuthenticatedPmRoute
   '/population': typeof AuthenticatedPopulationRoute
   '/results': typeof AuthenticatedResultsRoute
@@ -134,6 +142,7 @@ export interface FileRoutesById {
   '/_authenticated/export': typeof AuthenticatedExportRoute
   '/_authenticated/guide': typeof AuthenticatedGuideRoute
   '/_authenticated/home': typeof AuthenticatedHomeRoute
+  '/_authenticated/photos': typeof AuthenticatedPhotosRoute
   '/_authenticated/pm': typeof AuthenticatedPmRoute
   '/_authenticated/population': typeof AuthenticatedPopulationRoute
   '/_authenticated/results': typeof AuthenticatedResultsRoute
@@ -151,6 +160,7 @@ export interface FileRouteTypes {
     | '/export'
     | '/guide'
     | '/home'
+    | '/photos'
     | '/pm'
     | '/population'
     | '/results'
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/export'
     | '/guide'
     | '/home'
+    | '/photos'
     | '/pm'
     | '/population'
     | '/results'
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '/_authenticated/export'
     | '/_authenticated/guide'
     | '/_authenticated/home'
+    | '/_authenticated/photos'
     | '/_authenticated/pm'
     | '/_authenticated/population'
     | '/_authenticated/results'
@@ -261,6 +273,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPmRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/photos': {
+      id: '/_authenticated/photos'
+      path: '/photos'
+      fullPath: '/photos'
+      preLoaderRoute: typeof AuthenticatedPhotosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/home': {
       id: '/_authenticated/home'
       path: '/home'
@@ -305,6 +324,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedExportRoute: typeof AuthenticatedExportRoute
   AuthenticatedGuideRoute: typeof AuthenticatedGuideRoute
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
+  AuthenticatedPhotosRoute: typeof AuthenticatedPhotosRoute
   AuthenticatedPmRoute: typeof AuthenticatedPmRoute
   AuthenticatedPopulationRoute: typeof AuthenticatedPopulationRoute
   AuthenticatedResultsRoute: typeof AuthenticatedResultsRoute
@@ -319,6 +339,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedExportRoute: AuthenticatedExportRoute,
   AuthenticatedGuideRoute: AuthenticatedGuideRoute,
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
+  AuthenticatedPhotosRoute: AuthenticatedPhotosRoute,
   AuthenticatedPmRoute: AuthenticatedPmRoute,
   AuthenticatedPopulationRoute: AuthenticatedPopulationRoute,
   AuthenticatedResultsRoute: AuthenticatedResultsRoute,

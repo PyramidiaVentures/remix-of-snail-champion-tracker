@@ -431,6 +431,9 @@ function DashboardPage() {
         <div className="text-xs uppercase tracking-wide text-muted-foreground">{siteName || "—"}</div>
         <h1 className="text-2xl font-bold">Daily dashboard</h1>
         <p className="text-sm text-muted-foreground">{longDate(date)}</p>
+        <Link to="/photos" search={{ date }} className="inline-block text-sm text-primary underline">
+          Photo review — look at the evidence
+        </Link>
         <label className="block">
           <span className="text-xs text-muted-foreground">Date</span>
           <input

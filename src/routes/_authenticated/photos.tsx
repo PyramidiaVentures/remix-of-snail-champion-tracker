@@ -1,0 +1,273 @@
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+
+import { supabase } from "@/integrations/supabase/client";
+import { today } from "@/lib/date";
+import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
+import { PhotoFrame, PhotoLightbox } from "@/components/PhotoFrame";
+import { useSitePens, useSiteScope } from "@/lib/siteScope";
+
+type Search = { mode?: string; date?: string; pen?: string };
+
+export const Route = createFileRoute("/_authenticated/photos")({
+  component: PhotosPage,
+  validateSearch: (search: Record<string, unknown>): Search => {
+    const out: Search = {};
+    if (typeof search['mode'] === "string") out.mode = search['mode'];
+    if (typeof search['date'] === "string") out.date = search['date'];
+    if (typeof search['pen'] === "string") out.pen = search['pen'];
+    return out;
+  },
+  head: () => ({
+    meta: [
+      { title: "Photo review — SNOVA Growth Tracker" },
+      { name: "description", content: "Review the evening, morning and weighing photographs recorded for each pen, by date or over time." },
+      { property: "og:title", content: "Photo review — SNOVA Growth Tracker" },
+      { property: "og:description", content: "Browse the photographic evidence captured for every pen, day by day or pen by pen." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+});
+
+type SessionRow = { pen_id: string; obs_date: string; photo_am_url: string | null; photo_pm_url: string | null };
+type WeighRow = { pen_id: string; event_date: string; photo_url: string | null };
+
+const PAGE = 8;
+
+function PhotosPage() {
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/photos" });
+  const { siteId, siteName } = useSiteScope();
+  const pens = useSitePens();
+  const allPens = useMemo(() => pens.data ?? [], [pens.data]);
+
+  const mode = search.mode === "pen" ? "pen" : "date";
+  const date = search.date || today();
+  const [lightbox, setLightbox] = useState<{ url: string; caption: string } | null>(null);
+
+  const setSearch = (next: Search) => {
+    const current = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("pen");
+    void navigate({ search: { mode, date, ...(current ? { pen: current } : {}), ...next } });
+  };
+
+  const penIds = useMemo(() => allPens.map((p) => p.id), [allPens]);
+
+  /* ------------------------------------------------------ mode 1: by date */
+
+  const dayPhotos = useQuery({
+    queryKey: ["photos-day", siteId, date, penIds.length],
+    enabled: mode === "date" && penIds.length > 0,
+    queryFn: async () => {
+      const [sessions, weighs] = await Promise.all([
+        supabase.from("session_photos").select("pen_id,obs_date,photo_am_url,photo_pm_url")
+          .in("pen_id", penIds).eq("obs_date", date),
+        supabase.from("biomass_events").select("pen_id,event_date,photo_url")
+          .in("pen_id", penIds).eq("event_date", date),
+      ]);
+      return {
+        sessions: (sessions.data ?? []) as SessionRow[],
+        weighs: (weighs.data ?? []) as WeighRow[],
+      };
+    },
+  });
+
+  const sessionFor = (penId: string) => (dayPhotos.data?.sessions ?? []).find((s) => s.pen_id === penId);
+  const weighFor = (penId: string) =>
+    (dayPhotos.data?.weighs ?? []).find((w) => w.pen_id === penId && !!w.photo_url)?.photo_url ?? null;
+
+  const recorded = allPens.reduce((n, p) => {
+    const s = sessionFor(p.id);
+    return n + (s?.photo_pm_url ? 1 : 0) + (s?.photo_am_url ? 1 : 0);
+  }, 0);
+  const expected = allPens.length * 2;
+
+  const stateFor = (penId: string): PenCompletion => {
+    const s = sessionFor(penId);
+    const n = (s?.photo_pm_url ? 1 : 0) + (s?.photo_am_url ? 1 : 0);
+    return n === 2 ? "complete" : n === 1 ? "partial" : "empty";
+  };
+  const missingFor = (penId: string) => {
+    const s = sessionFor(penId);
+    const miss: string[] = [];
+    if (!s?.photo_pm_url) miss.push("evening photo");
+    if (!s?.photo_am_url) miss.push("morning photo");
+    return miss;
+  };
+
+  const stepperPens: StepperPen[] = allPens.map((p) => ({
+    id: p.id,
+    label: p.label,
+    role: p.role === "breeder" ? "breeder" : "trial",
+  }));
+
+  /* -------------------------------------------------- mode 2: by pen over time */
+
+  const selectedPenId = search.pen && search.pen !== "summary" ? search.pen : allPens[0]?.id;
+  const selectedPen = allPens.find((p) => p.id === selectedPenId);
+  const [shown, setShown] = useState(PAGE);
+
+  const penHistory = useQuery({
+    queryKey: ["photos-pen", selectedPenId],
+    enabled: mode === "pen" && !!selectedPenId,
+    queryFn: async () => {
+      const [sessions, weighs] = await Promise.all([
+        supabase.from("session_photos").select("pen_id,obs_date,photo_am_url,photo_pm_url")
+          .eq("pen_id", selectedPenId!).order("obs_date", { ascending: false }),
+        supabase.from("biomass_events").select("pen_id,event_date,photo_url").eq("pen_id", selectedPenId!),
+      ]);
+      return {
+        sessions: (sessions.data ?? []) as SessionRow[],
+        weighs: (weighs.data ?? []) as WeighRow[],
+      };
+    },
+  });
+
+  const historyRows = useMemo(() => {
+    const sessions = penHistory.data?.sessions ?? [];
+    const weighs = penHistory.data?.weighs ?? [];
+    const dates = new Set<string>([
+      ...sessions.filter((s) => s.photo_am_url || s.photo_pm_url).map((s) => s.obs_date),
+      ...weighs.filter((w) => w.photo_url).map((w) => w.event_date),
+    ]);
+    return [...dates].sort((a, b) => b.localeCompare(a)).map((d) => ({
+      date: d,
+      pm: sessions.find((s) => s.obs_date === d)?.photo_pm_url ?? null,
+      am: sessions.find((s) => s.obs_date === d)?.photo_am_url ?? null,
+      weigh: weighs.find((w) => w.event_date === d && w.photo_url)?.photo_url ?? null,
+    }));
+  }, [penHistory.data]);
+
+  const penLabel = (id: string) => allPens.find((p) => p.id === id)?.label ?? "Pen";
+
+  return (
+    <div className="space-y-5">
+      <header className="space-y-2">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">{siteName || "—"}</div>
+        <h1 className="text-2xl font-bold">Photo review</h1>
+        <p className="text-sm text-muted-foreground">
+          The photographic record for {siteName || "this site"} — evening, morning and weighing shots, breeder
+          pens included.
+        </p>
+        <div className="flex gap-2">
+          {(["date", "pen"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setSearch({ mode: m })}
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+                mode === m ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"
+              }`}
+            >
+              {m === "date" ? "By date" : "By pen over time"}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {allPens.length === 0 ? (
+        <p className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          No pens at {siteName || "this site"} yet.
+        </p>
+      ) : mode === "date" ? (
+        <section className="space-y-3">
+          <label className="block">
+            <span className="text-xs text-muted-foreground">Date</span>
+            <input
+              type="date"
+              value={date}
+              max={today()}
+              onChange={(e) => setSearch({ date: e.currentTarget.value })}
+              className="mt-1 block rounded-lg border border-input bg-card px-3 py-2 text-sm"
+            />
+          </label>
+          <p className="text-sm font-medium">
+            {recorded} of {expected} photos recorded for this date.
+          </p>
+
+          <PenStepper
+            pens={stepperPens}
+            stateFor={stateFor}
+            missingFor={missingFor}
+            renderPen={(pen) => {
+              const s = sessionFor(pen.id);
+              const weigh = weighFor(pen.id);
+              return (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <PhotoFrame stored={s?.photo_pm_url} session="PM · Evening" penLabel={pen.label}
+                    siteName={siteName} date={date} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                  <PhotoFrame stored={s?.photo_am_url} session="AM · Morning" penLabel={pen.label}
+                    siteName={siteName} date={date} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                  {weigh && (
+                    <PhotoFrame stored={weigh} session="Weighing" penLabel={pen.label}
+                      siteName={siteName} date={date} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                  )}
+                </div>
+              );
+            }}
+          />
+        </section>
+      ) : (
+        <section className="space-y-3">
+          <label className="block">
+            <span className="text-xs text-muted-foreground">Pen</span>
+            <select
+              value={selectedPenId ?? ""}
+              onChange={(e) => { setShown(PAGE); setSearch({ pen: e.currentTarget.value }); }}
+              className="mt-1 block rounded-lg border border-input bg-card px-3 py-2 text-sm"
+            >
+              {allPens.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}{p.role === "breeder" ? " (breeder)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {penHistory.isPending ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : historyRows.length === 0 ? (
+            <p className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+              No photos recorded for {selectedPen?.label ?? "this pen"} yet.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {historyRows.length} day{historyRows.length === 1 ? "" : "s"} with photos, newest first.
+              </p>
+              <div className="space-y-4">
+                {historyRows.slice(0, shown).map((row) => (
+                  <div key={row.date} className="space-y-1">
+                    <div className="text-sm font-semibold">{row.date}</div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <PhotoFrame stored={row.pm} session="PM · Evening" penLabel={penLabel(selectedPenId!)}
+                        siteName={siteName} date={row.date} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                      <PhotoFrame stored={row.am} session="AM · Morning" penLabel={penLabel(selectedPenId!)}
+                        siteName={siteName} date={row.date} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                      {row.weigh && (
+                        <PhotoFrame stored={row.weigh} session="Weighing" penLabel={penLabel(selectedPenId!)}
+                          siteName={siteName} date={row.date} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {shown < historyRows.length && (
+                <button
+                  type="button"
+                  onClick={() => setShown((s) => s + PAGE)}
+                  className="w-full rounded-xl border border-border bg-card py-3 text-sm font-semibold"
+                >
+                  Show earlier days
+                </button>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      <PhotoLightbox open={lightbox} onClose={() => setLightbox(null)} />
+    </div>
+  );
+}
