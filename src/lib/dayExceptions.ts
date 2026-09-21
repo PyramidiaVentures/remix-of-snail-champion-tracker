@@ -104,7 +104,7 @@ export type DayInputs = {
 
 /** Fetch every dataset the day review reads, for one trial and date. */
 export async function fetchDayInputs(trialId: string, date: string): Promise<DayInputs> {
-  const [obs, welfare, photos, pop, biomass] = await Promise.all([
+  const [obs, welfare, photos, pop, biomass, checklists] = await Promise.all([
     supabase.from("observations")
       .select("pen_id,obs_date,offered_g,dish_action,refusal_score,feed_id")
       .eq("trial_id", trialId).lte("obs_date", date),
