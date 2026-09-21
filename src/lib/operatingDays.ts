@@ -49,8 +49,11 @@ export interface OperatingCalendar {
   nextOperatingDay: (date: string) => string;
   /** A PM feeding is expected on this date. */
   pmExpected: (date: string) => boolean;
-  /** An AM check is expected for this date (it happens the next morning). */
+  /** The morning the dish from this feeding is actually checked. */
+  checkDayFor: (date: string) => string;
+  /** An AM check is expected for this feeding (once its check morning has come). */
   amExpected: (date: string) => boolean;
+
   /** The previous operating day before the given date. */
   previousOperatingDay: (date: string) => string;
 }
