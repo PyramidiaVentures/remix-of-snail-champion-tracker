@@ -65,25 +65,20 @@ function DashboardPage() {
       (await supabase.from("treatments").select("id,label,feed_id").eq("trial_id", trialId!)).data ?? [],
   });
 
-  const data = useQuery({
-    queryKey: ["dash-data", trialId, search.date ?? "default"],
-    enabled: !!trialId,
-    queryFn: async () => {
-      // The default date depends on the calendar, which is known by the time
-      // the trial has loaded; resolve it here so the key can stay stable.
-      const date = search.date || calendar.previousOperatingDay(today());
-      return fetchDayInputs(trialId!, date);
-    },
-  });
-
-  const allPens = (pens.data ?? []) as DayReviewPen[];
-
   // The last completed day: the most recent operating day before today. Today
   // itself is a half-told story — its evening feeding has not happened yet.
   const lastCompleted = calendar.previousOperatingDay(today());
   const date = search.date || lastCompleted;
   const isToday = date === today();
   const isLastCompleted = date === lastCompleted;
+
+  const data = useQuery({
+    queryKey: ["dash-data", trialId, date],
+    enabled: !!trialId,
+    queryFn: () => fetchDayInputs(trialId!, date),
+  });
+
+  const allPens = (pens.data ?? []) as DayReviewPen[];
 
   const setDate = (v: string) => {
     const params = new URLSearchParams(window.location.search);
