@@ -92,6 +92,13 @@ function todayStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function displayDate(date: string) {
+  const value = new Date(`${date}T00:00:00Z`);
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${weekdays[value.getUTCDay()]} ${value.getUTCDate()} ${months[value.getUTCMonth()]}`;
+}
+
 function AmPage() {
   const qc = useQueryClient();
   const uploads = useUploads();
@@ -107,6 +114,8 @@ function AmPage() {
   const date = manualDate ?? defaultDate;
   const isDefault = manualDate === null;
   const setDate = (value: string) => setManualDate(value);
+  // The check happens the morning after the feeding (the next operating day).
+  const checkDate = isDefault ? today : calendar.nextOperatingDay(addDays(date, 1));
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
@@ -290,14 +299,14 @@ function AmPage() {
       </header>
 
       <div className={`rounded-lg border p-3 text-sm ${isDefault ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
-        <span className="font-semibold">Completing PM from {date}</span>
+        <span className="font-semibold">{displayDate(checkDate)} <span className="font-normal text-muted-foreground">(checking feed from {displayDate(date)})</span></span>
         <div className="text-xs text-muted-foreground mt-0.5">
           {isDefault
-            ? `Defaults to the last feeding day at ${siteName} (${defaultDate}). Use the date picker below to catch up on a missed day.`
-            : <>Manual date. <button type="button" className="text-primary underline" onClick={() => setManualDate(null)}>reset to {defaultDate}</button></>}
+            ? `Defaults to the last feeding day at ${siteName} (${displayDate(defaultDate)}). Use the date picker below to catch up on a missed day.`
+            : <>Manual date. <button type="button" className="text-primary underline" onClick={() => setManualDate(null)}>reset to {displayDate(defaultDate)}</button></>}
         </div>
         {trial.data && obs.data && !anyPmForDate && (
-          <div className="mt-2 text-xs text-amber-700">No PM entry found for {date}. Pick a different date if catching up.</div>
+          <div className="mt-2 text-xs text-amber-700">No PM entry found for {displayDate(date)}. Pick a different date if catching up.</div>
         )}
       </div>
 
