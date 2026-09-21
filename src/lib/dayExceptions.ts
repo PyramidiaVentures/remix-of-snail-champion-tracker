@@ -107,7 +107,7 @@ export type DayInputs = {
     id: string;
     pen_id: string;
     event_date: string;
-    event_type: string;
+    event_type: "mortality" | "escape" | "removal" | "addition";
     count: number;
     cause: string | null;
   }[];
@@ -134,7 +134,7 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
     obs: obs.data ?? [],
     welfare: welfare.data ?? [],
     photos: photos.data ?? [],
-    pop: pop.data ?? [],
+    pop: (pop.data ?? []) as DayInputs["pop"],
     biomass: biomass.data ?? [],
   };
 }
@@ -147,7 +147,7 @@ export type DayReviewPen = {
   id: string;
   label: string;
   role: string | null;
-  initial_snail_count: number | null;
+  initial_snail_count: number;
   weighing_interval_days: number | null;
 };
 
