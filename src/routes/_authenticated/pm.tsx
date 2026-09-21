@@ -11,6 +11,9 @@ import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { useUploads } from "@/lib/photoUploads.store";
 import { upsertRow, OBSERVATIONS_TRIAL_KEY } from "@/lib/upsertRow";
 import { NoActiveTrial, useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+import { daysBetween } from "@/lib/metrics";
+import { useSiteCalendar } from "@/lib/operatingDays";
+
 
 import type { Database } from "@/integrations/supabase/types";
 import { BookOpen, Save, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
@@ -350,8 +353,11 @@ function PenCard({
           Assigned feed: <span className="font-medium text-foreground">{feed.name}</span>
         </div>
         <div className={`mt-1 text-xs ${carryOver > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
-          {carryOver === 0 ? "Fresh dish" : `Carry-over day ${carryOver} — check against the discard criteria`}
+          {carryOver === 0
+            ? "Fresh dish"
+            : `${carryOver} day${carryOver === 1 ? "" : "s"} since the dish was last emptied — check against the discard criteria`}
         </div>
+
       </div>
 
       <div className="space-y-1">
