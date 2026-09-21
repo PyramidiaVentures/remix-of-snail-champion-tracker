@@ -144,26 +144,22 @@ function PmPage() {
   const stepperPens = useMemo(() => [...trialPens, ...breederPens], [trialPens, breederPens]);
   const isBreeder = (penId: string) => breederPens.some((p) => p.id === penId);
 
+  // Carry-over age = calendar days since the dish was last emptied, so a
+  // closed day in between still counts — the feed is physically still there.
   const carryOverByPen = useMemo(() => {
     const map = new Map<string, number>();
-    const byPen = new Map<string, { obs_date: string; dish_action: DishAction | null }[]>();
+    const lastEmptied = new Map<string, string>();
     for (const r of history.data ?? []) {
-      const list = byPen.get(r.pen_id) ?? [];
-      list.push({ obs_date: r.obs_date, dish_action: r.dish_action });
-      byPen.set(r.pen_id, list);
+      if (r.dish_action !== "emptied_refilled" && r.dish_action !== "emptied_spoiled") continue;
+      const prev = lastEmptied.get(r.pen_id);
+      if (!prev || r.obs_date > prev) lastEmptied.set(r.pen_id, r.obs_date);
     }
-    for (const [penId, rows] of byPen) {
-      let count = 0;
-      let expected = addDays(date, -1);
-      for (const r of rows) {
-        if (r.obs_date !== expected || r.dish_action !== "topped_up") break;
-        count++;
-        expected = addDays(expected, -1);
-      }
-      map.set(penId, count);
+    for (const [penId, emptiedOn] of lastEmptied) {
+      map.set(penId, daysBetween(emptiedOn, date));
     }
     return map;
   }, [history.data, date]);
+
 
   const rowFor = (penId: string) => (obs.data ?? []).find((o) => o.pen_id === penId);
   const photoUrlFor = (penId: string) => (photos.data ?? []).find((r) => r.pen_id === penId)?.photo_pm_url ?? null;
