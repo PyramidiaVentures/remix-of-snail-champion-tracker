@@ -177,7 +177,8 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
           <h2 className="font-semibold">Session summary</h2>
           <p className="text-sm text-muted-foreground">
-            {doneCount} of {n} pens complete.
+            {trialDone} of {trialPens.length} trial pens complete.
+            {breederPens.length > 0 && ` ${breederDone} of ${breederPens.length} breeder pens complete.`}
           </p>
           {remaining === 0 ? (
             <p className="text-sm text-primary">Every pen is done for this session.</p>
