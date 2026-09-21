@@ -1,4 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { today } from "@/lib/date";
+import { useSiteScope } from "@/lib/siteScope";
+import { operatingDaysSentence, useSiteCalendar } from "@/lib/operatingDays";
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
@@ -136,6 +139,24 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
   },
 ];
 
+/** The site's operating days: no feeding or check happens on a closed day. */
+function OperatingDaysLine() {
+  const { siteName } = useSiteScope();
+  const { calendar, closures } = useSiteCalendar();
+  const upcoming = closures.filter((c) => c.closure_date >= today()).slice(0, 3);
+  return (
+    <p className="rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm">
+      <span className="font-medium">{siteName || "This site"}: {operatingDaysSentence(calendar)}</span>{" "}
+      No feeding and no check happens on a closed day.
+      {upcoming.length > 0 && (
+        <> Also closed:{" "}
+          {upcoming.map((c) => `${c.closure_date}${c.reason ? ` (${c.reason})` : ""}`).join(", ")}.
+        </>
+      )}
+    </p>
+  );
+}
+
 function GuidePage() {
   return (
     <div className="space-y-4">
@@ -143,6 +164,8 @@ function GuidePage() {
         <h1 className="text-2xl font-bold">Field Guide (SOP)</h1>
         <p className="text-sm text-muted-foreground">Read-only reference. Tap a section to expand.</p>
       </header>
+
+      <OperatingDaysLine />
       <div className="space-y-2">
         {SECTIONS.map((s) => (
           <Collapsible key={s.title} title={s.title} defaultOpen={s.title === "PM checklist (feeding)"}>
