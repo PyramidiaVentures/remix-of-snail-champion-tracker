@@ -3,9 +3,13 @@ import { ChevronLeft, ChevronRight, CheckCircle2, CircleDashed, Loader2, Circle 
 
 export type PenCompletion = "complete" | "partial" | "empty" | "uploading";
 
+export type PenRole = "trial" | "breeder";
+
 export interface StepperPen {
   id: string;
   label: string;
+  /** Breeder pens are monitored but sit outside the trial. Defaults to "trial". */
+  role?: PenRole;
 }
 
 interface Props {
