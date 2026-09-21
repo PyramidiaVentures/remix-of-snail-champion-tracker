@@ -21,6 +21,10 @@ import {
 
 export const Route = createFileRoute("/_authenticated/weigh")({
   component: WeighPage,
+  // The pen stepper remembers the current pen here, so other screens can link
+  // straight to one pen.
+  validateSearch: (search: Record<string, unknown>): { pen?: string } =>
+    typeof search['pen'] === "string" ? { pen: search['pen'] } : {},
 });
 
 type BiomassRow = Database["public"]["Tables"]["biomass_events"]["Row"];

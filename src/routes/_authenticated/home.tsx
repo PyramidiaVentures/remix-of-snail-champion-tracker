@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Moon, Sun, BarChart3, Settings, BookOpen, Download, FlaskConical, Scale, Users, AlertTriangle,
+  LayoutDashboard,
 } from "lucide-react";
 import { today } from "@/lib/date";
 import { daysBetween } from "@/lib/metrics";
@@ -150,6 +151,14 @@ function HomePage() {
         <p className="text-sm text-muted-foreground">{longDate(t)} · {siteName || "—"}</p>
       </div>
 
+      <Link
+        to="/dashboard"
+        className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium"
+      >
+        <span className="flex items-center gap-2"><LayoutDashboard className="h-4 w-4" /> Daily dashboard</span>
+        <span className="text-xs text-muted-foreground">exceptions, completeness, numbers</span>
+      </Link>
+
       {!!siteId && !trial.isLoading && !trial.data ? (
         <NoActiveTrial siteName={siteName} />
       ) : (
@@ -217,6 +226,7 @@ function HomePage() {
       <section className="space-y-2">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Manage</h2>
         <div className="grid grid-cols-2 gap-3">
+          <BigTile to="/dashboard" title="Dashboard" subtitle="Day in detail" icon={<LayoutDashboard className="h-5 w-5" />} tone="card" />
           <BigTile to="/results" title="Results" subtitle="Charts & table" icon={<BarChart3 className="h-5 w-5" />} tone="card" />
           <BigTile to="/trial" title="Trial" subtitle="Design & status" icon={<FlaskConical className="h-5 w-5" />} tone="card" />
           <BigTile to="/population" title="Population Log" subtitle="Deaths & survival" icon={<Users className="h-5 w-5" />} tone="card" />

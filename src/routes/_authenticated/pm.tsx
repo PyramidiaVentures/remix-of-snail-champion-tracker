@@ -17,6 +17,8 @@ import { BookOpen, Save, CheckCircle2, Loader2, AlertTriangle } from "lucide-rea
 
 export const Route = createFileRoute("/_authenticated/pm")({
   component: PmPage,
+  validateSearch: (search: Record<string, unknown>): { pen?: string } =>
+    typeof search['pen'] === "string" ? { pen: search['pen'] } : {},
 });
 
 type DishAction = Database["public"]["Enums"]["dish_action"];
