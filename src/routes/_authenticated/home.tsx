@@ -8,6 +8,7 @@ import {
 import { today } from "@/lib/date";
 import { daysBetween } from "@/lib/metrics";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+import { buildSchedule, overdueAdvisory, type SchedulePen } from "@/lib/weighSchedule";
 
 
 export const Route = createFileRoute("/_authenticated/home")({
@@ -43,7 +44,7 @@ function HomePage() {
   const assignments = useQuery({
     queryKey: ["assignments", trialId], enabled: !!trialId,
     queryFn: async () =>
-      (await supabase.from("pen_assignments").select("pen_id").eq("trial_id", trialId!)).data ?? [],
+      (await supabase.from("pen_assignments").select("pen_id,start_date").eq("trial_id", trialId!)).data ?? [],
   });
 
 
