@@ -121,12 +121,6 @@ function HomePage() {
   const amPhotos = new Set(
     trialOnly((daily.data?.photos ?? []).filter((p) => p.obs_date === yesterday && p.photo_am_url)).map((p) => p.pen_id),
   ).size;
-  const breederPmPhotos = new Set(
-    (daily.data?.photos ?? []).filter((p) => p.obs_date === t && p.photo_pm_url && breederIds.has(p.pen_id)).map((p) => p.pen_id),
-  ).size;
-  const breederAmPhotos = new Set(
-    (daily.data?.photos ?? []).filter((p) => p.obs_date === yesterday && p.photo_am_url && breederIds.has(p.pen_id)).map((p) => p.pen_id),
-  ).size;
 
   const start = trial.data?.start_date as string | undefined;
   const dayNumber = start ? daysBetween(start, t) + 1 : null;
