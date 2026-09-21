@@ -487,26 +487,46 @@ function DashboardPage() {
       <header className="space-y-2">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">{siteName || "—"}</div>
         <h1 className="text-2xl font-bold">Daily dashboard</h1>
-        <p className="text-sm text-muted-foreground">{longDate(date)}</p>
+        <p className="text-base font-medium">Showing {longDate(date)}</p>
+        <p className="text-sm text-muted-foreground">
+          {isToday
+            ? "Today is still under way — this evening's feeding has not happened yet."
+            : isLastCompleted
+              ? "The last completed day. This morning's check may still be in progress."
+              : "A past day."}
+        </p>
         <Link to="/photos" search={{ date }} className="inline-block text-sm text-primary underline">
           Photo review — look at the evidence
         </Link>
-        <label className="block">
-          <span className="text-xs text-muted-foreground">Date</span>
-          <input
-            type="date"
-            value={date}
-            max={today()}
-            onChange={(e) => {
-              const v = e.currentTarget.value;
-              const params = new URLSearchParams(window.location.search);
-              params.set("date", v);
-              window.location.search = params.toString();
-            }}
-            className="mt-1 block rounded-lg border border-input bg-card px-3 py-2 text-sm"
-          />
-        </label>
+        <div className="flex flex-wrap items-end gap-2">
+          <button
+            type="button"
+            onClick={() => setDate(addDays(date, -1))}
+            className="rounded-lg border border-input bg-card px-3 py-2 text-sm"
+          >
+            ← Previous day
+          </button>
+          <label className="block">
+            <span className="text-xs text-muted-foreground">Date</span>
+            <input
+              type="date"
+              value={date}
+              max={today()}
+              onChange={(e) => setDate(e.currentTarget.value)}
+              className="mt-1 block rounded-lg border border-input bg-card px-3 py-2 text-sm"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={isToday}
+            onClick={() => setDate(addDays(date, 1))}
+            className="rounded-lg border border-input bg-card px-3 py-2 text-sm disabled:opacity-40"
+          >
+            Next day →
+          </button>
+        </div>
       </header>
+
 
       {!!siteId && !trial.isLoading && !trial.data ? (
         <NoActiveTrial siteName={siteName} />
