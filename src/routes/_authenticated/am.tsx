@@ -167,7 +167,7 @@ function AmPage() {
     queryKey: ["trial-photos", trialId, date],
     enabled: !!trialId,
     queryFn: async () =>
-      (await supabase.from("session_photos").select("pen_id,photo_am_url").eq("trial_id", trialId!).eq("obs_date", date)).data ?? [],
+      (await supabase.from("session_photos").select("pen_id,photo_am_url,photo_pm_url").eq("trial_id", trialId!).eq("obs_date", date)).data ?? [],
   });
 
   const feedByPen = useMemo(() => {
