@@ -190,11 +190,43 @@ function DashboardPage() {
         <header className="space-y-2">
           <div className="text-xs uppercase tracking-wide text-muted-foreground">{siteName || "—"}</div>
           <h1 className="text-2xl font-bold">Daily dashboard</h1>
+          <p className="text-base font-medium">Showing {longDate(date)}</p>
+          <p className="rounded-2xl border border-border bg-card p-4 text-sm shadow-sm">
+            {longDate(date)} — no operations at {siteName || "this site"}
+            {calendar.closedBecause(date) ? ` (${calendar.closedBecause(date)})` : ""}.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <button
+              type="button"
+              onClick={() => setDate(prevDay)}
+              className="rounded-lg border border-input bg-card px-3 py-2 text-sm"
+            >
+              ← Previous day
+            </button>
+            <label className="block">
+              <span className="text-xs text-muted-foreground">Date</span>
+              <input
+                type="date"
+                value={date}
+                max={today()}
+                onChange={(e) => pickDate(e.currentTarget.value)}
+                className="mt-1 block rounded-lg border border-input bg-card px-3 py-2 text-sm"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={!canGoNext}
+              onClick={() => setDate(nextDay)}
+              className="rounded-lg border border-input bg-card px-3 py-2 text-sm disabled:opacity-40"
+            >
+              Next day →
+            </button>
+          </div>
+          {pickHint && <p className="text-xs text-amber-600">{pickHint}</p>}
+          {calendar.nonOperatingWeekdays.length > 0 && (
+            <p className="text-xs text-muted-foreground">{operatingDaysSentence(calendar)}</p>
+          )}
         </header>
-        <p className="rounded-2xl border border-border bg-card p-4 text-sm shadow-sm">
-          {longDate(date)} — no operations at {siteName || "this site"}
-          {calendar.closedBecause(date) ? ` (${calendar.closedBecause(date)})` : ""}.
-        </p>
       </div>
     );
   }
