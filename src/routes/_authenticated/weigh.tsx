@@ -11,6 +11,8 @@ import { uploadWeighPhoto } from "@/lib/photoUpload";
 import { useSignedPhotoUrl } from "@/lib/useSignedPhotoUrl";
 import { runUpload, useUploads } from "@/lib/photoUploads.store";
 import { today } from "@/lib/date";
+import { specificGrowthRate } from "@/lib/metrics";
+
 import { liveCount, hasAddition } from "@/lib/liveCount";
 import { Checklist } from "@/components/Checklist";
 import { NumberField } from "@/components/NumberField";
@@ -321,10 +323,10 @@ function PenCard({
     previous && previous.live_count ? previous.net_biomass_g / previous.live_count : null;
   const meanDeltaG = mean != null && prevMean != null ? mean - prevMean : null;
   const meanDeltaPct = meanDeltaG != null && prevMean ? (meanDeltaG / prevMean) * 100 : null;
-  const sgr =
-    mean != null && prevMean != null && mean > 0 && prevMean > 0 && previous
-      ? ((Math.log(mean) - Math.log(prevMean)) / Math.max(1, daysBetween(previous.event_date, date))) * 100
-      : null;
+  const sgr = previous
+    ? specificGrowthRate(prevMean, mean, Math.max(1, daysBetween(previous.event_date, date)))
+    : null;
+
 
   const save = async (
     override?: Partial<{ live_count: number | null; method: BiomassMethod; subsample_count: number | null; net_biomass_g: number | null; photo_url: string }>,
