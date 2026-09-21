@@ -26,6 +26,8 @@ interface Props {
   paramName?: string;
   /** Extra content rendered at the bottom of the summary tab (e.g. a completion button). */
   summaryFooter?: ReactNode;
+  /** When true, the Summary pill turns green like a completed pen. */
+  summaryComplete?: boolean;
 }
 
 function readParam(name: string): string | null {
