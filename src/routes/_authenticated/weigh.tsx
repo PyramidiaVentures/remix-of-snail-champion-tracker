@@ -201,21 +201,6 @@ function WeighPage() {
       : undefined,
   );
 
-  // Schedule advisory only — weighing off-schedule is fully supported.
-  const schedule = useMemo(() => {
-    if (!trial.data) return null;
-    const interval = trial.data.weighing_interval_days || 7;
-    const elapsed = daysBetween(trial.data.start_date, date);
-    if (elapsed >= 0 && elapsed % interval === 0) return { scheduled: true, text: "Scheduled weighing day" };
-    const last = (events.data ?? []).filter((e) => e.event_date < date).map((e) => e.event_date).sort().at(-1);
-    return {
-      scheduled: false,
-      text: last
-        ? `Off-schedule weighing (last was ${daysBetween(last, date)} days ago)`
-        : "Off-schedule weighing (no previous weighing yet)",
-    };
-  }, [trial.data, date, events.data]);
-
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["biomass-events", trialId] });
     void qc.invalidateQueries({ queryKey: ["population-events", trialId] });
