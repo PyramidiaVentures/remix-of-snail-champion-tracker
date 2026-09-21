@@ -987,8 +987,10 @@ function WeighingSchedule({
         startDateByPen,
         events,
         today: t,
+        isOperating: calendar.isOperating,
+        nextOperatingDay: calendar.nextOperatingDay,
       }),
-    [pens, trial.weighing_interval_days, startDateByPen, events, t],
+    [pens, trial.weighing_interval_days, startDateByPen, events, t, calendar],
   );
 
   const saveTrialDefault = useMutation({

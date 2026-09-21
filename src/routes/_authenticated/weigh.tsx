@@ -131,8 +131,10 @@ function WeighPage() {
         startDateByPen,
         events: events.data ?? [],
         today: today(),
+        isOperating: calendar.isOperating,
+        nextOperatingDay: calendar.nextOperatingDay,
       }),
-    [pens.data, trial.data?.weighing_interval_days, startDateByPen, events.data],
+    [pens.data, trial.data?.weighing_interval_days, startDateByPen, events.data, calendar],
   );
   const scheduleFor = (penId: string) => scheduleRows.find((r) => r.penId === penId) ?? null;
   const dueCount = scheduleRows.filter((r) => r.dueToday).length;

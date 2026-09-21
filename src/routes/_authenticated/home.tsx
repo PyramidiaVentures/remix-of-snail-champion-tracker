@@ -114,8 +114,10 @@ function HomePage() {
         startDateByPen,
         events: daily.data?.biomass ?? [],
         today: t,
+        isOperating: calendar.isOperating,
+        nextOperatingDay: calendar.nextOperatingDay,
       }),
-    [pens.data, trial.data?.weighing_interval_days, startDateByPen, daily.data?.biomass, t],
+    [pens.data, trial.data?.weighing_interval_days, startDateByPen, daily.data?.biomass, t, calendar],
   );
   const dueTodayCount = scheduleRows.filter((r) => r.dueToday).length;
   const overdueCount = scheduleRows.filter((r) => r.overdueDays > 0).length;
