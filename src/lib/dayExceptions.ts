@@ -99,6 +99,7 @@ export type DayInputs = {
     cause: string | null;
   }[];
   biomass: { pen_id: string; event_date: string; net_biomass_g: number; live_count: number }[];
+  checklists: { session: string; steps: boolean[] | null }[];
 };
 
 /** Fetch every dataset the day review reads, for one trial and date. */
