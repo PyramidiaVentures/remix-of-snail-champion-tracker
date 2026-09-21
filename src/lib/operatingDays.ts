@@ -89,7 +89,10 @@ export function makeCalendar(
     return d;
   };
 
+  const checkDayFor = (date: string) => nextOperatingDay(addDays(date, 1));
+
   return {
+
     nonOperatingWeekdays: Array.from(weekdays).sort(),
     closureReason: (date) => byDate.get(date) ?? null,
     isOperating,
