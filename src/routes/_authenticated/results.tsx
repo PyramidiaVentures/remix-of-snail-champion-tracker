@@ -765,7 +765,7 @@ const PEN_COLUMNS = [
 ] as const;
 
 function PenDetail({
-  metrics, observations, biomass, startDate, acclimationDays, includeAcclimation,
+  metrics, observations, isOperating, biomass, startDate, acclimationDays, includeAcclimation,
   hiddenColumns, onToggleColumn,
 }: PenDetailProps) {
   const [chooserOpen, setChooserOpen] = useState(false);
