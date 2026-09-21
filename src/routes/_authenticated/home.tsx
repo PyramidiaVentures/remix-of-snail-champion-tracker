@@ -80,9 +80,11 @@ function HomePage() {
   // the last completed operating day — computed by the same shared function so
   // the two screens can never disagree.
   const reportDate = lastCompletedDay(calendar);
+  // A day before the trial began has no work to report on, so it is never screened.
+  const beforeStart = !!trial.data?.start_date && reportDate < trial.data.start_date;
   const dayInputs = useQuery({
     queryKey: ["home-exceptions", trialId, reportDate],
-    enabled: !!trialId,
+    enabled: !!trialId && !beforeStart,
     queryFn: () => fetchDayInputs(trialId!, reportDate),
   });
   const review = useMemo(
