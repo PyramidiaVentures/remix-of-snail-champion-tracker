@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Moon, Sun, BarChart3, Settings, BookOpen, Download, FlaskConical, Scale, Users, AlertTriangle,
 } from "lucide-react";
 import { today } from "@/lib/date";
 import { daysBetween } from "@/lib/metrics";
-import { NoActiveTrial, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
 
 
 export const Route = createFileRoute("/_authenticated/home")({
@@ -37,6 +38,7 @@ function HomePage() {
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
+  const pens = useSitePens();
 
   const assignments = useQuery({
     queryKey: ["assignments", trialId], enabled: !!trialId,
