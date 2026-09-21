@@ -570,6 +570,14 @@ function DashboardPage() {
               </div>
             </div>
           </section>
+
+          {/* 4 — TRENDS */}
+          <DashboardTrends
+            trialId={trialId}
+            treatmentByPen={treatmentByPen}
+            treatments={(treatments.data ?? []).map((t) => ({ id: t.id, label: t.label }))}
+            breederPenIds={breederPenIds}
+          />
         </>
       )}
     </div>
