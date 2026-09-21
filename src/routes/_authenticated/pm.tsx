@@ -6,7 +6,7 @@ import { today } from "@/lib/date";
 import { Checklist } from "@/components/Checklist";
 import { ChecklistBlocker } from "@/components/ChecklistBlocker";
 import { NumberField } from "@/components/NumberField";
-import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
+import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { useUploads } from "@/lib/photoUploads.store";
 import { upsertRow, OBSERVATIONS_TRIAL_KEY } from "@/lib/upsertRow";
@@ -120,10 +120,27 @@ function PmPage() {
     return map;
   }, [assignments.data, treatments.data, feeds.data]);
 
+  // Breeder pens have no treatment and no feed, but they are still walked and
+  // photographed in the same session, so they join the stepper alongside the
+  // trial pens — counted separately everywhere.
   const trialPens: StepperPen[] = useMemo(
-    () => (pens.data ?? []).filter((p) => feedByPen.has(p.id)).map((p) => ({ id: p.id, label: p.label })),
+    () =>
+      (pens.data ?? [])
+        .filter((p) => p.role !== "breeder" && feedByPen.has(p.id))
+        .map((p) => ({ id: p.id, label: p.label, role: "trial" as const })),
     [pens.data, feedByPen],
   );
+
+  const breederPens: StepperPen[] = useMemo(
+    () =>
+      (pens.data ?? [])
+        .filter((p) => p.role === "breeder")
+        .map((p) => ({ id: p.id, label: p.label, role: "breeder" as const })),
+    [pens.data],
+  );
+
+  const stepperPens = useMemo(() => [...trialPens, ...breederPens], [trialPens, breederPens]);
+  const isBreeder = (penId: string) => breederPens.some((p) => p.id === penId);
 
   const carryOverByPen = useMemo(() => {
     const map = new Map<string, number>();
@@ -149,29 +166,36 @@ function PmPage() {
   const rowFor = (penId: string) => (obs.data ?? []).find((o) => o.pen_id === penId);
   const photoUrlFor = (penId: string) => (photos.data ?? []).find((r) => r.pen_id === penId)?.photo_pm_url ?? null;
 
+  const photoSaved = (penId: string) =>
+    !!photoUrlFor(penId) || uploads.get(penPhotoKey(trialId ?? "", penId, date, "pm"))?.status === "saved";
+
   const missingFor = (penId: string) => {
     const row = rowFor(penId);
     const missing: string[] = [];
-    if (row?.offered_g == null) missing.push("grams offered");
+    // Breeder pens get no weighed portion, so grams offered is not asked for.
+    if (!isBreeder(penId) && row?.offered_g == null) missing.push("grams offered");
     if (!row?.dish_action) missing.push("dish action");
-    if (!photoUrlFor(penId) && uploads.get(penPhotoKey(trialId ?? "", penId, date, "pm"))?.status !== "saved") {
-      missing.push("PM photo");
-    }
+    if (!photoSaved(penId)) missing.push("PM photo");
     return missing;
   };
 
   const stateFor = (penId: string): PenCompletion => {
     if (uploads.get(penPhotoKey(trialId ?? "", penId, date, "pm"))?.status === "uploading") return "uploading";
     const missing = missingFor(penId);
+    const total = isBreeder(penId) ? 2 : 3;
     if (missing.length === 0) return "complete";
-    return missing.length === 3 ? "empty" : "partial";
+    return missing.length === total ? "empty" : "partial";
   };
 
-  const photosDone = trialPens.filter(
-    (p) => photoUrlFor(p.id) || uploads.get(penPhotoKey(trialId ?? "", p.id, date, "pm"))?.status === "saved",
-  ).length;
+  const countPhotos = (list: StepperPen[]) => list.filter((p) => photoSaved(p.id)).length;
+  const photosDone = countPhotos(trialPens);
   const photosNeeded = trialPens.length;
-  const allPhotos = photosNeeded > 0 && photosDone === photosNeeded;
+  const breederPhotosDone = countPhotos(breederPens);
+  const breederPhotosNeeded = breederPens.length;
+  const allPhotos =
+    photosNeeded + breederPhotosNeeded > 0 &&
+    photosDone === photosNeeded &&
+    breederPhotosDone === breederPhotosNeeded;
 
   const [checklistDone, setChecklistDone] = useState(0);
   const [checklistAll, setChecklistAll] = useState(false);
@@ -185,11 +209,12 @@ function PmPage() {
       ? {
           forced: allPhotos,
           locked: true,
-          subtitle: photosNeeded === 0
+          subtitle: photosNeeded + breederPhotosNeeded === 0
             ? "Assign pens to the trial first."
-            : allPhotos
-              ? `All ${photosNeeded} pen photos uploaded.`
-              : `${photosNeeded - photosDone} of ${photosNeeded} pen photos still needed.`,
+            : `${photosDone} of ${photosNeeded} trial pen photos uploaded` +
+              (breederPhotosNeeded > 0
+                ? ` · ${breederPhotosDone} of ${breederPhotosNeeded} breeder pen photos uploaded.`
+                : "."),
         }
       : undefined,
   );
@@ -229,23 +254,35 @@ function PmPage() {
 
       {trial.data && (
         <PenStepper
-          pens={trialPens}
+          pens={stepperPens}
           stateFor={stateFor}
           missingFor={missingFor}
           paramName="pen"
-          renderPen={(pen) => (
-            <PenCard
-              key={pen.id}
-              trial={trial.data!}
-              pen={pen}
-              feed={feedByPen.get(pen.id)!}
-              date={date}
-              row={rowFor(pen.id)}
-              carryOver={carryOverByPen.get(pen.id) ?? 0}
-              photoUrl={photoUrlFor(pen.id)}
-              onSaved={refresh}
-            />
-          )}
+          renderPen={(pen) =>
+            pen.role === "breeder" ? (
+              <BreederCard
+                key={pen.id}
+                trial={trial.data!}
+                pen={pen}
+                date={date}
+                row={rowFor(pen.id)}
+                photoUrl={photoUrlFor(pen.id)}
+                onSaved={refresh}
+              />
+            ) : (
+              <PenCard
+                key={pen.id}
+                trial={trial.data!}
+                pen={pen}
+                feed={feedByPen.get(pen.id)!}
+                date={date}
+                row={rowFor(pen.id)}
+                carryOver={carryOverByPen.get(pen.id) ?? 0}
+                photoUrl={photoUrlFor(pen.id)}
+                onSaved={refresh}
+              />
+            )
+          }
         />
       )}
 
@@ -369,6 +406,116 @@ function PenCard({
         existingUrl={photoUrl}
         onSaved={onSaved}
       />
+    </section>
+  );
+}
+
+/**
+ * Breeder pen card: monitored in the same walk, but outside the trial.
+ * No grams offered, no assigned feed and no carry-over indicator, because a
+ * breeder pen has no treatment feed to carry over.
+ */
+function BreederCard({
+  trial,
+  pen,
+  date,
+  row,
+  photoUrl,
+  onSaved,
+}: {
+  trial: TrialRow;
+  pen: StepperPen;
+  date: string;
+  row: ObsRow | undefined;
+  photoUrl: string | null;
+  onSaved: () => void;
+}) {
+  const [actionState, setActionState] = useState<SaveState>("idle");
+  const [notesState, setNotesState] = useState<SaveState>("idle");
+  const [action, setAction] = useState<DishAction | null>(row?.dish_action ?? null);
+
+  const isAcclimation =
+    trial.acclimation_days > 0 && date < addDays(trial.start_date, trial.acclimation_days);
+
+  const saveField = async (patch: Partial<ObsRow>, setState: (s: SaveState) => void) => {
+    setState("saving");
+    try {
+      await upsertRow(
+        "observations",
+        {
+          trial_id: trial.id,
+          pen_id: pen.id,
+          feed_id: null,
+          obs_date: date,
+          is_acclimation: isAcclimation,
+          ...patch,
+        },
+        OBSERVATIONS_TRIAL_KEY,
+      );
+      setState("saved");
+      onSaved();
+    } catch {
+      setState("failed");
+    }
+  };
+
+  return (
+    <section className="rounded-2xl border border-dashed border-border bg-card p-4 shadow-sm space-y-4">
+      <div className="space-y-1">
+        <div className="text-lg font-bold">{pen.label}</div>
+        <BreederBadge />
+        <div className="text-xs text-muted-foreground">
+          Not part of the trial — nothing recorded here enters any feed or growth figure.
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm font-medium">Dish action</span>
+          <StatusPill state={actionState === "idle" && row?.dish_action ? "saved" : actionState} />
+        </div>
+        <div className="grid grid-cols-1 gap-2">
+          {DISH_ACTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => {
+                setAction(o.value);
+                void saveField({ dish_action: o.value }, setActionState);
+              }}
+              className={`rounded-xl border py-3 text-sm font-medium ${
+                action === o.value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <PenPhotoSlot
+        trial_id={trial.id}
+        pen_id={pen.id}
+        obs_date={date}
+        kind="pm"
+        label="PM photo — dish and paper tag in frame"
+        existingUrl={photoUrl}
+        onSaved={onSaved}
+      />
+
+      <div className="space-y-1">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm font-medium">Notes</span>
+          <StatusPill state={notesState === "idle" && row?.notes ? "saved" : notesState} />
+        </div>
+        <textarea
+          key={`${pen.id}-${date}-breeder-notes`}
+          defaultValue={row?.notes ?? ""}
+          rows={2}
+          onBlur={(e) => void saveField({ notes: e.currentTarget.value || null }, setNotesState)}
+          className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm"
+        />
+      </div>
     </section>
   );
 }

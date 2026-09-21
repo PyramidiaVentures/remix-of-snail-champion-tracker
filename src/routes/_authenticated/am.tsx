@@ -8,7 +8,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Checklist } from "@/components/Checklist";
 import { ChecklistBlocker } from "@/components/ChecklistBlocker";
 import { NumberField } from "@/components/NumberField";
-import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
+import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { useUploads } from "@/lib/photoUploads.store";
 import { liveCount } from "@/lib/liveCount";
@@ -52,6 +52,7 @@ const SUBSTRATE: { value: SubstrateCondition; label: string }[] = [
   { value: "dry", label: "Dry" },
   { value: "waterlogged", label: "Waterlogged" },
   { value: "soiled", label: "Soiled" },
+  { value: "mouldy", label: "Mouldy" },
 ];
 
 const AM_STEPS = [
@@ -153,10 +154,25 @@ function AmPage() {
     return map;
   }, [assignments.data, treatments.data]);
 
+  // Breeder pens are checked in the same walk, marked apart and counted apart.
   const trialPens: StepperPen[] = useMemo(
-    () => (pens.data ?? []).filter((p) => feedByPen.has(p.id)).map((p) => ({ id: p.id, label: p.label })),
+    () =>
+      (pens.data ?? [])
+        .filter((p) => p.role !== "breeder" && feedByPen.has(p.id))
+        .map((p) => ({ id: p.id, label: p.label, role: "trial" as const })),
     [pens.data, feedByPen],
   );
+
+  const breederPens: StepperPen[] = useMemo(
+    () =>
+      (pens.data ?? [])
+        .filter((p) => p.role === "breeder")
+        .map((p) => ({ id: p.id, label: p.label, role: "breeder" as const })),
+    [pens.data],
+  );
+
+  const stepperPens = useMemo(() => [...trialPens, ...breederPens], [trialPens, breederPens]);
+  const isBreeder = (penId: string) => breederPens.some((p) => p.id === penId);
 
   const anyPmForDate = (obs.data ?? []).some((o) => o.offered_g != null);
 
@@ -168,10 +184,12 @@ function AmPage() {
 
   const missingFor = (penId: string) => {
     const w = welfareFor(penId);
+    const breeder = isBreeder(penId);
     const missing: string[] = [];
     if (!photoSaved(penId)) missing.push("AM photo");
-    if (!obsFor(penId)?.refusal_score) missing.push("refusal score");
-    if (!w?.activity) missing.push("activity");
+    // A breeder pen has no assigned feed, so there is no refusal to score.
+    if (!breeder && !obsFor(penId)?.refusal_score) missing.push("refusal score");
+    if (!breeder && !w?.activity) missing.push("activity");
     if (!w?.substrate_condition) missing.push("substrate condition");
     return missing;
   };
@@ -179,13 +197,19 @@ function AmPage() {
   const stateFor = (penId: string): PenCompletion => {
     if (uploads.get(penPhotoKey(trialId ?? "", penId, date, "am"))?.status === "uploading") return "uploading";
     const missing = missingFor(penId);
+    const total = isBreeder(penId) ? 2 : 4;
     if (missing.length === 0) return "complete";
-    return missing.length === 5 ? "empty" : "partial";
+    return missing.length === total ? "empty" : "partial";
   };
 
   const photosDone = trialPens.filter((p) => photoSaved(p.id)).length;
   const photosNeeded = trialPens.length;
-  const allPhotos = photosNeeded > 0 && photosDone === photosNeeded;
+  const breederPhotosDone = breederPens.filter((p) => photoSaved(p.id)).length;
+  const breederPhotosNeeded = breederPens.length;
+  const allPhotos =
+    photosNeeded + breederPhotosNeeded > 0 &&
+    photosDone === photosNeeded &&
+    breederPhotosDone === breederPhotosNeeded;
 
   const [checklistDone, setChecklistDone] = useState(0);
   const [checklistAll, setChecklistAll] = useState(false);
@@ -199,11 +223,13 @@ function AmPage() {
       ? {
           forced: allPhotos,
           locked: true,
-          subtitle: photosNeeded === 0
+          subtitle: photosNeeded + breederPhotosNeeded === 0
             ? "Assign pens to the trial first."
-            : allPhotos
-              ? `All ${photosNeeded} pen photos uploaded.`
-              : `${photosNeeded - photosDone} of ${photosNeeded} pen photos still needed — take them before disturbing the dish.`,
+            : `${photosDone} of ${photosNeeded} trial pen photos uploaded` +
+              (breederPhotosNeeded > 0
+                ? ` · ${breederPhotosDone} of ${breederPhotosNeeded} breeder pen photos uploaded.`
+                : ".") +
+              (allPhotos ? "" : " Take them before disturbing the dish."),
         }
       : undefined,
   );
@@ -310,11 +336,26 @@ function AmPage() {
           </section>
 
           <PenStepper
-            pens={trialPens}
+            pens={stepperPens}
             stateFor={stateFor}
             missingFor={missingFor}
             paramName="pen"
-            renderPen={(pen) => (
+            renderPen={(pen) =>
+              pen.role === "breeder" ? (
+                <BreederCard
+                  key={pen.id}
+                  trialId={trial.data!.id}
+                  pen={pen}
+                  date={date}
+                  welfareRow={welfareFor(pen.id)}
+                  photoUrl={photoUrlFor(pen.id)}
+                  sessionTemp={temp}
+                  sessionHumidity={humidity}
+                  penEvents={eventsForPenDate(pen.id)}
+                  liveCountValue={liveCountFor(pen.id)}
+                  onSaved={refresh}
+                />
+              ) : (
               <PenCard
                 key={pen.id}
                 trialId={trial.data!.id}
@@ -330,7 +371,8 @@ function AmPage() {
                 liveCountValue={liveCountFor(pen.id)}
                 onSaved={refresh}
               />
-            )}
+              )
+            }
           />
         </>
       )}
@@ -580,6 +622,215 @@ function PenCard({
         </div>
         <textarea
           key={`${pen.id}-${date}-notes`}
+          defaultValue={welfareRow?.notes ?? ""}
+          rows={2}
+          onBlur={(e) => void saveWelfare({ notes: e.currentTarget.value || null }, setNotesState)}
+          className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm"
+        />
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Breeder pen morning card. Same walk, but outside the trial: no refusal score
+ * and no feed, while substrate, health, deaths and notes are all still logged.
+ */
+function BreederCard({
+  trialId, pen, date, welfareRow, photoUrl, sessionTemp, sessionHumidity,
+  penEvents, liveCountValue, onSaved,
+}: {
+  trialId: string;
+  pen: StepperPen;
+  date: string;
+  welfareRow: WelfareRow | undefined;
+  photoUrl: string | null;
+  sessionTemp: number | null;
+  sessionHumidity: number | null;
+  penEvents: { id: string; event_type: PopulationEventType; count: number }[];
+  liveCountValue: number;
+  onSaved: () => void;
+}) {
+  const [welfareState, setWelfareState] = useState<SaveState>("idle");
+  const [notesState, setNotesState] = useState<SaveState>("idle");
+  const [eventState, setEventState] = useState<SaveState>("idle");
+
+  const [flags, setFlags] = useState<HealthFlag[]>((welfareRow?.health_flags as HealthFlag[] | null) ?? []);
+  const [substrate, setSubstrate] = useState<SubstrateCondition | null>(welfareRow?.substrate_condition ?? null);
+
+  const saveWelfare = async (patch: Record<string, unknown>, setState: (s: SaveState) => void) => {
+    setState("saving");
+    try {
+      await upsertRow(
+        "welfare_checks",
+        {
+          trial_id: trialId,
+          pen_id: pen.id,
+          obs_date: date,
+          temp_c: sessionTemp,
+          humidity_pct: sessionHumidity,
+          ...patch,
+        },
+        WELFARE_CHECKS_KEY,
+      );
+      setState("saved");
+      onSaved();
+    } catch {
+      setState("failed");
+    }
+  };
+
+  const toggleFlag = (f: HealthFlag) => {
+    const next = flags.includes(f) ? flags.filter((x) => x !== f) : [...flags, f];
+    setFlags(next);
+    void saveWelfare({ health_flags: next }, setWelfareState);
+  };
+
+  const [eventType, setEventType] = useState<PopulationEventType>("mortality");
+  const [eventCount, setEventCount] = useState<string>("1");
+
+  const logEvent = async () => {
+    const count = Number(eventCount);
+    if (!Number.isFinite(count) || count <= 0) return;
+    setEventState("saving");
+    try {
+      await writeWithRetry("population_events", () =>
+        supabase.from("population_events").insert({
+          trial_id: trialId,
+          pen_id: pen.id,
+          event_date: date,
+          event_type: eventType,
+          count,
+        } as never),
+      );
+      setEventState("saved");
+      setEventCount("1");
+      onSaved();
+    } catch {
+      setEventState("failed");
+    }
+  };
+
+  const removeEvent = async (id: string) => {
+    setEventState("saving");
+    try {
+      await writeWithRetry("population_events", () =>
+        supabase.from("population_events").delete().eq("id", id),
+      );
+      setEventState("saved");
+      onSaved();
+    } catch {
+      setEventState("failed");
+    }
+  };
+
+  return (
+    <section className="rounded-2xl border border-dashed border-border bg-card p-4 shadow-sm space-y-4">
+      <div className="space-y-1">
+        <div className="text-lg font-bold">{pen.label}</div>
+        <BreederBadge />
+        <div className="text-xs text-muted-foreground">
+          Not part of the trial — nothing recorded here enters any growth figure.
+        </div>
+      </div>
+
+      <PenPhotoSlot
+        trial_id={trialId}
+        pen_id={pen.id}
+        obs_date={date}
+        kind="am"
+        label="AM photo — take it before disturbing the dish"
+        existingUrl={photoUrl}
+        onSaved={onSaved}
+      />
+
+      <div className="space-y-1">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm font-medium">Substrate condition</span>
+          <StatusPill state={welfareState === "idle" && welfareRow?.substrate_condition ? "saved" : welfareState} />
+        </div>
+        <OptionRow
+          options={SUBSTRATE}
+          value={substrate}
+          onPick={(v) => { setSubstrate(v); void saveWelfare({ substrate_condition: v }, setWelfareState); }}
+          columns={2}
+        />
+      </div>
+
+      <div className="space-y-1">
+        <span className="text-sm font-medium">Signs of sickness</span>
+        <div className="grid grid-cols-2 gap-2">
+          {HEALTH_FLAGS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => toggleFlag(f.value)}
+              className={`rounded-xl border py-3 text-sm font-medium ${
+                flags.includes(f.value) ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border p-3 space-y-2">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm font-medium">Log a death, escape or removal</span>
+          <StatusPill state={eventState} />
+        </div>
+        <div className="flex gap-2">
+          <select
+            value={eventType}
+            onChange={(e) => setEventType(e.target.value as PopulationEventType)}
+            className="flex-1 rounded-lg border border-input bg-card px-3 py-2 text-sm"
+          >
+            <option value="mortality">Death</option>
+            <option value="escape">Escape</option>
+            <option value="removal">Removal</option>
+            <option value="addition">Addition</option>
+          </select>
+          <input
+            type="number" inputMode="numeric" min="1" step="1"
+            value={eventCount}
+            onChange={(e) => setEventCount(e.target.value)}
+            className="num-input w-20"
+          />
+          <button type="button" onClick={() => void logEvent()}
+            className="flex items-center gap-1 rounded-lg border border-primary bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">
+            <Plus className="h-4 w-4" />Add
+          </button>
+        </div>
+
+        {penEvents.length > 0 && (
+          <ul className="space-y-1">
+            {penEvents.map((e) => (
+              <li key={e.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
+                <span>{EVENT_LABEL[e.event_type] ?? e.event_type} · {e.count}</span>
+                <button
+                  type="button"
+                  aria-label="Remove event"
+                  onClick={() => void removeEvent(e.id)}
+                  className="text-destructive p-1"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="text-sm font-medium">Live count: {liveCountValue}</div>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm font-medium">Notes</span>
+          <StatusPill state={notesState === "idle" && welfareRow?.notes ? "saved" : notesState} />
+        </div>
+        <textarea
+          key={`${pen.id}-${date}-breeder-notes`}
           defaultValue={welfareRow?.notes ?? ""}
           rows={2}
           onBlur={(e) => void saveWelfare({ notes: e.currentTarget.value || null }, setNotesState)}

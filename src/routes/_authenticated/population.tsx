@@ -83,8 +83,9 @@ function PopulationPage() {
   });
 
   const assignedIds = useMemo(() => new Set((assignments.data ?? []).map((a) => a.pen_id)), [assignments.data]);
+  // Breeder pens carry no treatment but their deaths and additions still count.
   const trialPens = useMemo(
-    () => (pens.data ?? []).filter((p) => assignedIds.has(p.id)),
+    () => (pens.data ?? []).filter((p) => p.role === "breeder" || assignedIds.has(p.id)),
     [pens.data, assignedIds],
   );
   const penLabel = (id: string) => (pens.data ?? []).find((p) => p.id === id)?.label ?? "—";

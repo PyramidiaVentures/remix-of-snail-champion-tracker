@@ -7,6 +7,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { useState } from "react";
 import { Plus, Trash2, Pencil, X, Check, Lock } from "lucide-react";
 import { usePensWithData, INITIAL_COUNT_LOCK_MESSAGE } from "@/lib/penDataLock";
+import type { PenRole } from "@/components/PenStepper";
 import { useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
 
 
@@ -50,6 +51,7 @@ function PensSection() {
 
   const [label, setLabel] = useState("");
   const [count, setCount] = useState(0);
+  const [role, setRole] = useState<PenRole>("trial");
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["pens"] });
@@ -59,10 +61,10 @@ function PensSection() {
   const add = useMutation({
     mutationFn: async () => {
       if (!siteId) throw new Error("No site selected");
-      const { error } = await supabase.from("pens").insert({ label, initial_snail_count: count, site_id: siteId });
+      const { error } = await supabase.from("pens").insert({ label, initial_snail_count: count, site_id: siteId, role });
       if (error) throw error;
     },
-    onSuccess: () => { setLabel(""); setCount(0); refresh(); },
+    onSuccess: () => { setLabel(""); setCount(0); setRole("trial"); refresh(); },
   });
 
 
@@ -72,7 +74,7 @@ function PensSection() {
   });
 
   const update = useMutation({
-    mutationFn: async (p: { id: string; patch: { label?: string; initial_snail_count?: number; area_m2?: number | null } }) => {
+    mutationFn: async (p: { id: string; patch: { label?: string; initial_snail_count?: number; area_m2?: number | null; role?: PenRole } }) => {
       await supabase.from("pens").update(p.patch).eq("id", p.id);
     },
     onSuccess: refresh,
@@ -125,6 +127,24 @@ function PensSection() {
                 )}
               </label>
               <label className="text-xs">
+                <span className="block mb-1 text-muted-foreground">Pen role</span>
+                {locked(p.id) ? (
+                  <div className="rounded-md border border-input bg-muted px-2 py-1">
+                    {p.role === "breeder" ? "Breeder pen" : "Trial pen"}
+                  </div>
+                ) : (
+                  <select
+                    defaultValue={p.role ?? "trial"}
+                    aria-label={`Role for ${p.label}`}
+                    onChange={(e) => update.mutate({ id: p.id, patch: { role: e.target.value as PenRole } })}
+                    className="w-full rounded-md border border-input bg-background px-2 py-1"
+                  >
+                    <option value="trial">Trial pen</option>
+                    <option value="breeder">Breeder pen</option>
+                  </select>
+                )}
+              </label>
+              <label className="text-xs">
                 <span className="block mb-1 text-muted-foreground">Area (m²)</span>
                 <input type="number" step="0.01" min={0} defaultValue={p.area_m2 ?? ""}
                   aria-label={`Area for ${p.label}`}
@@ -135,7 +155,7 @@ function PensSection() {
             {locked(p.id) && (
               <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
                 <Lock className="mt-0.5 h-3 w-3 shrink-0" />
-                <span>{INITIAL_COUNT_LOCK_MESSAGE} The pen also cannot be removed while it holds recorded data.</span>
+                <span>{INITIAL_COUNT_LOCK_MESSAGE} Its role as a trial or breeder pen is fixed for the same reason, and the pen cannot be removed while it holds recorded data.</span>
               </p>
             )}
           </li>
@@ -144,11 +164,19 @@ function PensSection() {
           <li className="text-sm text-muted-foreground">No pens at {siteName || "this site"} yet.</li>
         )}
       </ul>
-      <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
+      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-end">
         <label className="text-xs col-span-full sm:col-span-1">
           <span className="block mb-1 text-muted-foreground">Label</span>
           <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Pen A"
             className="w-full rounded-md border border-input bg-background px-3 py-2" />
+        </label>
+        <label className="text-xs">
+          <span className="block mb-1 text-muted-foreground">Pen role</span>
+          <select value={role} onChange={(e) => setRole(e.target.value as PenRole)}
+            className="rounded-md border border-input bg-background px-3 py-2">
+            <option value="trial">Trial pen</option>
+            <option value="breeder">Breeder pen</option>
+          </select>
         </label>
         <label className="text-xs">
           <span className="block mb-1 text-muted-foreground">Initial snail count</span>

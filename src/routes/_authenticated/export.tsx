@@ -199,8 +199,9 @@ async function buildRows(name: ExportName): Promise<Row[]> {
       if (!trial) return [];
       const trialId = trial['id'] as string;
       const [obs, biomass] = await Promise.all([all("observations"), all("biomass_events")]);
+      // Breeder pens have no feed, so they never enter the analysis sheet.
       const trialObs = obs
-        .filter((o) => o['trial_id'] === trialId)
+        .filter((o) => o['trial_id'] === trialId && o['feed_id'] != null)
         .map((o) => ({
           pen_id: o['pen_id'] as string,
           feed_id: o['feed_id'] as string,
@@ -223,7 +224,7 @@ async function buildRows(name: ExportName): Promise<Row[]> {
         .filter((a) => a['trial_id'] === trialId)
         .map((a) => ({ pen_id: a['pen_id'] as string, treatment_id: a['treatment_id'] as string }));
       const assignedPens = pens
-        .filter((p) => trialAssignments.some((a) => a.pen_id === p['id']))
+        .filter((p) => p['role'] !== "breeder" && trialAssignments.some((a) => a.pen_id === p['id']))
         .map((p) => ({ id: p['id'] as string, label: penLabel.get(p['id'] as string) ?? (p['label'] as string) }));
 
 

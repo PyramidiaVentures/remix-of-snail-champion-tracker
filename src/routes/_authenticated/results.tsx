@@ -73,11 +73,12 @@ function ResultsPage() {
     queryKey: ["pens", "with-site"],
     queryFn: async () => {
       const [{ data: rows }, { data: sites }] = await Promise.all([
-        supabase.from("pens").select("id,label,site_id").order("label"),
+        supabase.from("pens").select("id,label,site_id,role").order("label"),
         supabase.from("sites").select("id,name"),
       ]);
       const siteName = new Map((sites ?? []).map((s) => [s.id, s.name]));
-      return (rows ?? []).map((p) => ({
+      // Breeder pens never enter a treatment mean, so Results drops them here.
+      return (rows ?? []).filter((p) => p.role !== "breeder").map((p) => ({
         id: p.id,
         label: siteName.get(p.site_id) ? `${p.label} · ${siteName.get(p.site_id)}` : p.label,
       }));
@@ -102,6 +103,7 @@ function ResultsPage() {
     queryFn: async () => (await supabase.from("biomass_events").select("pen_id,event_date,net_biomass_g,live_count").eq("trial_id", trialId!)).data ?? [],
   });
 
+  // Breeder pens are never part of a treatment mean, so Results never sees them.
   const assignedPens = useMemo(
     () =>
       (pens.data ?? [])
@@ -144,9 +146,11 @@ function ResultsPage() {
   const scopedObservations = useMemo(
     () =>
       rangeStart && rangeEnd
-        ? (observations.data ?? []).filter(
-            (o) => o.obs_date > rangeStart && o.obs_date <= rangeEnd && selectedPenIds.has(o.pen_id),
-          )
+        ? (observations.data ?? [])
+            .filter(
+              (o) => o.feed_id != null && o.obs_date > rangeStart && o.obs_date <= rangeEnd && selectedPenIds.has(o.pen_id),
+            )
+            .map((o) => ({ ...o, feed_id: o.feed_id as string }))
         : [],
     [observations.data, rangeStart, rangeEnd, selectedPenIds],
   );

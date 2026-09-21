@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, CheckCircle2, CircleDashed, Loader2, Circle } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, CircleDashed, Loader2, Circle, Sprout } from "lucide-react";
 
 export type PenCompletion = "complete" | "partial" | "empty" | "uploading";
+
+export type PenRole = "trial" | "breeder";
 
 export interface StepperPen {
   id: string;
   label: string;
+  /** Breeder pens are monitored but sit outside the trial. Defaults to "trial". */
+  role?: PenRole;
 }
 
 interface Props {
@@ -40,9 +44,15 @@ function ChipIcon({ state }: { state: PenCompletion }) {
 }
 
 export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = "pen" }: Props) {
-  // Stable order: always by label, matching the walk down the beds.
+  // Stable order: trial pens first, then breeder pens, each by label —
+  // matching the walk down the beds.
   const ordered = useMemo(
-    () => [...pens].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })),
+    () =>
+      [...pens].sort(
+        (a, b) =>
+          (a.role === "breeder" ? 1 : 0) - (b.role === "breeder" ? 1 : 0) ||
+          a.label.localeCompare(b.label, undefined, { numeric: true }),
+      ),
     [pens],
   );
   const n = ordered.length;
@@ -103,35 +113,52 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
     );
   }
 
-  const doneCount = ordered.filter((p) => stateFor(p.id) === "complete").length;
+  // Trial pens and breeder pens are always counted apart, so a completion
+  // figure never mixes the two kinds of pen.
+  const trialPens = ordered.filter((p) => p.role !== "breeder");
+  const breederPens = ordered.filter((p) => p.role === "breeder");
+  const doneIn = (list: StepperPen[]) => list.filter((p) => stateFor(p.id) === "complete").length;
+  const trialDone = doneIn(trialPens);
+  const breederDone = doneIn(breederPens);
+  const doneCount = trialDone + breederDone;
   const remaining = n - doneCount;
   const current = index < n ? ordered[index] : null;
 
   return (
     <div className="space-y-3" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-      <div className="flex items-baseline justify-between text-sm">
+      <div className="flex items-baseline justify-between gap-2 text-sm">
         <span className="font-semibold">
-          {current ? `Pen ${current.label} · ${index + 1} of ${n}` : "Session summary"}
+          {current
+            ? `Pen ${current.label}${current.role === "breeder" ? " (breeder)" : ""} · ${index + 1} of ${n}`
+            : "Session summary"}
         </span>
-        <span className="text-xs text-muted-foreground">
-          {doneCount} complete, {remaining} to go
+        <span className="text-right text-xs text-muted-foreground">
+          {trialDone} of {trialPens.length} trial pens complete
+          {breederPens.length > 0 && (
+            <>
+              <br />
+              {breederDone} of {breederPens.length} breeder pens complete
+            </>
+          )}
         </span>
       </div>
 
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {ordered.map((p, i) => {
           const state = stateFor(p.id);
+          const breeder = p.role === "breeder";
           return (
             <button
               key={p.id}
               type="button"
               onClick={() => go(i)}
               className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${CHIP_STYLES[state]} ${
-                i === index ? "ring-2 ring-ring ring-offset-1 ring-offset-background" : ""
-              }`}
+                breeder ? "border-dashed" : ""
+              } ${i === index ? "ring-2 ring-ring ring-offset-1 ring-offset-background" : ""}`}
             >
               <ChipIcon state={state} />
               {p.label}
+              {breeder && <Sprout className="h-3 w-3" aria-label="Breeder pen" />}
             </button>
           );
         })}
@@ -150,7 +177,8 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
           <h2 className="font-semibold">Session summary</h2>
           <p className="text-sm text-muted-foreground">
-            {doneCount} of {n} pens complete.
+            {trialDone} of {trialPens.length} trial pens complete.
+            {breederPens.length > 0 && ` ${breederDone} of ${breederPens.length} breeder pens complete.`}
           </p>
           {remaining === 0 ? (
             <p className="text-sm text-primary">Every pen is done for this session.</p>
@@ -165,7 +193,12 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
                       onClick={() => go(indexOfId(p.id))}
                       className="flex w-full items-start justify-between gap-3 py-2 text-left"
                     >
-                      <span className="text-sm font-medium">{p.label}</span>
+                      <span className="text-sm font-medium">
+                        {p.label}
+                        {p.role === "breeder" && (
+                          <span className="ml-1 text-xs font-normal text-muted-foreground">breeder</span>
+                        )}
+                      </span>
                       <span className="text-xs text-amber-600">
                         missing: {missingFor(p.id).join(", ") || "—"}
                       </span>
@@ -196,5 +229,14 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
         </button>
       </div>
     </div>
+  );
+}
+
+/** Marks a pen card as a breeder pen, outside the trial. */
+export function BreederBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      <Sprout className="h-3 w-3" /> Breeder pen
+    </span>
   );
 }

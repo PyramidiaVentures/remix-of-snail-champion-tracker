@@ -122,7 +122,7 @@ export type Database = {
         Row: {
           created_at: string
           dish_action: Database["public"]["Enums"]["dish_action"] | null
-          feed_id: string
+          feed_id: string | null
           id: string
           is_acclimation: boolean
           notes: string | null
@@ -137,7 +137,7 @@ export type Database = {
         Insert: {
           created_at?: string
           dish_action?: Database["public"]["Enums"]["dish_action"] | null
-          feed_id: string
+          feed_id?: string | null
           id?: string
           is_acclimation?: boolean
           notes?: string | null
@@ -152,7 +152,7 @@ export type Database = {
         Update: {
           created_at?: string
           dish_action?: Database["public"]["Enums"]["dish_action"] | null
-          feed_id?: string
+          feed_id?: string | null
           id?: string
           is_acclimation?: boolean
           notes?: string | null
@@ -251,6 +251,7 @@ export type Database = {
           initial_snail_count: number
           label: string
           notes: string | null
+          role: Database["public"]["Enums"]["pen_role"]
           site_id: string
         }
         Insert: {
@@ -260,6 +261,7 @@ export type Database = {
           initial_snail_count?: number
           label: string
           notes?: string | null
+          role?: Database["public"]["Enums"]["pen_role"]
           site_id?: string
         }
         Update: {
@@ -269,6 +271,7 @@ export type Database = {
           initial_snail_count?: number
           label?: string
           notes?: string | null
+          role?: Database["public"]["Enums"]["pen_role"]
           site_id?: string
         }
         Relationships: [
@@ -612,6 +615,7 @@ export type Database = {
         | "foul_smell"
         | "mould_in_dish"
         | "visible_dead"
+      pen_role: "trial" | "breeder"
       population_cause:
         | "disease"
         | "predation"
@@ -628,7 +632,7 @@ export type Database = {
         | "most_left"
       round_status: "active" | "closed"
       snail_activity: "active" | "mixed" | "mostly_sealed"
-      substrate_condition: "good" | "dry" | "waterlogged" | "soiled"
+      substrate_condition: "good" | "dry" | "waterlogged" | "soiled" | "mouldy"
       trial_status: "setup" | "active" | "closed"
     }
     CompositeTypes: {
@@ -768,6 +772,7 @@ export const Constants = {
         "mould_in_dish",
         "visible_dead",
       ],
+      pen_role: ["trial", "breeder"],
       population_cause: [
         "disease",
         "predation",
@@ -786,7 +791,7 @@ export const Constants = {
       ],
       round_status: ["active", "closed"],
       snail_activity: ["active", "mixed", "mostly_sealed"],
-      substrate_condition: ["good", "dry", "waterlogged", "soiled"],
+      substrate_condition: ["good", "dry", "waterlogged", "soiled", "mouldy"],
       trial_status: ["setup", "active", "closed"],
     },
   },
