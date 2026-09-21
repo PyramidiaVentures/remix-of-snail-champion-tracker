@@ -7,6 +7,7 @@ import { today } from "@/lib/date";
 import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PhotoFrame, PhotoLightbox } from "@/components/PhotoFrame";
 import { useSitePens, useSiteScope } from "@/lib/siteScope";
+import { useSiteCalendar, type OperatingCalendar } from "@/lib/operatingDays";
 
 type Search = { mode?: string; date?: string; pen?: string };
 
@@ -63,6 +64,22 @@ function nextDate(date: string) {
   return value.toISOString().slice(0, 10);
 }
 
+/**
+ * The morning the dish is actually checked. Normally the next day, but when
+ * that day is closed at the site nobody is there — the check happens on the
+ * next operating morning instead (a Saturday feeding is checked on Monday).
+ */
+function morningOf(date: string, calendar: OperatingCalendar) {
+  return calendar.nextOperatingDay(nextDate(date));
+}
+
+/** "16 hours later" only holds for a same-next-morning check. */
+function afterLabel(date: string, morning: string) {
+  return morning === nextDate(date)
+    ? "After — 16 hours later"
+    : `After — checked ${displayDate(morning)} morning`;
+}
+
 function displayDate(date: string) {
   const value = new Date(`${date}T00:00:00Z`);
   const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -93,10 +110,10 @@ function CycleDetails({ observation }: { observation: ObservationRow | undefined
   );
 }
 
-function CycleHeading({ penLabel, date }: { penLabel: string; date: string }) {
+function CycleHeading({ penLabel, date, morning }: { penLabel: string; date: string; morning: string }) {
   return (
     <h2 className="text-base font-semibold">
-      {penLabel} — fed {displayDate(date)} evening, checked {displayDate(nextDate(date))} morning
+      {penLabel} — fed {displayDate(date)} evening, checked {displayDate(morning)} morning
     </h2>
   );
 }
@@ -105,6 +122,7 @@ function PhotosPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/photos" });
   const { siteId, siteName } = useSiteScope();
+  const { calendar } = useSiteCalendar();
   const pens = useSitePens();
   const allPens = useMemo(() => pens.data ?? [], [pens.data]);
 
@@ -269,14 +287,15 @@ function PhotosPage() {
             renderPen={(pen) => {
               const s = sessionFor(pen.id);
               const weigh = weighFor(pen.id);
+              const morning = morningOf(date, calendar);
               return (
                 <div className="space-y-3">
-                  <CycleHeading penLabel={pen.label} date={date} />
+                  <CycleHeading penLabel={pen.label} date={date} morning={morning} />
                   <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_13rem]">
                     <PhotoFrame stored={s?.photo_pm_url} session="Before — feed offered" penLabel={pen.label}
                       siteName={siteName} date={date} onOpen={(url, caption) => setLightbox({ url, caption })} />
-                    <PhotoFrame stored={s?.photo_am_url} session="After — 16 hours later" penLabel={pen.label}
-                      siteName={siteName} date={nextDate(date)} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                    <PhotoFrame stored={s?.photo_am_url} session={afterLabel(date, morning)} penLabel={pen.label}
+                      siteName={siteName} date={morning} onOpen={(url, caption) => setLightbox({ url, caption })} />
                     <CycleDetails observation={observationFor(pen.id)} />
                   </div>
                   {weigh && (
@@ -321,14 +340,15 @@ function PhotosPage() {
               <div className="space-y-4">
                  {historyRows.slice(0, shown).map((row) => {
                    const label = selectedPenId ? penLabel(selectedPenId) : "Pen";
+                   const morning = morningOf(row.date, calendar);
                    return (
                    <div key={row.date} className="space-y-3 border-b border-border pb-5 last:border-0">
-                     <CycleHeading penLabel={label} date={row.date} />
+                     <CycleHeading penLabel={label} date={row.date} morning={morning} />
                      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_13rem]">
                        <PhotoFrame stored={row.pm} session="Before — feed offered" penLabel={label}
                          siteName={siteName} date={row.date} onOpen={(url, caption) => setLightbox({ url, caption })} />
-                       <PhotoFrame stored={row.am} session="After — 16 hours later" penLabel={label}
-                         siteName={siteName} date={nextDate(row.date)} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                       <PhotoFrame stored={row.am} session={afterLabel(row.date, morning)} penLabel={label}
+                         siteName={siteName} date={morning} onOpen={(url, caption) => setLightbox({ url, caption })} />
                        <CycleDetails observation={row.observation} />
                     </div>
                      {row.weigh && (
