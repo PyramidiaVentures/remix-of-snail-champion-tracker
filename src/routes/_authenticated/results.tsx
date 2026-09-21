@@ -61,12 +61,15 @@ function ResultsPage() {
   const hiddenColumns = useMemo(() => listToSet(search.hide), [search.hide]);
   const hiddenSeries = useMemo(() => listToSet(search.hs), [search.hs]);
 
+  const { calendarFor } = useAllSiteCalendars();
   const trial = useQuery({
     queryKey: ["active-trial"],
     queryFn: async () =>
       (await supabase.from("trials").select("*").eq("status", "active").limit(1)).data?.[0] ?? null,
   });
   const trialId = trial.data?.id;
+  // Closed days never count as missing feeding days.
+  const isOperating = calendarFor(trial.data?.site_id).isOperating;
 
   // Results span every site, so each pen is named with its site: "Pen 1" exists at both.
   const pens = useQuery({
@@ -339,6 +342,7 @@ function ResultsPage() {
         <PenDetail
           metrics={metrics}
           observations={scopedObservations}
+          isOperating={isOperating}
           biomass={scopedBiomass}
           startDate={trial.data.start_date}
           acclimationDays={trial.data.acclimation_days}
@@ -357,6 +361,7 @@ function ResultsPage() {
           view={view}
           domain={[rangeStart, rangeEnd]}
           observations={scopedObservations}
+          isOperating={isOperating}
           startDate={trial.data?.start_date ?? rangeStart}
           acclimationDays={trial.data?.acclimation_days ?? 0}
           includeAcclimation={includeAcclimation}
@@ -552,13 +557,14 @@ function IntervalChartCard({
 }
 
 function Charts({
-  metrics, view, domain, observations, startDate, acclimationDays, includeAcclimation,
+  metrics, view, domain, observations, isOperating, startDate, acclimationDays, includeAcclimation,
   hiddenSeries, onToggleSeries,
 }: {
   metrics: TrialMetrics;
   view: View;
   domain: Domain;
   observations: { pen_id: string; obs_date: string; offered_g: number | null; dish_action: string | null }[];
+  isOperating: (d: string) => boolean;
   startDate: string;
   acclimationDays: number;
   includeAcclimation: boolean;
@@ -729,6 +735,7 @@ function SummaryTable({ metrics }: { metrics: TrialMetrics }) {
 interface PenDetailProps {
   metrics: TrialMetrics;
   observations: { pen_id: string; obs_date: string; offered_g: number | null; dish_action: string | null }[];
+  isOperating: (d: string) => boolean;
   biomass: { pen_id: string; event_date: string; live_count: number }[];
   startDate: string;
   acclimationDays: number;
