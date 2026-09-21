@@ -13,9 +13,8 @@ import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
-  validateSearch: (search: Record<string, unknown>) => ({
-    date: typeof search['date'] === "string" ? search['date'] : "",
-  }),
+  validateSearch: (search: Record<string, unknown>): { date?: string } =>
+    typeof search['date'] === "string" ? { date: search['date'] } : {},
   head: () => ({
     meta: [
       { title: "Daily Dashboard — SNOVA Growth Tracker" },

@@ -14,9 +14,8 @@ import { Plus, Trash2, Pencil, X, Check, Upload, Loader2, AlertTriangle } from "
 
 export const Route = createFileRoute("/_authenticated/population")({
   component: PopulationPage,
-  validateSearch: (search: Record<string, unknown>) => ({
-    pen: typeof search['pen'] === "string" ? search['pen'] : "",
-  }),
+  validateSearch: (search: Record<string, unknown>): { pen?: string } =>
+    typeof search['pen'] === "string" ? { pen: search['pen'] } : {},
   head: () => ({
     meta: [
       { title: "Population — SNOVA Growth Tracker" },

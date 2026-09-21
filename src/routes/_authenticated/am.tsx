@@ -17,9 +17,8 @@ import { BookOpen, AlertTriangle, CheckCircle2, Loader2, Save, Plus, Trash2 } fr
 
 export const Route = createFileRoute("/_authenticated/am")({
   component: AmPage,
-  validateSearch: (search: Record<string, unknown>) => ({
-    pen: typeof search['pen'] === "string" ? search['pen'] : "",
-  }),
+  validateSearch: (search: Record<string, unknown>): { pen?: string } =>
+    typeof search['pen'] === "string" ? { pen: search['pen'] } : {},
 });
 
 type RefusalScore = Database["public"]["Enums"]["refusal_score"];
