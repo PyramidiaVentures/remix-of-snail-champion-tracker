@@ -35,7 +35,6 @@ export const Route = createFileRoute("/_authenticated/home")({
 });
 
 const DAY = 86_400_000;
-const shift = (d: string, n: number) => new Date(Date.parse(d) + n * DAY).toISOString().slice(0, 10);
 const longDate = (d: string) =>
   new Date(`${d}T00:00:00`).toLocaleDateString(undefined, {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
@@ -43,9 +42,12 @@ const longDate = (d: string) =>
 
 function HomePage() {
   const t = today();
-  const yesterday = shift(t, -1);
   const { siteName, siteId } = useSiteScope();
   const { calendar } = useSiteCalendar();
+  // The morning check done today completes the feeding from the previous
+  // operating day — Saturday's feed when Sunday is closed, never yesterday
+  // if it was a closed day.
+  const feedDay = calendar.previousOperatingDay(t);
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
@@ -59,11 +61,11 @@ function HomePage() {
 
 
   const daily = useQuery({
-    queryKey: ["home-daily", trialId, t], enabled: !!trialId,
+    queryKey: ["home-daily", trialId, t, feedDay], enabled: !!trialId,
     queryFn: async () => {
       const [obs, welfare, photos, biomass] = await Promise.all([
         supabase.from("observations").select("pen_id,obs_date,offered_g").eq("trial_id", trialId!),
-        supabase.from("welfare_checks").select("pen_id,obs_date").eq("trial_id", trialId!).eq("obs_date", yesterday),
+        supabase.from("welfare_checks").select("pen_id,obs_date").eq("trial_id", trialId!).eq("obs_date", feedDay),
         supabase.from("session_photos").select("pen_id,obs_date,photo_am_url,photo_pm_url").eq("trial_id", trialId!),
         supabase.from("biomass_events").select("pen_id,event_date").eq("trial_id", trialId!),
       ]);
@@ -121,7 +123,7 @@ function HomePage() {
     trialOnly((daily.data?.photos ?? []).filter((p) => p.obs_date === t && p.photo_pm_url)).map((p) => p.pen_id),
   ).size;
   const amPhotos = new Set(
-    trialOnly((daily.data?.photos ?? []).filter((p) => p.obs_date === yesterday && p.photo_am_url)).map((p) => p.pen_id),
+    trialOnly((daily.data?.photos ?? []).filter((p) => p.obs_date === feedDay && p.photo_am_url)).map((p) => p.pen_id),
   ).size;
 
   const start = trial.data?.start_date as string | undefined;
@@ -193,7 +195,7 @@ function HomePage() {
 
           <dl className="grid grid-cols-3 gap-2 text-center">
             <Stat label="Fed today" value={`${fedToday}/${expected}`} />
-            <Stat label={`Checks (${yesterday.slice(5)})`} value={`${checked}/${expected}`} />
+            <Stat label={`Checks (${feedDay.slice(5)})`} value={`${checked}/${expected}`} />
             <Stat label="Photos today" value={`${pmPhotos + amPhotos}/${expected * 2}`} />
           </dl>
 
