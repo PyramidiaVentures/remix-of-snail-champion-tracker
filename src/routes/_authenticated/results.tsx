@@ -7,6 +7,8 @@ import {
   type PenMetrics, type TrialMetrics,
 } from "@/lib/metrics";
 import { readIncludeAcclimation } from "@/lib/acclimation";
+import { useAllSiteCalendars } from "@/lib/operatingDays";
+
 import {
   XAxis, YAxis, ResponsiveContainer, Tooltip, Legend,
   LineChart, Line, CartesianGrid,
