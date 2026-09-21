@@ -145,9 +145,11 @@ function ResultsPage() {
   const scopedObservations = useMemo(
     () =>
       rangeStart && rangeEnd
-        ? (observations.data ?? []).filter(
-            (o) => o.obs_date > rangeStart && o.obs_date <= rangeEnd && selectedPenIds.has(o.pen_id),
-          )
+        ? (observations.data ?? [])
+            .filter(
+              (o) => o.feed_id != null && o.obs_date > rangeStart && o.obs_date <= rangeEnd && selectedPenIds.has(o.pen_id),
+            )
+            .map((o) => ({ ...o, feed_id: o.feed_id as string }))
         : [],
     [observations.data, rangeStart, rangeEnd, selectedPenIds],
   );
