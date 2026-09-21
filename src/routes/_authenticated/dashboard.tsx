@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardList, Thermometer } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +8,7 @@ import { today } from "@/lib/date";
 import { addDays, roundOut } from "@/lib/metrics";
 import { cumulativeMortality } from "@/lib/liveCount";
 import { NoActiveTrial, useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
-import { useSiteCalendar } from "@/lib/operatingDays";
+import { operatingDaysSentence, useSiteCalendar } from "@/lib/operatingDays";
 import {
   REFUSAL_LABEL,
   REFUSAL_ORDER,
@@ -80,11 +80,31 @@ function DashboardPage() {
 
   const allPens = (pens.data ?? []) as DayReviewPen[];
 
+  const [pickHint, setPickHint] = useState<string | null>(null);
+
   const setDate = (v: string) => {
+    setPickHint(null);
     const params = new URLSearchParams(window.location.search);
     params.set("date", v);
     window.location.search = params.toString();
   };
+
+  // A closed day cannot be chosen — the picker refuses it and says why.
+  const pickDate = (v: string) => {
+    if (!v) return;
+    if (calendar.isNonOperating(v)) {
+      setPickHint(`${longDate(v)} — no operations at ${siteName || "this site"} (${calendar.closedBecause(v)}).`);
+      return;
+    }
+    setDate(v);
+  };
+
+  // Previous / Next step over closed days entirely.
+  const prevDay = calendar.previousOperatingDay(date);
+  const nextDay = calendar.nextOperatingDay(addDays(date, 1));
+  const canGoNext = nextDay <= today();
+
+  const isClosedDay = calendar.isNonOperating(date);
 
   const review = useMemo(
     () =>
