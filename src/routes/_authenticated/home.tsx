@@ -8,6 +8,7 @@ import {
 import { today } from "@/lib/date";
 import { daysBetween } from "@/lib/metrics";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+import { buildSchedule, overdueAdvisory, type SchedulePen } from "@/lib/weighSchedule";
 
 
 export const Route = createFileRoute("/_authenticated/home")({
@@ -43,7 +44,7 @@ function HomePage() {
   const assignments = useQuery({
     queryKey: ["assignments", trialId], enabled: !!trialId,
     queryFn: async () =>
-      (await supabase.from("pen_assignments").select("pen_id").eq("trial_id", trialId!)).data ?? [],
+      (await supabase.from("pen_assignments").select("pen_id,start_date").eq("trial_id", trialId!)).data ?? [],
   });
 
 
@@ -96,11 +97,33 @@ function HomePage() {
   const dayNumber = start ? daysBetween(start, t) + 1 : null;
   const acclimationDays = (trial.data?.acclimation_days as number | undefined) ?? 0;
   const inAcclimation = dayNumber != null && dayNumber <= acclimationDays;
-  const interval = (trial.data?.weighing_interval_days as number | undefined) ?? 7;
-  const elapsed = start ? daysBetween(start, t) : null;
-  const isWeighDay = elapsed != null && elapsed >= 0 && interval > 0 && elapsed % interval === 0;
-  const daysToWeigh =
-    elapsed != null && interval > 0 && !isWeighDay ? interval - (((elapsed % interval) + interval) % interval) : 0;
+  // Weighing runs pen by pen: each pen has its own interval, falling back to
+  // the trial's when it has none.
+  const startDateByPen = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of assignments.data ?? []) if (!m.has(a.pen_id)) m.set(a.pen_id, a.start_date);
+    return m;
+  }, [assignments.data]);
+
+  const scheduleRows = useMemo(
+    () =>
+      buildSchedule({
+        pens: (pens.data ?? []) as SchedulePen[],
+        trialInterval: trial.data?.weighing_interval_days,
+        startDateByPen,
+        events: daily.data?.biomass ?? [],
+        today: t,
+      }),
+    [pens.data, trial.data?.weighing_interval_days, startDateByPen, daily.data?.biomass, t],
+  );
+  const dueTodayCount = scheduleRows.filter((r) => r.dueToday).length;
+  const overdueCount = scheduleRows.filter((r) => r.overdueDays > 0).length;
+  const isWeighDay = dueTodayCount > 0 || overdueCount > 0;
+  const nextDueDate = scheduleRows
+    .map((r) => r.nextDue)
+    .filter((d): d is string => !!d && d > t)
+    .sort()[0] ?? null;
+  const daysToWeigh = nextDueDate ? daysBetween(t, nextDueDate) : null;
 
   const advisories: string[] = [];
   if (trial.data) {
@@ -114,6 +137,10 @@ function HomePage() {
       advisories.push(`${breederExpected - breederAmPhotos} breeder pen morning photo(s) missing for ${yesterday}.`);
     const weighedPens = new Set(trialOnly(daily.data?.biomass ?? []).map((b) => b.pen_id)).size;
     if (expected > 0 && weighedPens < expected) advisories.push(`${expected - weighedPens} pen(s) have never been weighed.`);
+    // Weighings are the only source of growth data and a missed one cannot be
+    // recovered later, so overdue pens are always surfaced.
+    const overdueMsg = overdueAdvisory(scheduleRows);
+    if (overdueMsg) advisories.push(overdueMsg);
   }
 
   return (
@@ -149,11 +176,14 @@ function HomePage() {
 
           {isWeighDay ? (
             <Link to="/weigh" className="block rounded-lg bg-primary px-3 py-3 text-center text-sm font-semibold text-primary-foreground">
-              Weigh day today — open Weigh Day
+              {dueTodayCount} pen{dueTodayCount === 1 ? "" : "s"} due today
+              {overdueCount > 0 ? `, ${overdueCount} overdue` : ""} — open Weigh Day
             </Link>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Next scheduled weighing in {daysToWeigh} day{daysToWeigh === 1 ? "" : "s"}.
+              {daysToWeigh != null
+                ? `Next weighing due in ${daysToWeigh} day${daysToWeigh === 1 ? "" : "s"}.`
+                : "No weighing is scheduled."}
             </p>
           )}
         </section>

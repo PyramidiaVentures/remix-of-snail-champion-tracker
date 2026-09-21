@@ -253,6 +253,7 @@ export type Database = {
           notes: string | null
           role: Database["public"]["Enums"]["pen_role"]
           site_id: string
+          weighing_interval_days: number | null
         }
         Insert: {
           area_m2?: number | null
@@ -263,6 +264,7 @@ export type Database = {
           notes?: string | null
           role?: Database["public"]["Enums"]["pen_role"]
           site_id?: string
+          weighing_interval_days?: number | null
         }
         Update: {
           area_m2?: number | null
@@ -273,6 +275,7 @@ export type Database = {
           notes?: string | null
           role?: Database["public"]["Enums"]["pen_role"]
           site_id?: string
+          weighing_interval_days?: number | null
         }
         Relationships: [
           {

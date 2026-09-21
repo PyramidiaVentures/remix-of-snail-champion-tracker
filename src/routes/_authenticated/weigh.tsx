@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { upsertRow, BIOMASS_EVENTS_KEY } from "@/lib/upsertRow";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+import { buildSchedule, overdueSummary, type PenSchedule, type SchedulePen } from "@/lib/weighSchedule";
 
 import { uploadWeighPhoto } from "@/lib/photoUpload";
 import { useSignedPhotoUrl } from "@/lib/useSignedPhotoUrl";
@@ -69,7 +70,7 @@ function WeighPage() {
     queryKey: ["pen-assignments", trialId],
     enabled: !!trialId,
     queryFn: async () =>
-      (await supabase.from("pen_assignments").select("pen_id,treatment_id").eq("trial_id", trialId!).is("end_date", null)).data ?? [],
+      (await supabase.from("pen_assignments").select("pen_id,treatment_id,start_date").eq("trial_id", trialId!).is("end_date", null)).data ?? [],
   });
 
   const events = useQuery({
@@ -109,8 +110,41 @@ function WeighPage() {
     [pens.data],
   );
 
-  const stepperPens = useMemo(() => [...trialPens, ...breederPens], [trialPens, breederPens]);
   const isBreeder = (penId: string) => breederPens.some((p) => p.id === penId);
+
+  // Per-pen weighing schedule. Scheduling only — no growth figure uses it.
+  const startDateByPen = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of assignments.data ?? []) if (!m.has(a.pen_id)) m.set(a.pen_id, a.start_date);
+    return m;
+  }, [assignments.data]);
+
+  const scheduleRows = useMemo(
+    () =>
+      buildSchedule({
+        pens: (pens.data ?? []) as SchedulePen[],
+        trialInterval: trial.data?.weighing_interval_days,
+        startDateByPen,
+        events: events.data ?? [],
+        today: today(),
+      }),
+    [pens.data, trial.data?.weighing_interval_days, startDateByPen, events.data],
+  );
+  const scheduleFor = (penId: string) => scheduleRows.find((r) => r.penId === penId) ?? null;
+  const dueCount = scheduleRows.filter((r) => r.dueToday).length;
+  const overdue = overdueSummary(scheduleRows);
+
+  const stepperPens = useMemo(
+    () =>
+      [...trialPens, ...breederPens].map((p) => {
+        const s = scheduleRows.find((r) => r.penId === p.id);
+        return {
+          ...p,
+          dueState: s?.overdueDays ? ("overdue" as const) : s?.dueToday ? ("due" as const) : undefined,
+        };
+      }),
+    [trialPens, breederPens, scheduleRows],
+  );
 
   const rowFor = (penId: string) => (events.data ?? []).find((e) => e.pen_id === penId && e.event_date === date);
   const previousFor = (penId: string) =>
@@ -168,21 +202,6 @@ function WeighPage() {
       : undefined,
   );
 
-  // Schedule advisory only — weighing off-schedule is fully supported.
-  const schedule = useMemo(() => {
-    if (!trial.data) return null;
-    const interval = trial.data.weighing_interval_days || 7;
-    const elapsed = daysBetween(trial.data.start_date, date);
-    if (elapsed >= 0 && elapsed % interval === 0) return { scheduled: true, text: "Scheduled weighing day" };
-    const last = (events.data ?? []).filter((e) => e.event_date < date).map((e) => e.event_date).sort().at(-1);
-    return {
-      scheduled: false,
-      text: last
-        ? `Off-schedule weighing (last was ${daysBetween(last, date)} days ago)`
-        : "Off-schedule weighing (no previous weighing yet)",
-    };
-  }, [trial.data, date, events.data]);
-
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["biomass-events", trialId] });
     void qc.invalidateQueries({ queryKey: ["population-events", trialId] });
@@ -204,14 +223,15 @@ function WeighPage() {
           className="mt-1 rounded-lg border border-input bg-card px-3 py-2" />
       </label>
 
-      {schedule && (
-        <div className={`rounded-lg border p-3 text-sm ${schedule.scheduled ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
-          <span className="font-semibold">{schedule.text}</span>
-          {!schedule.scheduled && (
-            <div className="mt-0.5 text-xs text-muted-foreground">
-              Pens may be weighed on a staggered rota — record whichever pens you weighed today.
-            </div>
-          )}
+      {trial.data && (
+        <div className={`rounded-lg border p-3 text-sm ${overdue.count > 0 ? "border-destructive/40 bg-destructive/5" : "border-border bg-card"}`}>
+          <span className="font-semibold">
+            {dueCount} pen{dueCount === 1 ? "" : "s"} due today, {overdue.count} overdue
+          </span>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            Every pen runs on its own interval. Weighing a pen off-schedule is always welcome — record whichever pens
+            you weighed today.
+          </div>
         </div>
       )}
 
@@ -235,6 +255,7 @@ function WeighPage() {
               row={rowFor(pen.id)}
               previous={previousFor(pen.id)}
               ledger={ledgerFor(pen.id)}
+              schedule={scheduleFor(pen.id)}
               onSaved={refresh}
             />
           )}
@@ -258,7 +279,7 @@ function fmt(n: number, digits = 1) {
 }
 
 function PenCard({
-  trialId, pen, date, row, previous, ledger, onSaved,
+  trialId, pen, date, row, previous, ledger, schedule, onSaved,
 }: {
   trialId: string;
   pen: StepperPen;
@@ -266,6 +287,7 @@ function PenCard({
   row: BiomassRow | undefined;
   previous: BiomassRow | null;
   ledger: { count: number; hadAddition: boolean };
+  schedule: PenSchedule | null;
   onSaved: () => void;
 }) {
   const [state, setState] = useState<SaveState>("idle");
@@ -354,6 +376,27 @@ function PenCard({
         <div className="text-lg font-bold">{pen.label}</div>
         <StatusPill state={state === "idle" && row ? "saved" : state} />
       </div>
+
+      {schedule && (
+        <div
+          className={`rounded-lg border px-3 py-2 text-xs ${
+            schedule.overdueDays > 0
+              ? "border-destructive/40 bg-destructive/5 text-destructive"
+              : schedule.dueToday
+                ? "border-primary/40 bg-primary/5 text-primary"
+                : "border-border text-muted-foreground"
+          }`}
+        >
+          {schedule.overdueDays > 0
+            ? `Overdue by ${schedule.overdueDays} day${schedule.overdueDays === 1 ? "" : "s"}`
+            : schedule.dueToday
+              ? "Due today"
+              : schedule.nextDue
+                ? `Next due ${schedule.nextDue}`
+                : "No weighing schedule set"}
+          {schedule.isBaseline && schedule.nextDue ? " · baseline weighing" : ""}
+        </div>
+      )}
 
       <NumberField
         label="Live count"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, CheckCircle2, CircleDashed, Loader2, Circle, Sprout } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, CircleDashed, Loader2, Circle, Sprout, AlertTriangle, Clock } from "lucide-react";
 
 export type PenCompletion = "complete" | "partial" | "empty" | "uploading";
 
@@ -10,6 +10,8 @@ export interface StepperPen {
   label: string;
   /** Breeder pens are monitored but sit outside the trial. Defaults to "trial". */
   role?: PenRole;
+  /** Weighing schedule marker, used on Weigh Day only. */
+  dueState?: "due" | "overdue";
 }
 
 interface Props {
@@ -159,6 +161,10 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
               <ChipIcon state={state} />
               {p.label}
               {breeder && <Sprout className="h-3 w-3" aria-label="Breeder pen" />}
+              {p.dueState === "overdue" && (
+                <AlertTriangle className="h-3 w-3 text-destructive" aria-label="Overdue for weighing" />
+              )}
+              {p.dueState === "due" && <Clock className="h-3 w-3" aria-label="Due for weighing today" />}
             </button>
           );
         })}
