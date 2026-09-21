@@ -52,6 +52,7 @@ const SUBSTRATE: { value: SubstrateCondition; label: string }[] = [
   { value: "dry", label: "Dry" },
   { value: "waterlogged", label: "Waterlogged" },
   { value: "soiled", label: "Soiled" },
+  { value: "mouldy", label: "Mouldy" },
 ];
 
 const AM_STEPS = [
@@ -153,10 +154,25 @@ function AmPage() {
     return map;
   }, [assignments.data, treatments.data]);
 
+  // Breeder pens are checked in the same walk, marked apart and counted apart.
   const trialPens: StepperPen[] = useMemo(
-    () => (pens.data ?? []).filter((p) => feedByPen.has(p.id)).map((p) => ({ id: p.id, label: p.label })),
+    () =>
+      (pens.data ?? [])
+        .filter((p) => p.role !== "breeder" && feedByPen.has(p.id))
+        .map((p) => ({ id: p.id, label: p.label, role: "trial" as const })),
     [pens.data, feedByPen],
   );
+
+  const breederPens: StepperPen[] = useMemo(
+    () =>
+      (pens.data ?? [])
+        .filter((p) => p.role === "breeder")
+        .map((p) => ({ id: p.id, label: p.label, role: "breeder" as const })),
+    [pens.data],
+  );
+
+  const stepperPens = useMemo(() => [...trialPens, ...breederPens], [trialPens, breederPens]);
+  const isBreeder = (penId: string) => breederPens.some((p) => p.id === penId);
 
   const anyPmForDate = (obs.data ?? []).some((o) => o.offered_g != null);
 
@@ -168,10 +184,12 @@ function AmPage() {
 
   const missingFor = (penId: string) => {
     const w = welfareFor(penId);
+    const breeder = isBreeder(penId);
     const missing: string[] = [];
     if (!photoSaved(penId)) missing.push("AM photo");
-    if (!obsFor(penId)?.refusal_score) missing.push("refusal score");
-    if (!w?.activity) missing.push("activity");
+    // A breeder pen has no assigned feed, so there is no refusal to score.
+    if (!breeder && !obsFor(penId)?.refusal_score) missing.push("refusal score");
+    if (!breeder && !w?.activity) missing.push("activity");
     if (!w?.substrate_condition) missing.push("substrate condition");
     return missing;
   };
@@ -179,13 +197,19 @@ function AmPage() {
   const stateFor = (penId: string): PenCompletion => {
     if (uploads.get(penPhotoKey(trialId ?? "", penId, date, "am"))?.status === "uploading") return "uploading";
     const missing = missingFor(penId);
+    const total = isBreeder(penId) ? 2 : 4;
     if (missing.length === 0) return "complete";
-    return missing.length === 5 ? "empty" : "partial";
+    return missing.length === total ? "empty" : "partial";
   };
 
   const photosDone = trialPens.filter((p) => photoSaved(p.id)).length;
   const photosNeeded = trialPens.length;
-  const allPhotos = photosNeeded > 0 && photosDone === photosNeeded;
+  const breederPhotosDone = breederPens.filter((p) => photoSaved(p.id)).length;
+  const breederPhotosNeeded = breederPens.length;
+  const allPhotos =
+    photosNeeded + breederPhotosNeeded > 0 &&
+    photosDone === photosNeeded &&
+    breederPhotosDone === breederPhotosNeeded;
 
   const [checklistDone, setChecklistDone] = useState(0);
   const [checklistAll, setChecklistAll] = useState(false);
@@ -199,11 +223,13 @@ function AmPage() {
       ? {
           forced: allPhotos,
           locked: true,
-          subtitle: photosNeeded === 0
+          subtitle: photosNeeded + breederPhotosNeeded === 0
             ? "Assign pens to the trial first."
-            : allPhotos
-              ? `All ${photosNeeded} pen photos uploaded.`
-              : `${photosNeeded - photosDone} of ${photosNeeded} pen photos still needed — take them before disturbing the dish.`,
+            : `${photosDone} of ${photosNeeded} trial pen photos uploaded` +
+              (breederPhotosNeeded > 0
+                ? ` · ${breederPhotosDone} of ${breederPhotosNeeded} breeder pen photos uploaded.`
+                : ".") +
+              (allPhotos ? "" : " Take them before disturbing the dish."),
         }
       : undefined,
   );
@@ -310,11 +336,26 @@ function AmPage() {
           </section>
 
           <PenStepper
-            pens={trialPens}
+            pens={stepperPens}
             stateFor={stateFor}
             missingFor={missingFor}
             paramName="pen"
-            renderPen={(pen) => (
+            renderPen={(pen) =>
+              pen.role === "breeder" ? (
+                <BreederCard
+                  key={pen.id}
+                  trialId={trial.data!.id}
+                  pen={pen}
+                  date={date}
+                  welfareRow={welfareFor(pen.id)}
+                  photoUrl={photoUrlFor(pen.id)}
+                  sessionTemp={temp}
+                  sessionHumidity={humidity}
+                  penEvents={eventsForPenDate(pen.id)}
+                  liveCountValue={liveCountFor(pen.id)}
+                  onSaved={refresh}
+                />
+              ) : (
               <PenCard
                 key={pen.id}
                 trialId={trial.data!.id}
@@ -330,7 +371,8 @@ function AmPage() {
                 liveCountValue={liveCountFor(pen.id)}
                 onSaved={refresh}
               />
-            )}
+              )
+            }
           />
         </>
       )}
