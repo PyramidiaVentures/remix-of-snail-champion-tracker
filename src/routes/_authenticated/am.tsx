@@ -695,7 +695,7 @@ function PenCard({
  * and no feed, while substrate, health, deaths and notes are all still logged.
  */
 function BreederCard({
-  trialId, pen, date, welfareRow, photoUrl, sessionTemp, sessionHumidity,
+  trialId, pen, date, welfareRow, photoUrl, pmPhotoUrl, fedLabel, sessionTemp, sessionHumidity,
   penEvents, liveCountValue, onSaved,
 }: {
   trialId: string;
@@ -703,6 +703,9 @@ function BreederCard({
   date: string;
   welfareRow: WelfareRow | undefined;
   photoUrl: string | null;
+  pmPhotoUrl: string | null;
+  fedLabel: string;
+
   sessionTemp: number | null;
   sessionHumidity: number | null;
   penEvents: { id: string; event_type: PopulationEventType; count: number }[];
