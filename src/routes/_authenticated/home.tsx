@@ -256,6 +256,30 @@ function HomePage() {
         </section>
       )}
 
+      {trial.data && (
+        <Link
+          to="/dashboard"
+          search={{ date: reportDate }}
+          className="block rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-sm"
+        >
+          {!review ? (
+            <span className="text-muted-foreground">Checking {longDate(reportDate)}…</span>
+          ) : review.exceptions.length === 0 ? (
+            <span className="font-medium text-primary">Every item was closed on {longDate(reportDate)}.</span>
+          ) : (
+            <>
+              <span className="flex items-center gap-2 font-medium">
+                <AlertTriangle className="h-4 w-4 text-earth" />
+                {review.exceptions.length} exception{review.exceptions.length === 1 ? "" : "s"} on {longDate(reportDate)}
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {summarizeExceptions(review.exceptions)}
+              </span>
+            </>
+          )}
+        </Link>
+      )}
+
       <section className="space-y-2">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today</h2>
         <div className="grid grid-cols-2 gap-3">
