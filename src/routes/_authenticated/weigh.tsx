@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { upsertRow, BIOMASS_EVENTS_KEY } from "@/lib/upsertRow";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+import { buildSchedule, overdueSummary, type PenSchedule, type SchedulePen } from "@/lib/weighSchedule";
 
 import { uploadWeighPhoto } from "@/lib/photoUpload";
 import { useSignedPhotoUrl } from "@/lib/useSignedPhotoUrl";
