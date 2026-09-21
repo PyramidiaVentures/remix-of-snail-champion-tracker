@@ -107,6 +107,8 @@ function AmPage() {
   const date = manualDate ?? defaultDate;
   const isDefault = manualDate === null;
   const setDate = (value: string) => setManualDate(value);
+  // The check happens the morning after the feeding (the next operating day).
+  const checkDate = isDefault ? today : calendar.nextOperatingDay(addDays(date, 1));
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
