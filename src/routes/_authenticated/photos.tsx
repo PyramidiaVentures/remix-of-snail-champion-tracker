@@ -109,10 +109,10 @@ function CycleDetails({ observation }: { observation: ObservationRow | undefined
   );
 }
 
-function CycleHeading({ penLabel, date }: { penLabel: string; date: string }) {
+function CycleHeading({ penLabel, date, morning }: { penLabel: string; date: string; morning: string }) {
   return (
     <h2 className="text-base font-semibold">
-      {penLabel} — fed {displayDate(date)} evening, checked {displayDate(nextDate(date))} morning
+      {penLabel} — fed {displayDate(date)} evening, checked {displayDate(morning)} morning
     </h2>
   );
 }
