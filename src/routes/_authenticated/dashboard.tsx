@@ -9,6 +9,7 @@ import { addDays, roundOut } from "@/lib/metrics";
 import { cumulativeMortality, liveCount } from "@/lib/liveCount";
 import { buildSchedule, type SchedulePen } from "@/lib/weighSchedule";
 import { NoActiveTrial, useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
+import DashboardTrends from "@/components/DashboardTrends";
 import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -391,6 +392,13 @@ function DashboardPage() {
     .filter((e) => e.event_date === date && e.event_type === "mortality")
     .reduce((s, e) => s + e.count, 0);
   const mortalityCum = watched.reduce((s, p) => s + cumulativeMortality(p.id, d?.pop ?? [], date), 0);
+
+  const treatmentByPen = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of assignments.data ?? []) if (!m.has(a.pen_id)) m.set(a.pen_id, a.treatment_id);
+    return m;
+  }, [assignments.data]);
+  const breederPenIds = useMemo(() => new Set(breederPens.map((p) => p.id)), [breederPens]);
 
   const feedName = (id: string) => (feeds.data ?? []).find((f) => f.id === id)?.name ?? "";
   const treatmentOfPen = (penId: string) =>
