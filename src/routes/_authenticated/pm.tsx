@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { today } from "@/lib/date";
 import { Checklist } from "@/components/Checklist";
 import { ChecklistBlocker } from "@/components/ChecklistBlocker";
+import { SessionCompleteButton } from "@/components/SessionCompleteButton";
 import { NumberField } from "@/components/NumberField";
 import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
@@ -268,6 +269,16 @@ function PmPage() {
           stateFor={stateFor}
           missingFor={missingFor}
           paramName="pen"
+          summaryFooter={
+            <SessionCompleteButton
+              label="Complete PM Feed"
+              enabled={
+                stepperPens.length > 0 &&
+                stepperPens.every((p) => stateFor(p.id) === "complete") &&
+                checklistAll
+              }
+            />
+          }
           renderPen={(pen) =>
             pen.role === "breeder" ? (
               <BreederCard

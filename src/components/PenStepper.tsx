@@ -24,6 +24,8 @@ interface Props {
   renderPen: (pen: StepperPen) => ReactNode;
   /** Query-string parameter used to remember the current pen. */
   paramName?: string;
+  /** Extra content rendered at the bottom of the summary tab (e.g. a completion button). */
+  summaryFooter?: ReactNode;
 }
 
 function readParam(name: string): string | null {
@@ -45,7 +47,7 @@ function ChipIcon({ state }: { state: PenCompletion }) {
   return <Circle className="h-3.5 w-3.5" />;
 }
 
-export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = "pen" }: Props) {
+export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = "pen", summaryFooter }: Props) {
   // Stable order: trial pens first, then breeder pens, each by label —
   // matching the walk down the beds.
   const ordered = useMemo(
@@ -213,6 +215,7 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
                 ))}
             </ul>
           )}
+          {summaryFooter}
         </section>
       )}
 
