@@ -95,8 +95,15 @@ export function Checklist({
     <section className="rounded-xl border border-border bg-card shadow-sm">
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
-        <span className={`text-xs font-medium ${allDone ? "text-primary" : "text-muted-foreground"}`}>
-          {completeCount}/{items.length}
+        <span className="flex items-center gap-2">
+          {saveFailed && (
+            <span className="flex items-center gap-1 text-xs text-amber-600">
+              <CloudOff className="h-3 w-3" />Not saved yet
+            </span>
+          )}
+          <span className={`text-xs font-medium ${allDone ? "text-primary" : "text-muted-foreground"}`}>
+            {completeCount}/{items.length}
+          </span>
         </span>
       </header>
       <ol className="divide-y divide-border">
