@@ -448,6 +448,47 @@ export type Database = {
         }
         Relationships: []
       }
+      sop_checklists: {
+        Row: {
+          created_at: string
+          id: string
+          obs_date: string
+          recorded_by: string | null
+          session: string
+          steps: boolean[]
+          trial_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          obs_date: string
+          recorded_by?: string | null
+          session: string
+          steps?: boolean[]
+          trial_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          obs_date?: string
+          recorded_by?: string | null
+          session?: string
+          steps?: boolean[]
+          trial_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sop_checklists_trial_id_fkey"
+            columns: ["trial_id"]
+            isOneToOne: false
+            referencedRelation: "trials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       treatments: {
         Row: {
           created_at: string
