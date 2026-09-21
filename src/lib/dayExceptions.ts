@@ -306,12 +306,16 @@ export function computeDayReview(args: {
   }
 
   // SOP steps still unticked.
-  const pmTicks = readChecklist(`pm-checklist-${date}`, PM_STEPS.length);
+  const ticksFor = (session: string, length: number) => {
+    const steps = d.checklists.find((c) => c.session === session)?.steps ?? null;
+    return Array.from({ length }, (_, i) => Boolean(steps?.[i]));
+  };
+  const pmTicks = ticksFor("pm", PM_STEPS.length);
   (pmExpected && !pmInProgress ? PM_STEPS : []).forEach((step, i) => {
     const done = i === PM_PHOTO_STEP_INDEX ? pmPhotosAll : pmTicks[i];
     if (!done) exceptions.push({ key: `pmstep-${i}`, group: "PM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/pm" });
   });
-  const amTicks = readChecklist(`am-checklist-${date}`, AM_STEPS.length);
+  const amTicks = ticksFor("am", AM_STEPS.length);
   (amExpected && !amInProgress ? AM_STEPS : []).forEach((step, i) => {
     const done = i === AM_PHOTO_STEP_INDEX ? amPhotosAll : amTicks[i];
     if (!done) exceptions.push({ key: `amstep-${i}`, group: "AM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/am" });
