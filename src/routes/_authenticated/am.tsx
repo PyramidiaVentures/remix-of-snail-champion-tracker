@@ -576,7 +576,18 @@ function PenCard({
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-4">
       <div className="text-lg font-bold">{pen.label}</div>
 
+      <PhotoCompare
+        trialId={trialId}
+        penId={pen.id}
+        date={date}
+        fedLabel={fedLabel}
+        offeredG={obsRow?.offered_g != null ? Number(obsRow.offered_g) : null}
+        pmUrl={pmPhotoUrl}
+        amUrl={photoUrl}
+      />
+
       <PenPhotoSlot
+
         trial_id={trialId}
         pen_id={pen.id}
         obs_date={date}
