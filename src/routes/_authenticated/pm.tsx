@@ -209,11 +209,12 @@ function PmPage() {
       ? {
           forced: allPhotos,
           locked: true,
-          subtitle: photosNeeded === 0
+          subtitle: photosNeeded + breederPhotosNeeded === 0
             ? "Assign pens to the trial first."
-            : allPhotos
-              ? `All ${photosNeeded} pen photos uploaded.`
-              : `${photosNeeded - photosDone} of ${photosNeeded} pen photos still needed.`,
+            : `${photosDone} of ${photosNeeded} trial pen photos uploaded` +
+              (breederPhotosNeeded > 0
+                ? ` · ${breederPhotosDone} of ${breederPhotosNeeded} breeder pen photos uploaded.`
+                : "."),
         }
       : undefined,
   );
