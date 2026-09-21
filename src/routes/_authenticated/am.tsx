@@ -8,7 +8,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Checklist } from "@/components/Checklist";
 import { ChecklistBlocker } from "@/components/ChecklistBlocker";
 import { NumberField } from "@/components/NumberField";
-import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
+import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { useUploads } from "@/lib/photoUploads.store";
 import { liveCount } from "@/lib/liveCount";

@@ -6,7 +6,7 @@ import { today } from "@/lib/date";
 import { Checklist } from "@/components/Checklist";
 import { ChecklistBlocker } from "@/components/ChecklistBlocker";
 import { NumberField } from "@/components/NumberField";
-import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
+import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { useUploads } from "@/lib/photoUploads.store";
 import { upsertRow, OBSERVATIONS_TRIAL_KEY } from "@/lib/upsertRow";
@@ -406,6 +406,116 @@ function PenCard({
         existingUrl={photoUrl}
         onSaved={onSaved}
       />
+    </section>
+  );
+}
+
+/**
+ * Breeder pen card: monitored in the same walk, but outside the trial.
+ * No grams offered, no assigned feed and no carry-over indicator, because a
+ * breeder pen has no treatment feed to carry over.
+ */
+function BreederCard({
+  trial,
+  pen,
+  date,
+  row,
+  photoUrl,
+  onSaved,
+}: {
+  trial: TrialRow;
+  pen: StepperPen;
+  date: string;
+  row: ObsRow | undefined;
+  photoUrl: string | null;
+  onSaved: () => void;
+}) {
+  const [actionState, setActionState] = useState<SaveState>("idle");
+  const [notesState, setNotesState] = useState<SaveState>("idle");
+  const [action, setAction] = useState<DishAction | null>(row?.dish_action ?? null);
+
+  const isAcclimation =
+    trial.acclimation_days > 0 && date < addDays(trial.start_date, trial.acclimation_days);
+
+  const saveField = async (patch: Partial<ObsRow>, setState: (s: SaveState) => void) => {
+    setState("saving");
+    try {
+      await upsertRow(
+        "observations",
+        {
+          trial_id: trial.id,
+          pen_id: pen.id,
+          feed_id: null,
+          obs_date: date,
+          is_acclimation: isAcclimation,
+          ...patch,
+        },
+        OBSERVATIONS_TRIAL_KEY,
+      );
+      setState("saved");
+      onSaved();
+    } catch {
+      setState("failed");
+    }
+  };
+
+  return (
+    <section className="rounded-2xl border border-dashed border-border bg-card p-4 shadow-sm space-y-4">
+      <div className="space-y-1">
+        <div className="text-lg font-bold">{pen.label}</div>
+        <BreederBadge />
+        <div className="text-xs text-muted-foreground">
+          Not part of the trial — nothing recorded here enters any feed or growth figure.
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm font-medium">Dish action</span>
+          <StatusPill state={actionState === "idle" && row?.dish_action ? "saved" : actionState} />
+        </div>
+        <div className="grid grid-cols-1 gap-2">
+          {DISH_ACTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => {
+                setAction(o.value);
+                void saveField({ dish_action: o.value }, setActionState);
+              }}
+              className={`rounded-xl border py-3 text-sm font-medium ${
+                action === o.value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <PenPhotoSlot
+        trial_id={trial.id}
+        pen_id={pen.id}
+        obs_date={date}
+        kind="pm"
+        label="PM photo — dish and paper tag in frame"
+        existingUrl={photoUrl}
+        onSaved={onSaved}
+      />
+
+      <div className="space-y-1">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm font-medium">Notes</span>
+          <StatusPill state={notesState === "idle" && row?.notes ? "saved" : notesState} />
+        </div>
+        <textarea
+          key={`${pen.id}-${date}-breeder-notes`}
+          defaultValue={row?.notes ?? ""}
+          rows={2}
+          onBlur={(e) => void saveField({ notes: e.currentTarget.value || null }, setNotesState)}
+          className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm"
+        />
+      </div>
     </section>
   );
 }
