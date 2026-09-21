@@ -117,15 +117,34 @@ type Exception = {
 
 function DashboardPage() {
   const search = Route.useSearch();
-  const date = search.date || today();
   const { siteId, siteName } = useSiteScope();
   const { calendar } = useSiteCalendar();
+
+  // The last completed day: the most recent operating day before today. Today
+  // itself is a half-told story — its evening feeding has not happened yet.
+  const lastCompleted = calendar.previousOperatingDay(today());
+  const date = search.date || lastCompleted;
+  const isToday = date === today();
+  const isLastCompleted = date === lastCompleted;
+
+  const setDate = (v: string) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("date", v);
+    window.location.search = params.toString();
+  };
 
   // A closed day is never expected to carry a session. The morning check for a
   // date happens the next morning, so it is expected only when date + 1 is open.
   const pmExpected = calendar.pmExpected(date);
   const amExpected = calendar.amExpected(date);
   const closedReason = calendar.closedBecause(date);
+
+  // The most recent cycle is still running: the morning check for the last
+  // completed day may be happening right now, and today's evening feeding has
+  // not happened at all yet. Those gaps are "in progress", not exceptions.
+  const amInProgress = amExpected && (isLastCompleted || isToday);
+  const pmInProgress = pmExpected && isToday;
+
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
