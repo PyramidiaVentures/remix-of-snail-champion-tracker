@@ -106,16 +106,18 @@ function AmPage() {
   const { siteName, siteId } = useSiteScope();
   const { calendar } = useSiteCalendar();
 
-  // The morning check completes the most recent feeding, which is the last
-  // operating day before today — Saturday when Sunday is closed.
+  // The picker selects the day the check actually happens (defaults to
+  // today); the feeding it completes is the last operating day before it.
   const today = useMemo(() => todayStr(), []);
-  const defaultDate = useMemo(() => calendar.previousOperatingDay(today), [calendar, today]);
-  const [manualDate, setManualDate] = useState<string | null>(null);
-  const date = manualDate ?? defaultDate;
-  const isDefault = manualDate === null;
-  const setDate = (value: string) => setManualDate(value);
-  // The check happens the morning after the feeding (the next operating day).
-  const checkDate = isDefault ? today : calendar.nextOperatingDay(addDays(date, 1));
+  const defaultCheckDate = today;
+  const [manualCheckDate, setManualCheckDate] = useState<string | null>(null);
+  const checkDate = manualCheckDate ?? defaultCheckDate;
+  const isDefault = manualCheckDate === null;
+  const setCheckDate = (value: string) => {
+    // A check can't happen on a closed day — roll back to the last operating day.
+    setManualCheckDate(calendar.isOperating(value) ? value : calendar.previousOperatingDay(value));
+  };
+  const date = useMemo(() => calendar.previousOperatingDay(checkDate), [calendar, checkDate]);
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
