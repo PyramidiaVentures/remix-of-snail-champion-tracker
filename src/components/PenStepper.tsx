@@ -193,7 +193,12 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
                       onClick={() => go(indexOfId(p.id))}
                       className="flex w-full items-start justify-between gap-3 py-2 text-left"
                     >
-                      <span className="text-sm font-medium">{p.label}</span>
+                      <span className="text-sm font-medium">
+                        {p.label}
+                        {p.role === "breeder" && (
+                          <span className="ml-1 text-xs font-normal text-muted-foreground">breeder</span>
+                        )}
+                      </span>
                       <span className="text-xs text-amber-600">
                         missing: {missingFor(p.id).join(", ") || "—"}
                       </span>
