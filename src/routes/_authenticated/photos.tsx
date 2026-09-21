@@ -63,6 +63,22 @@ function nextDate(date: string) {
   return value.toISOString().slice(0, 10);
 }
 
+/**
+ * The morning the dish is actually checked. Normally the next day, but when
+ * that day is closed at the site nobody is there — the check happens on the
+ * next operating morning instead (a Saturday feeding is checked on Monday).
+ */
+function morningOf(date: string, calendar: OperatingCalendar) {
+  return calendar.nextOperatingDay(nextDate(date));
+}
+
+/** "16 hours later" only holds for a same-next-morning check. */
+function afterLabel(date: string, morning: string) {
+  return morning === nextDate(date)
+    ? "After — 16 hours later"
+    : `After — checked ${displayDate(morning)} morning`;
+}
+
 function displayDate(date: string) {
   const value = new Date(`${date}T00:00:00Z`);
   const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
