@@ -8,6 +8,13 @@
       "when": 1789976691097,
       "tag": "0000_pen_role_and_mouldy_substrate",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789977410603,
+      "tag": "0001_pen_weighing_interval",
+      "breakpoints": true
     }
   ]
 }
