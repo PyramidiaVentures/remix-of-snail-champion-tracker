@@ -120,10 +120,27 @@ function PmPage() {
     return map;
   }, [assignments.data, treatments.data, feeds.data]);
 
+  // Breeder pens have no treatment and no feed, but they are still walked and
+  // photographed in the same session, so they join the stepper alongside the
+  // trial pens — counted separately everywhere.
   const trialPens: StepperPen[] = useMemo(
-    () => (pens.data ?? []).filter((p) => feedByPen.has(p.id)).map((p) => ({ id: p.id, label: p.label })),
+    () =>
+      (pens.data ?? [])
+        .filter((p) => p.role !== "breeder" && feedByPen.has(p.id))
+        .map((p) => ({ id: p.id, label: p.label, role: "trial" as const })),
     [pens.data, feedByPen],
   );
+
+  const breederPens: StepperPen[] = useMemo(
+    () =>
+      (pens.data ?? [])
+        .filter((p) => p.role === "breeder")
+        .map((p) => ({ id: p.id, label: p.label, role: "breeder" as const })),
+    [pens.data],
+  );
+
+  const stepperPens = useMemo(() => [...trialPens, ...breederPens], [trialPens, breederPens]);
+  const isBreeder = (penId: string) => breederPens.some((p) => p.id === penId);
 
   const carryOverByPen = useMemo(() => {
     const map = new Map<string, number>();
