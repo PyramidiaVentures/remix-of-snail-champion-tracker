@@ -13,7 +13,6 @@ import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { ClosedDayNotice } from "@/components/ClosedDayNotice";
 import { useUploads } from "@/lib/photoUploads.store";
 import { liveCount } from "@/lib/liveCount";
-import { addDays } from "@/lib/metrics";
 import { useSiteCalendar } from "@/lib/operatingDays";
 
 import type { Database } from "@/integrations/supabase/types";
