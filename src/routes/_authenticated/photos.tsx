@@ -340,14 +340,15 @@ function PhotosPage() {
               <div className="space-y-4">
                  {historyRows.slice(0, shown).map((row) => {
                    const label = selectedPenId ? penLabel(selectedPenId) : "Pen";
+                   const morning = morningOf(row.date, calendar);
                    return (
                    <div key={row.date} className="space-y-3 border-b border-border pb-5 last:border-0">
-                     <CycleHeading penLabel={label} date={row.date} />
+                     <CycleHeading penLabel={label} date={row.date} morning={morning} />
                      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_13rem]">
                        <PhotoFrame stored={row.pm} session="Before — feed offered" penLabel={label}
                          siteName={siteName} date={row.date} onOpen={(url, caption) => setLightbox({ url, caption })} />
-                       <PhotoFrame stored={row.am} session="After — 16 hours later" penLabel={label}
-                         siteName={siteName} date={nextDate(row.date)} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                       <PhotoFrame stored={row.am} session={afterLabel(row.date, morning)} penLabel={label}
+                         siteName={siteName} date={morning} onOpen={(url, caption) => setLightbox({ url, caption })} />
                        <CycleDetails observation={row.observation} />
                     </div>
                      {row.weigh && (
