@@ -87,21 +87,26 @@ function StatusPill({ state }: { state: SaveState }) {
   return <span className="inline-flex items-center gap-1 text-[10px] text-destructive"><AlertTriangle className="h-3 w-3" />failed — retry</span>;
 }
 
-function yesterday(): string {
+function todayStr(): string {
   const d = new Date();
-  d.setDate(d.getDate() - 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function AmPage() {
   const qc = useQueryClient();
-  const defaultDate = useMemo(() => yesterday(), []);
-  const [date, setDate] = useState<string>(defaultDate);
-  const isDefault = date === defaultDate;
   const uploads = useUploads();
 
   const { siteName, siteId } = useSiteScope();
   const { calendar } = useSiteCalendar();
+
+  // The morning check completes the most recent feeding, which is the last
+  // operating day before today — Saturday when Sunday is closed.
+  const today = useMemo(() => todayStr(), []);
+  const defaultDate = useMemo(() => calendar.previousOperatingDay(today), [calendar, today]);
+  const [manualDate, setManualDate] = useState<string | null>(null);
+  const date = manualDate ?? defaultDate;
+  const isDefault = manualDate === null;
+  const setDate = (value: string) => setManualDate(value);
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
@@ -288,8 +293,8 @@ function AmPage() {
         <span className="font-semibold">Completing PM from {date}</span>
         <div className="text-xs text-muted-foreground mt-0.5">
           {isDefault
-            ? "Defaults to yesterday. Use the date picker below to catch up on a missed day."
-            : <>Manual date. <button type="button" className="text-primary underline" onClick={() => setDate(defaultDate)}>reset to yesterday</button></>}
+            ? `Defaults to the last feeding day at ${siteName} (${defaultDate}). Use the date picker below to catch up on a missed day.`
+            : <>Manual date. <button type="button" className="text-primary underline" onClick={() => setManualDate(null)}>reset to {defaultDate}</button></>}
         </div>
         {trial.data && obs.data && !anyPmForDate && (
           <div className="mt-2 text-xs text-amber-700">No PM entry found for {date}. Pick a different date if catching up.</div>
