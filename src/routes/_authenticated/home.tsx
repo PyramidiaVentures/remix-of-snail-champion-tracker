@@ -333,8 +333,6 @@ function OtherSites({ currentSiteId, date }: { currentSiteId: string | null; dat
           };
         }),
       );
-
-      );
     },
   });
 
