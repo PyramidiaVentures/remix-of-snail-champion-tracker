@@ -264,7 +264,7 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
                   <div className="h-36">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={refusalSeries[score]} margin={{ top: 4, right: 6, bottom: 0, left: -24 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                         <XAxis
                           dataKey="date"
                           tickFormatter={shortDate}
@@ -286,7 +286,7 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
                         <Line
                           type="monotone"
                           dataKey="pens"
-                          stroke="hsl(var(--primary))"
+                          stroke="var(--color-primary)"
                           strokeWidth={2}
                           dot={false}
                           isAnimationActive={false}
@@ -311,12 +311,12 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={envDaily} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 10 }} minTickGap={16} />
                   <YAxis yAxisId="t" domain={[15, 40]} tick={{ fontSize: 10 }} width={38} />
                   <YAxis yAxisId="h" orientation="right" domain={[40, 100]} tick={{ fontSize: 10 }} width={38} />
-                  <ReferenceArea yAxisId="t" y1={TEMP_MIN} y2={TEMP_MAX} fill="hsl(var(--primary))" fillOpacity={0.08} />
-                  <ReferenceArea yAxisId="h" y1={HUM_MIN} y2={HUM_MAX} fill="hsl(var(--earth))" fillOpacity={0.08} />
+                  <ReferenceArea yAxisId="t" y1={TEMP_MIN} y2={TEMP_MAX} fill="var(--color-primary)" fillOpacity={0.08} />
+                  <ReferenceArea yAxisId="h" y1={HUM_MIN} y2={HUM_MAX} fill="var(--color-earth)" fillOpacity={0.08} />
                   <Tooltip
                     labelFormatter={(v) => shortDate(String(v))}
                     formatter={(v, name) =>
@@ -325,8 +325,8 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
                         : ["—", String(name)]
                     }
                   />
-                  <Line yAxisId="t" name="Temperature" type="monotone" dataKey="temp" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
-                  <Line yAxisId="h" name="Humidity" type="monotone" dataKey="hum" stroke="hsl(var(--earth))" strokeWidth={2} strokeDasharray="4 3" dot={false} connectNulls isAnimationActive={false} />
+                  <Line yAxisId="t" name="Temperature" type="monotone" dataKey="temp" stroke="var(--color-primary)" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+                  <Line yAxisId="h" name="Humidity" type="monotone" dataKey="hum" stroke="var(--color-earth)" strokeWidth={2} strokeDasharray="4 3" dot={false} connectNulls isAnimationActive={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
