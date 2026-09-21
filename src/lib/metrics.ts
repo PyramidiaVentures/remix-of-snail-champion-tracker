@@ -194,6 +194,21 @@ export function intervalExtras(
 }
 
 
+/**
+ * Specific growth rate, % per day. Single definition — used by the Results
+ * interval table and the live preview on Weigh Day.
+ */
+export function specificGrowthRate(
+  meanWeight1: number | null,
+  meanWeight2: number | null,
+  days: number,
+): number | null {
+  if (meanWeight1 == null || meanWeight2 == null) return null;
+  if (!(meanWeight1 > 0) || !(meanWeight2 > 0) || !(days > 0)) return null;
+  return ((Math.log(meanWeight2) - Math.log(meanWeight1)) / days) * 100;
+}
+
+
 export function computeMetrics(input: MetricsInput): TrialMetrics {
   const {
     trial, pens, feeds, treatments, assignments,
@@ -246,8 +261,13 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
     for (let i = 1; i < weighings.length; i++) {
       const a = weighings[i - 1];
       const b = weighings[i];
+      // An interval must measure gain and feed over exactly the same days.
+      // If its start falls inside the acclimation window while the feed in it
+      // is filtered by dateIncluded, the interval measures nothing — drop it.
+      if (!dateIncluded(a.event_date)) continue;
       const days = daysBetween(a.event_date, b.event_date);
       const valid = a.live_count > 0 && b.live_count > 0 && days > 0;
+
 
       const meanWeight1 = valid ? a.net_biomass_g / a.live_count : NaN;
       const meanWeight2 = valid ? b.net_biomass_g / b.live_count : NaN;
@@ -286,9 +306,8 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
             ? basisOffered / 1000 / (gain_g! / 1000)
             : null,
         sgr:
-          valid && meanWeight1 > 0 && meanWeight2 > 0
-            ? ((Math.log(meanWeight2) - Math.log(meanWeight1)) / days) * 100
-            : null,
+          valid ? specificGrowthRate(meanWeight1, meanWeight2, days) : null,
+
         survival: valid ? (b.live_count / a.live_count) * 100 : null,
         feedingRate:
           valid && a.net_biomass_g > 0
@@ -322,13 +341,14 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
 
     // Carry-over and spoilage, from the recorded dish actions.
     // Carry-over is days since the dish was last emptied, not entries counted.
-    const actionRows = penObs.filter((o) => o.dish_action != null);
+    // Spoilage counts DATES, matching the denominator (intervalExtras does the same).
     const byDate = new Map<string, string | null>();
     for (const o of penObs) if (o.dish_action != null) byDate.set(o.obs_date, o.dish_action);
     const ages = carryOverDaysSeries(
       Array.from(byDate, ([date, action]) => ({ date, action })),
     ).map((r) => r.days);
-    const spoiled = actionRows.filter((o) => o.dish_action === "emptied_spoiled").length;
+    const spoiled = Array.from(byDate.values()).filter((a) => a === "emptied_spoiled").length;
+
 
 
     let running = 0;
