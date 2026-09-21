@@ -193,6 +193,21 @@ function TrialPage() {
         baselineByPen={baselineByPen}
       />
 
+      {current && (
+        <WeighingSchedule
+          trial={current}
+          pens={(pens.data ?? []) as SchedulePen[]}
+          treatments={tList}
+          assignmentByPen={assignmentByPen}
+          assignments={aList}
+          events={biomass.data ?? []}
+          onChanged={() => {
+            qc.invalidateQueries({ queryKey: ["pens"] });
+            invalidate();
+          }}
+        />
+      )}
+
       {!activeTrial && (
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <button
