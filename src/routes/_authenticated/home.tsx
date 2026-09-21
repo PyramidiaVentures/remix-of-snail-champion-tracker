@@ -216,7 +216,13 @@ function HomePage() {
 
 
 
-      {trial.data && (
+      {trial.data && beforeStart && (
+        <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
+          The trial starts {longDate(trial.data.start_date)} — nothing to report yet.
+        </div>
+      )}
+
+      {trial.data && !beforeStart && (
         <Link
           to="/dashboard"
           search={{ date: reportDate }}
@@ -224,6 +230,7 @@ function HomePage() {
         >
           {!review ? (
             <span className="text-muted-foreground">Checking {longDate(reportDate)}…</span>
+
           ) : review.exceptions.length === 0 ? (
             <span className="font-medium text-primary">Every item was closed on {longDate(reportDate)}.</span>
           ) : (
