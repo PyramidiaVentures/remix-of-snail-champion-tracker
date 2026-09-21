@@ -35,7 +35,6 @@ export const Route = createFileRoute("/_authenticated/home")({
 });
 
 const DAY = 86_400_000;
-const shift = (d: string, n: number) => new Date(Date.parse(d) + n * DAY).toISOString().slice(0, 10);
 const longDate = (d: string) =>
   new Date(`${d}T00:00:00`).toLocaleDateString(undefined, {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
