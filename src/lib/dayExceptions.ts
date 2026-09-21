@@ -60,21 +60,8 @@ export const AM_STEPS = [
 ];
 export const AM_PHOTO_STEP_INDEX = 0;
 
-/** Ticked steps as the Checklist component stores them (today's ticks only). */
-function readChecklist(storageKey: string, length: number): boolean[] {
-  const empty = Array.from({ length }, () => false);
-  if (typeof window === "undefined") return empty;
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return empty;
-    const parsed = JSON.parse(raw) as { date: string; done: boolean[] };
-    const stamp = new Date().toISOString().slice(0, 10);
-    if (parsed.date !== stamp || parsed.done.length !== length) return empty;
-    return parsed.done;
-  } catch {
-    return empty;
-  }
-}
+// SOP ticks live in the database (table sop_checklists), so a step ticked on a
+// field phone is visible to everyone. They arrive through DayInputs.checklists.
 
 export type DayException = {
   key: string;
