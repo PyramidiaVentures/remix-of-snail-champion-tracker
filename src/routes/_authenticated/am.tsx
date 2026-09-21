@@ -13,7 +13,6 @@ import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { ClosedDayNotice } from "@/components/ClosedDayNotice";
 import { useUploads } from "@/lib/photoUploads.store";
 import { liveCount } from "@/lib/liveCount";
-import { addDays } from "@/lib/metrics";
 import { useSiteCalendar } from "@/lib/operatingDays";
 
 import type { Database } from "@/integrations/supabase/types";
@@ -106,16 +105,18 @@ function AmPage() {
   const { siteName, siteId } = useSiteScope();
   const { calendar } = useSiteCalendar();
 
-  // The morning check completes the most recent feeding, which is the last
-  // operating day before today — Saturday when Sunday is closed.
+  // The picker selects the day the check actually happens (defaults to
+  // today); the feeding it completes is the last operating day before it.
   const today = useMemo(() => todayStr(), []);
-  const defaultDate = useMemo(() => calendar.previousOperatingDay(today), [calendar, today]);
-  const [manualDate, setManualDate] = useState<string | null>(null);
-  const date = manualDate ?? defaultDate;
-  const isDefault = manualDate === null;
-  const setDate = (value: string) => setManualDate(value);
-  // The check happens the morning after the feeding (the next operating day).
-  const checkDate = isDefault ? today : calendar.nextOperatingDay(addDays(date, 1));
+  const defaultCheckDate = today;
+  const [manualCheckDate, setManualCheckDate] = useState<string | null>(null);
+  const checkDate = manualCheckDate ?? defaultCheckDate;
+  const isDefault = manualCheckDate === null;
+  const setCheckDate = (value: string) => {
+    // A check can't happen on a closed day — roll back to the last operating day.
+    setManualCheckDate(calendar.isOperating(value) ? value : calendar.previousOperatingDay(value));
+  };
+  const date = useMemo(() => calendar.previousOperatingDay(checkDate), [calendar, checkDate]);
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
@@ -302,8 +303,8 @@ function AmPage() {
         <span className="font-semibold">{displayDate(checkDate)} <span className="font-normal text-muted-foreground">(checking feed from {displayDate(date)})</span></span>
         <div className="text-xs text-muted-foreground mt-0.5">
           {isDefault
-            ? `Defaults to the last feeding day at ${siteName} (${displayDate(defaultDate)}). Use the date picker below to catch up on a missed day.`
-            : <>Manual date. <button type="button" className="text-primary underline" onClick={() => setManualDate(null)}>reset to {displayDate(defaultDate)}</button></>}
+            ? `Defaults to today (${displayDate(defaultCheckDate)}), checking the last feeding day at ${siteName} (${displayDate(date)}). Pick another check date below to catch up.`
+            : <>Manual date. <button type="button" className="text-primary underline" onClick={() => setManualCheckDate(null)}>reset to today</button></>}
         </div>
         {trial.data && obs.data && !anyPmForDate && (
           <div className="mt-2 text-xs text-amber-700">No PM entry found for {displayDate(date)}. Pick a different date if catching up.</div>
@@ -311,14 +312,14 @@ function AmPage() {
       </div>
 
       <label className="block">
-        <span className="text-sm font-medium">Date (override)</span>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+        <span className="text-sm font-medium">Check date (the day the check is done)</span>
+        <input type="date" value={checkDate} onChange={(e) => setCheckDate(e.target.value)}
           className="mt-1 rounded-lg border border-input bg-card px-3 py-2" />
       </label>
 
-      {/* The check for this date happens the next morning, so the closure that
-          matters is the one on date + 1. */}
-      <ClosedDayNotice calendar={calendar} date={addDays(date, 1)} siteName={siteName} session="AM" />
+      {/* The check happens on checkDate, so the closure that matters is the
+          one on that day. */}
+      <ClosedDayNotice calendar={calendar} date={checkDate} siteName={siteName} session="AM" />
 
 
 
