@@ -94,7 +94,10 @@ export function makeCalendar(
     closedBecause,
     nextOperatingDay,
     pmExpected: isOperating,
-    amExpected: (date) => isOperating(addDays(date, 1)),
+    // The check belongs to the feeding of date D, so it needs D itself to be
+    // an operating day as well as the morning after it.
+    amExpected: (date) => isOperating(date) && isOperating(addDays(date, 1)),
+
     previousOperatingDay,
   };
 }
