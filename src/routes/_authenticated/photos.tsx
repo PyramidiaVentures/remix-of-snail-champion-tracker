@@ -7,6 +7,7 @@ import { today } from "@/lib/date";
 import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PhotoFrame, PhotoLightbox } from "@/components/PhotoFrame";
 import { useSitePens, useSiteScope } from "@/lib/siteScope";
+import { useSiteCalendar, type OperatingCalendar } from "@/lib/operatingDays";
 
 type Search = { mode?: string; date?: string; pen?: string };
 
