@@ -7,7 +7,7 @@ import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/si
 import { useCallback, useMemo, useState } from "react";
 import { Checklist } from "@/components/Checklist";
 import { ChecklistBlocker } from "@/components/ChecklistBlocker";
-import { SessionCompleteButton } from "@/components/SessionCompleteButton";
+import { SessionCompleteButton, useSessionCompleted } from "@/components/SessionCompleteButton";
 import { NumberField } from "@/components/NumberField";
 import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
