@@ -304,8 +304,8 @@ function AmPage() {
         <span className="font-semibold">{displayDate(checkDate)} <span className="font-normal text-muted-foreground">(checking feed from {displayDate(date)})</span></span>
         <div className="text-xs text-muted-foreground mt-0.5">
           {isDefault
-            ? `Defaults to the last feeding day at ${siteName} (${displayDate(defaultDate)}). Use the date picker below to catch up on a missed day.`
-            : <>Manual date. <button type="button" className="text-primary underline" onClick={() => setManualDate(null)}>reset to {displayDate(defaultDate)}</button></>}
+            ? `Defaults to today (${displayDate(defaultCheckDate)}), checking the last feeding day at ${siteName} (${displayDate(date)}). Pick another check date below to catch up.`
+            : <>Manual date. <button type="button" className="text-primary underline" onClick={() => setManualCheckDate(null)}>reset to today</button></>}
         </div>
         {trial.data && obs.data && !anyPmForDate && (
           <div className="mt-2 text-xs text-amber-700">No PM entry found for {displayDate(date)}. Pick a different date if catching up.</div>
@@ -313,14 +313,14 @@ function AmPage() {
       </div>
 
       <label className="block">
-        <span className="text-sm font-medium">Date (override)</span>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+        <span className="text-sm font-medium">Check date (the day the check is done)</span>
+        <input type="date" value={checkDate} onChange={(e) => setCheckDate(e.target.value)}
           className="mt-1 rounded-lg border border-input bg-card px-3 py-2" />
       </label>
 
-      {/* The check for this date happens the next morning, so the closure that
-          matters is the one on date + 1. */}
-      <ClosedDayNotice calendar={calendar} date={addDays(date, 1)} siteName={siteName} session="AM" />
+      {/* The check happens on checkDate, so the closure that matters is the
+          one on that day. */}
+      <ClosedDayNotice calendar={calendar} date={checkDate} siteName={siteName} session="AM" />
 
 
 
