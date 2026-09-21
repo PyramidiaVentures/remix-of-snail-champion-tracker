@@ -73,7 +73,7 @@ function ResultsPage() {
     queryKey: ["pens", "with-site"],
     queryFn: async () => {
       const [{ data: rows }, { data: sites }] = await Promise.all([
-        supabase.from("pens").select("id,label,site_id").order("label"),
+        supabase.from("pens").select("id,label,site_id,role").order("label"),
         supabase.from("sites").select("id,name"),
       ]);
       const siteName = new Map((sites ?? []).map((s) => [s.id, s.name]));
