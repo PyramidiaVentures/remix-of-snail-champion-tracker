@@ -597,9 +597,10 @@ function DashboardPage() {
                       {p.role === "breeder" && <span className="ml-1 text-xs font-normal text-muted-foreground">breeder</span>}
                     </span>
                     <div className="text-xs text-amber-600">
-                      {pm.length > 0 && <div>PM missing: {pm.join(", ")}</div>}
-                      {am.length > 0 && <div>AM missing: {am.join(", ")}</div>}
+                      {pm.length > 0 && <div>{pmInProgress ? "PM not yet recorded:" : "PM missing:"} {pm.join(", ")}</div>}
+                      {am.length > 0 && <div>{amInProgress ? "AM not yet recorded:" : "AM missing:"} {am.join(", ")}</div>}
                     </div>
+
                   </li>
                 ))}
               {!pmExpected && !amExpected ? (
