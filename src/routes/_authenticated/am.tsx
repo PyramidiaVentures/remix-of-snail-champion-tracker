@@ -292,14 +292,14 @@ function AmPage() {
       </header>
 
       <div className={`rounded-lg border p-3 text-sm ${isDefault ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
-        <span className="font-semibold">Completing PM from {date}</span>
+        <span className="font-semibold">{displayDate(checkDate)} <span className="font-normal text-muted-foreground">(checking feed from {displayDate(date)})</span></span>
         <div className="text-xs text-muted-foreground mt-0.5">
           {isDefault
-            ? `Defaults to the last feeding day at ${siteName} (${defaultDate}). Use the date picker below to catch up on a missed day.`
-            : <>Manual date. <button type="button" className="text-primary underline" onClick={() => setManualDate(null)}>reset to {defaultDate}</button></>}
+            ? `Defaults to the last feeding day at ${siteName} (${displayDate(defaultDate)}). Use the date picker below to catch up on a missed day.`
+            : <>Manual date. <button type="button" className="text-primary underline" onClick={() => setManualDate(null)}>reset to {displayDate(defaultDate)}</button></>}
         </div>
         {trial.data && obs.data && !anyPmForDate && (
-          <div className="mt-2 text-xs text-amber-700">No PM entry found for {date}. Pick a different date if catching up.</div>
+          <div className="mt-2 text-xs text-amber-700">No PM entry found for {displayDate(date)}. Pick a different date if catching up.</div>
         )}
       </div>
 
