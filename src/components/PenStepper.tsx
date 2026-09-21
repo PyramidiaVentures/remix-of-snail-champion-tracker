@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, CheckCircle2, CircleDashed, Loader2, Circle } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, CircleDashed, Loader2, Circle, Sprout } from "lucide-react";
 
 export type PenCompletion = "complete" | "partial" | "empty" | "uploading";
 
