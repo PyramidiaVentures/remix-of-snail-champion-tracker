@@ -64,12 +64,10 @@ function nextDate(date: string) {
 }
 
 function displayDate(date: string) {
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  }).format(new Date(`${date}T00:00:00Z`));
+  const value = new Date(`${date}T00:00:00Z`);
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${weekdays[value.getUTCDay()]} ${value.getUTCDate()} ${months[value.getUTCMonth()]}`;
 }
 
 function CycleDetails({ observation }: { observation: ObservationRow | undefined }) {
