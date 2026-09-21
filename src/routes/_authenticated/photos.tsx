@@ -287,14 +287,15 @@ function PhotosPage() {
             renderPen={(pen) => {
               const s = sessionFor(pen.id);
               const weigh = weighFor(pen.id);
+              const morning = morningOf(date, calendar);
               return (
                 <div className="space-y-3">
-                  <CycleHeading penLabel={pen.label} date={date} />
+                  <CycleHeading penLabel={pen.label} date={date} morning={morning} />
                   <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_13rem]">
                     <PhotoFrame stored={s?.photo_pm_url} session="Before — feed offered" penLabel={pen.label}
                       siteName={siteName} date={date} onOpen={(url, caption) => setLightbox({ url, caption })} />
-                    <PhotoFrame stored={s?.photo_am_url} session="After — 16 hours later" penLabel={pen.label}
-                      siteName={siteName} date={nextDate(date)} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                    <PhotoFrame stored={s?.photo_am_url} session={afterLabel(date, morning)} penLabel={pen.label}
+                      siteName={siteName} date={morning} onOpen={(url, caption) => setLightbox({ url, caption })} />
                     <CycleDetails observation={observationFor(pen.id)} />
                   </div>
                   {weigh && (
