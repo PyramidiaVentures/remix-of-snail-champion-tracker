@@ -121,6 +121,8 @@ function AmPage() {
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
+  // The Summary pill goes green only once the Complete button was actually clicked.
+  const sessionCompleted = useSessionCompleted("am", trialId, date);
 
   const pens = useSitePens();
 
