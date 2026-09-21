@@ -321,11 +321,15 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
         : null;
 
     // Carry-over and spoilage, from the recorded dish actions.
+    // Carry-over is days since the dish was last emptied, not entries counted.
     const actionRows = penObs.filter((o) => o.dish_action != null);
     const byDate = new Map<string, string | null>();
     for (const o of penObs) if (o.dish_action != null) byDate.set(o.obs_date, o.dish_action);
-    const runs = carryOverRuns(Array.from(byDate, ([date, action]) => ({ date, action })));
+    const ages = carryOverDaysSeries(
+      Array.from(byDate, ([date, action]) => ({ date, action })),
+    ).map((r) => r.days);
     const spoiled = actionRows.filter((o) => o.dish_action === "emptied_spoiled").length;
+
 
     let running = 0;
     const offeredSeries = Array.from(
