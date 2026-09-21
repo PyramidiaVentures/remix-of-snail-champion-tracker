@@ -176,11 +176,14 @@ function HomePage() {
 
           {isWeighDay ? (
             <Link to="/weigh" className="block rounded-lg bg-primary px-3 py-3 text-center text-sm font-semibold text-primary-foreground">
-              Weigh day today — open Weigh Day
+              {dueTodayCount} pen{dueTodayCount === 1 ? "" : "s"} due today
+              {overdueCount > 0 ? `, ${overdueCount} overdue` : ""} — open Weigh Day
             </Link>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Next scheduled weighing in {daysToWeigh} day{daysToWeigh === 1 ? "" : "s"}.
+              {daysToWeigh != null
+                ? `Next weighing due in ${daysToWeigh} day${daysToWeigh === 1 ? "" : "s"}.`
+                : "No weighing is scheduled."}
             </p>
           )}
         </section>
