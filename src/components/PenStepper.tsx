@@ -113,35 +113,52 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
     );
   }
 
-  const doneCount = ordered.filter((p) => stateFor(p.id) === "complete").length;
+  // Trial pens and breeder pens are always counted apart, so a completion
+  // figure never mixes the two kinds of pen.
+  const trialPens = ordered.filter((p) => p.role !== "breeder");
+  const breederPens = ordered.filter((p) => p.role === "breeder");
+  const doneIn = (list: StepperPen[]) => list.filter((p) => stateFor(p.id) === "complete").length;
+  const trialDone = doneIn(trialPens);
+  const breederDone = doneIn(breederPens);
+  const doneCount = trialDone + breederDone;
   const remaining = n - doneCount;
   const current = index < n ? ordered[index] : null;
 
   return (
     <div className="space-y-3" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-      <div className="flex items-baseline justify-between text-sm">
+      <div className="flex items-baseline justify-between gap-2 text-sm">
         <span className="font-semibold">
-          {current ? `Pen ${current.label} · ${index + 1} of ${n}` : "Session summary"}
+          {current
+            ? `Pen ${current.label}${current.role === "breeder" ? " (breeder)" : ""} · ${index + 1} of ${n}`
+            : "Session summary"}
         </span>
-        <span className="text-xs text-muted-foreground">
-          {doneCount} complete, {remaining} to go
+        <span className="text-right text-xs text-muted-foreground">
+          {trialDone} of {trialPens.length} trial pens complete
+          {breederPens.length > 0 && (
+            <>
+              <br />
+              {breederDone} of {breederPens.length} breeder pens complete
+            </>
+          )}
         </span>
       </div>
 
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {ordered.map((p, i) => {
           const state = stateFor(p.id);
+          const breeder = p.role === "breeder";
           return (
             <button
               key={p.id}
               type="button"
               onClick={() => go(i)}
               className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${CHIP_STYLES[state]} ${
-                i === index ? "ring-2 ring-ring ring-offset-1 ring-offset-background" : ""
-              }`}
+                breeder ? "border-dashed" : ""
+              } ${i === index ? "ring-2 ring-ring ring-offset-1 ring-offset-background" : ""}`}
             >
               <ChipIcon state={state} />
               {p.label}
+              {breeder && <Sprout className="h-3 w-3" aria-label="Breeder pen" />}
             </button>
           );
         })}
