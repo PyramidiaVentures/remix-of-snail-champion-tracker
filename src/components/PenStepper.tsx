@@ -44,9 +44,15 @@ function ChipIcon({ state }: { state: PenCompletion }) {
 }
 
 export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = "pen" }: Props) {
-  // Stable order: always by label, matching the walk down the beds.
+  // Stable order: trial pens first, then breeder pens, each by label —
+  // matching the walk down the beds.
   const ordered = useMemo(
-    () => [...pens].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })),
+    () =>
+      [...pens].sort(
+        (a, b) =>
+          (a.role === "breeder" ? 1 : 0) - (b.role === "breeder" ? 1 : 0) ||
+          a.label.localeCompare(b.label, undefined, { numeric: true }),
+      ),
     [pens],
   );
   const n = ordered.length;
