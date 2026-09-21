@@ -7,6 +7,7 @@ import { Plus, Trash2, AlertTriangle, CheckCircle2, Lock } from "lucide-react";
 import { usePensWithData, TREATMENT_LOCK_MESSAGE } from "@/lib/penDataLock";
 import { useSiteFeeds, useSitePens, useSiteScope, useSiteTrials } from "@/lib/siteScope";
 import { useSiteCalendar } from "@/lib/operatingDays";
+import { OperatingDaysEditor } from "@/components/OperatingDaysEditor";
 import { buildSchedule, overdueAdvisory, type SchedulePen } from "@/lib/weighSchedule";
 
 
@@ -186,6 +187,8 @@ function TrialPage() {
           />
         </>
       )}
+
+      <OperatingDaysEditor />
 
       <DesignIntegrityPanel
         pens={penList}
