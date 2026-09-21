@@ -972,6 +972,7 @@ function WeighingSchedule({
   onChanged: () => void;
 }) {
   const t = today();
+  const { calendar } = useSiteCalendar();
   const [trialInterval, setTrialInterval] = useState(String(trial.weighing_interval_days));
 
   const startDateByPen = useMemo(() => {
