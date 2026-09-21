@@ -182,6 +182,23 @@ function DashboardPage() {
 
   const loading = trial.isLoading || data.isPending || !review;
 
+  // A closed day reached by URL or a stale link shows one line and nothing
+  // else — no exception list, no empty tables.
+  if (isClosedDay) {
+    return (
+      <div className="space-y-5">
+        <header className="space-y-2">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">{siteName || "—"}</div>
+          <h1 className="text-2xl font-bold">Daily dashboard</h1>
+        </header>
+        <p className="rounded-2xl border border-border bg-card p-4 text-sm shadow-sm">
+          {longDate(date)} — no operations at {siteName || "this site"}
+          {calendar.closedBecause(date) ? ` (${calendar.closedBecause(date)})` : ""}.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <header className="space-y-2">
@@ -201,7 +218,7 @@ function DashboardPage() {
         <div className="flex flex-wrap items-end gap-2">
           <button
             type="button"
-            onClick={() => setDate(addDays(date, -1))}
+            onClick={() => setDate(prevDay)}
             className="rounded-lg border border-input bg-card px-3 py-2 text-sm"
           >
             ← Previous day
@@ -212,19 +229,23 @@ function DashboardPage() {
               type="date"
               value={date}
               max={today()}
-              onChange={(e) => setDate(e.currentTarget.value)}
+              onChange={(e) => pickDate(e.currentTarget.value)}
               className="mt-1 block rounded-lg border border-input bg-card px-3 py-2 text-sm"
             />
           </label>
           <button
             type="button"
-            disabled={isToday}
-            onClick={() => setDate(addDays(date, 1))}
+            disabled={!canGoNext}
+            onClick={() => setDate(nextDay)}
             className="rounded-lg border border-input bg-card px-3 py-2 text-sm disabled:opacity-40"
           >
             Next day →
           </button>
         </div>
+        {pickHint && <p className="text-xs text-amber-600">{pickHint}</p>}
+        {calendar.nonOperatingWeekdays.length > 0 && (
+          <p className="text-xs text-muted-foreground">{operatingDaysSentence(calendar)}</p>
+        )}
       </header>
 
 

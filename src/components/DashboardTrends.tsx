@@ -45,6 +45,8 @@ type Props = {
   treatmentByPen: Map<string, string>;
   treatments: { id: string; label: string }[];
   breederPenIds: Set<string>;
+  /** The site's operating calendar — closed days never appear on an axis. */
+  calendar: OperatingCalendar;
 };
 
 /** Every date in the window, oldest first. */
