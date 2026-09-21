@@ -21,6 +21,7 @@ import { Route as AuthenticatedPmRouteImport } from './routes/_authenticated/pm'
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
 import { Route as AuthenticatedGuideRouteImport } from './routes/_authenticated/guide'
 import { Route as AuthenticatedExportRouteImport } from './routes/_authenticated/export'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAmRouteImport } from './routes/_authenticated/am'
 
 const AuthRoute = AuthRouteImport.update({
@@ -82,6 +83,11 @@ const AuthenticatedExportRoute = AuthenticatedExportRouteImport.update({
   path: '/export',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAmRoute = AuthenticatedAmRouteImport.update({
   id: '/am',
   path: '/am',
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/am': typeof AuthenticatedAmRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
   '/export': typeof AuthenticatedExportRoute
   '/guide': typeof AuthenticatedGuideRoute
   '/home': typeof AuthenticatedHomeRoute
@@ -106,6 +113,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/am': typeof AuthenticatedAmRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
   '/export': typeof AuthenticatedExportRoute
   '/guide': typeof AuthenticatedGuideRoute
   '/home': typeof AuthenticatedHomeRoute
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/am': typeof AuthenticatedAmRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/export': typeof AuthenticatedExportRoute
   '/_authenticated/guide': typeof AuthenticatedGuideRoute
   '/_authenticated/home': typeof AuthenticatedHomeRoute
@@ -138,6 +147,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/am'
+    | '/dashboard'
     | '/export'
     | '/guide'
     | '/home'
@@ -152,6 +162,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/am'
+    | '/dashboard'
     | '/export'
     | '/guide'
     | '/home'
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/am'
+    | '/_authenticated/dashboard'
     | '/_authenticated/export'
     | '/_authenticated/guide'
     | '/_authenticated/home'
@@ -270,6 +282,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedExportRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/am': {
       id: '/_authenticated/am'
       path: '/am'
@@ -282,6 +301,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAmRoute: typeof AuthenticatedAmRoute
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedExportRoute: typeof AuthenticatedExportRoute
   AuthenticatedGuideRoute: typeof AuthenticatedGuideRoute
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
@@ -295,6 +315,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAmRoute: AuthenticatedAmRoute,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedExportRoute: AuthenticatedExportRoute,
   AuthenticatedGuideRoute: AuthenticatedGuideRoute,
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
