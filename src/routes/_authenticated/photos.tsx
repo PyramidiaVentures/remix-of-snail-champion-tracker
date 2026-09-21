@@ -33,8 +33,73 @@ export const Route = createFileRoute("/_authenticated/photos")({
 
 type SessionRow = { pen_id: string; obs_date: string; photo_am_url: string | null; photo_pm_url: string | null };
 type WeighRow = { pen_id: string; event_date: string; photo_url: string | null };
+type ObservationRow = {
+  pen_id: string;
+  obs_date: string;
+  offered_g: number | null;
+  dish_action: string | null;
+  refusal_score: string | null;
+};
 
 const PAGE = 8;
+
+const DISH_ACTION_LABELS: Record<string, string> = {
+  topped_up: "Topped up",
+  emptied_refilled: "Emptied & refilled",
+  emptied_spoiled: "Emptied — spoiled",
+};
+
+const REFUSAL_LABELS: Record<string, string> = {
+  none_left: "None left",
+  trace: "Trace",
+  about_25: "About 25%",
+  about_50: "About 50%",
+  most_left: "Most left",
+};
+
+function nextDate(date: string) {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + 1);
+  return value.toISOString().slice(0, 10);
+}
+
+function displayDate(date: string) {
+  const value = new Date(`${date}T00:00:00Z`);
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${weekdays[value.getUTCDay()]} ${value.getUTCDate()} ${months[value.getUTCMonth()]}`;
+}
+
+function CycleDetails({ observation }: { observation: ObservationRow | undefined }) {
+  return (
+    <dl className="grid gap-3 rounded-lg border border-border bg-card p-3 text-sm sm:grid-cols-3 lg:grid-cols-1">
+      <div>
+        <dt className="text-xs text-muted-foreground">Grams offered</dt>
+        <dd className="font-semibold">{observation?.offered_g == null ? "—" : `${observation.offered_g} g`}</dd>
+      </div>
+      <div>
+        <dt className="text-xs text-muted-foreground">Dish action</dt>
+        <dd className="font-semibold">
+          {observation?.dish_action ? DISH_ACTION_LABELS[observation.dish_action] ?? observation.dish_action : "—"}
+        </dd>
+      </div>
+      <div>
+        <dt className="text-xs text-muted-foreground">Morning refusal score</dt>
+        <dd className="font-semibold">
+          {observation?.refusal_score ? REFUSAL_LABELS[observation.refusal_score] ?? observation.refusal_score : "—"}
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
+function CycleHeading({ penLabel, date }: { penLabel: string; date: string }) {
+  return (
+    <h2 className="text-base font-semibold">
+      {penLabel} — fed {displayDate(date)} evening, checked {displayDate(nextDate(date))} morning
+    </h2>
+  );
+}
 
 function PhotosPage() {
   const search = Route.useSearch();
@@ -60,15 +125,18 @@ function PhotosPage() {
     queryKey: ["photos-day", siteId, date, penIds.length],
     enabled: mode === "date" && penIds.length > 0,
     queryFn: async () => {
-      const [sessions, weighs] = await Promise.all([
+      const [sessions, weighs, observations] = await Promise.all([
         supabase.from("session_photos").select("pen_id,obs_date,photo_am_url,photo_pm_url")
           .in("pen_id", penIds).eq("obs_date", date),
         supabase.from("biomass_events").select("pen_id,event_date,photo_url")
           .in("pen_id", penIds).eq("event_date", date),
+        supabase.from("observations").select("pen_id,obs_date,offered_g,dish_action,refusal_score")
+          .in("pen_id", penIds).eq("obs_date", date),
       ]);
       return {
         sessions: (sessions.data ?? []) as SessionRow[],
         weighs: (weighs.data ?? []) as WeighRow[],
+        observations: (observations.data ?? []) as ObservationRow[],
       };
     },
   });
@@ -76,6 +144,8 @@ function PhotosPage() {
   const sessionFor = (penId: string) => (dayPhotos.data?.sessions ?? []).find((s) => s.pen_id === penId);
   const weighFor = (penId: string) =>
     (dayPhotos.data?.weighs ?? []).find((w) => w.pen_id === penId && !!w.photo_url)?.photo_url ?? null;
+  const observationFor = (penId: string) =>
+    (dayPhotos.data?.observations ?? []).find((o) => o.pen_id === penId);
 
   const recorded = allPens.reduce((n, p) => {
     const s = sessionFor(p.id);
@@ -112,14 +182,18 @@ function PhotosPage() {
     queryKey: ["photos-pen", selectedPenId],
     enabled: mode === "pen" && !!selectedPenId,
     queryFn: async () => {
-      const [sessions, weighs] = await Promise.all([
+      if (!selectedPenId) return { sessions: [], weighs: [], observations: [] };
+      const [sessions, weighs, observations] = await Promise.all([
         supabase.from("session_photos").select("pen_id,obs_date,photo_am_url,photo_pm_url")
-          .eq("pen_id", selectedPenId!).order("obs_date", { ascending: false }),
-        supabase.from("biomass_events").select("pen_id,event_date,photo_url").eq("pen_id", selectedPenId!),
+          .eq("pen_id", selectedPenId).order("obs_date", { ascending: false }),
+        supabase.from("biomass_events").select("pen_id,event_date,photo_url").eq("pen_id", selectedPenId),
+        supabase.from("observations").select("pen_id,obs_date,offered_g,dish_action,refusal_score")
+          .eq("pen_id", selectedPenId),
       ]);
       return {
         sessions: (sessions.data ?? []) as SessionRow[],
         weighs: (weighs.data ?? []) as WeighRow[],
+        observations: (observations.data ?? []) as ObservationRow[],
       };
     },
   });
@@ -127,6 +201,7 @@ function PhotosPage() {
   const historyRows = useMemo(() => {
     const sessions = penHistory.data?.sessions ?? [];
     const weighs = penHistory.data?.weighs ?? [];
+    const observations = penHistory.data?.observations ?? [];
     const dates = new Set<string>([
       ...sessions.filter((s) => s.photo_am_url || s.photo_pm_url).map((s) => s.obs_date),
       ...weighs.filter((w) => w.photo_url).map((w) => w.event_date),
@@ -136,6 +211,7 @@ function PhotosPage() {
       pm: sessions.find((s) => s.obs_date === d)?.photo_pm_url ?? null,
       am: sessions.find((s) => s.obs_date === d)?.photo_am_url ?? null,
       weigh: weighs.find((w) => w.event_date === d && w.photo_url)?.photo_url ?? null,
+      observation: observations.find((o) => o.obs_date === d),
     }));
   }, [penHistory.data]);
 
@@ -194,14 +270,20 @@ function PhotosPage() {
               const s = sessionFor(pen.id);
               const weigh = weighFor(pen.id);
               return (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <PhotoFrame stored={s?.photo_pm_url} session="PM · Evening" penLabel={pen.label}
-                    siteName={siteName} date={date} onOpen={(url, caption) => setLightbox({ url, caption })} />
-                  <PhotoFrame stored={s?.photo_am_url} session="AM · Morning" penLabel={pen.label}
-                    siteName={siteName} date={date} onOpen={(url, caption) => setLightbox({ url, caption })} />
-                  {weigh && (
-                    <PhotoFrame stored={weigh} session="Weighing" penLabel={pen.label}
+                <div className="space-y-3">
+                  <CycleHeading penLabel={pen.label} date={date} />
+                  <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_13rem]">
+                    <PhotoFrame stored={s?.photo_pm_url} session="Before — feed offered" penLabel={pen.label}
                       siteName={siteName} date={date} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                    <PhotoFrame stored={s?.photo_am_url} session="After — 16 hours later" penLabel={pen.label}
+                      siteName={siteName} date={nextDate(date)} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                    <CycleDetails observation={observationFor(pen.id)} />
+                  </div>
+                  {weigh && (
+                    <div className="max-w-md">
+                      <PhotoFrame stored={weigh} session="Weighing" penLabel={pen.label}
+                        siteName={siteName} date={date} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                    </div>
                   )}
                 </div>
               );
@@ -237,21 +319,27 @@ function PhotosPage() {
                 {historyRows.length} day{historyRows.length === 1 ? "" : "s"} with photos, newest first.
               </p>
               <div className="space-y-4">
-                {historyRows.slice(0, shown).map((row) => (
-                  <div key={row.date} className="space-y-1">
-                    <div className="text-sm font-semibold">{row.date}</div>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      <PhotoFrame stored={row.pm} session="PM · Evening" penLabel={penLabel(selectedPenId!)}
-                        siteName={siteName} date={row.date} onOpen={(url, caption) => setLightbox({ url, caption })} />
-                      <PhotoFrame stored={row.am} session="AM · Morning" penLabel={penLabel(selectedPenId!)}
-                        siteName={siteName} date={row.date} onOpen={(url, caption) => setLightbox({ url, caption })} />
-                      {row.weigh && (
-                        <PhotoFrame stored={row.weigh} session="Weighing" penLabel={penLabel(selectedPenId!)}
-                          siteName={siteName} date={row.date} onOpen={(url, caption) => setLightbox({ url, caption })} />
-                      )}
+                 {historyRows.slice(0, shown).map((row) => {
+                   const label = selectedPenId ? penLabel(selectedPenId) : "Pen";
+                   return (
+                   <div key={row.date} className="space-y-3 border-b border-border pb-5 last:border-0">
+                     <CycleHeading penLabel={label} date={row.date} />
+                     <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_13rem]">
+                       <PhotoFrame stored={row.pm} session="Before — feed offered" penLabel={label}
+                         siteName={siteName} date={row.date} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                       <PhotoFrame stored={row.am} session="After — 16 hours later" penLabel={label}
+                         siteName={siteName} date={nextDate(row.date)} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                       <CycleDetails observation={row.observation} />
                     </div>
+                     {row.weigh && (
+                       <div className="max-w-md">
+                         <PhotoFrame stored={row.weigh} session="Weighing" penLabel={label}
+                           siteName={siteName} date={row.date} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                       </div>
+                     )}
                   </div>
-                ))}
+                   );
+                 })}
               </div>
               {shown < historyRows.length && (
                 <button

@@ -42,7 +42,7 @@ export function PhotoFrame({
               loading="lazy"
               decoding="async"
               onError={() => setFailed(true)}
-              className="h-full w-full object-cover"
+             className="h-full w-full object-contain"
             />
           </button>
         ) : (
