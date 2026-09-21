@@ -69,7 +69,7 @@ function WeighPage() {
     queryKey: ["pen-assignments", trialId],
     enabled: !!trialId,
     queryFn: async () =>
-      (await supabase.from("pen_assignments").select("pen_id,treatment_id").eq("trial_id", trialId!).is("end_date", null)).data ?? [],
+      (await supabase.from("pen_assignments").select("pen_id,treatment_id,start_date").eq("trial_id", trialId!).is("end_date", null)).data ?? [],
   });
 
   const events = useQuery({
