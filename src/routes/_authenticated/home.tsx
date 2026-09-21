@@ -10,7 +10,7 @@ import { today } from "@/lib/date";
 import { daysBetween } from "@/lib/metrics";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
 import { useAllSiteCalendars, useSiteCalendar } from "@/lib/operatingDays";
-import { buildSchedule, overdueAdvisory, type SchedulePen } from "@/lib/weighSchedule";
+import { buildSchedule, type SchedulePen } from "@/lib/weighSchedule";
 import {
   computeDayReview,
   fetchDayInputs,
@@ -162,31 +162,6 @@ function HomePage() {
     .sort()[0] ?? null;
   const daysToWeigh = nextDueDate ? daysBetween(t, nextDueDate) : null;
 
-  // A closed day is never expected to carry a session, so nothing is reported
-  // missing on one.
-  const pmExpectedToday = calendar.pmExpected(t);
-  const amExpectedYesterday = calendar.amExpected(yesterday);
-  const closedToday = calendar.closedBecause(t);
-
-  const advisories: string[] = [];
-  if (trial.data) {
-    if (closedToday) advisories.push(`${closedToday} — no operations at ${siteName || "this site"} today.`);
-    if (expected === 0) advisories.push("No pens are assigned to this trial yet.");
-    if (pmExpectedToday && expected > 0 && fedToday < expected) advisories.push(`${expected - fedToday} pen(s) not yet fed today.`);
-    if (pmExpectedToday && expected > 0 && pmPhotos < expected) advisories.push(`${expected - pmPhotos} evening photo(s) missing for today.`);
-    if (amExpectedYesterday && expected > 0 && checked < expected) advisories.push(`${expected - checked} morning check(s) missing for ${yesterday}.`);
-    if (pmExpectedToday && breederExpected > 0 && breederPmPhotos < breederExpected)
-      advisories.push(`${breederExpected - breederPmPhotos} breeder pen evening photo(s) missing for today.`);
-    if (amExpectedYesterday && breederExpected > 0 && breederAmPhotos < breederExpected)
-      advisories.push(`${breederExpected - breederAmPhotos} breeder pen morning photo(s) missing for ${yesterday}.`);
-    const weighedPens = new Set(trialOnly(daily.data?.biomass ?? []).map((b) => b.pen_id)).size;
-    if (expected > 0 && weighedPens < expected) advisories.push(`${expected - weighedPens} pen(s) have never been weighed.`);
-    // Weighings are the only source of growth data and a missed one cannot be
-    // recovered later, so overdue pens are always surfaced.
-    const overdueMsg = overdueAdvisory(scheduleRows);
-    if (overdueMsg) advisories.push(overdueMsg);
-  }
-
   return (
     <div className="space-y-5">
       <div>
@@ -244,17 +219,6 @@ function HomePage() {
       <OtherSites currentSiteId={siteId} date={t} />
 
 
-
-      {advisories.length > 0 && (
-        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <h2 className="flex items-center gap-2 text-sm font-semibold">
-            <AlertTriangle className="h-4 w-4 text-earth" /> Open advisories
-          </h2>
-          <ul className="mt-2 list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-            {advisories.map((a) => <li key={a}>{a}</li>)}
-          </ul>
-        </section>
-      )}
 
       {trial.data && (
         <Link
