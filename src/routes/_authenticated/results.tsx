@@ -77,7 +77,8 @@ function ResultsPage() {
         supabase.from("sites").select("id,name"),
       ]);
       const siteName = new Map((sites ?? []).map((s) => [s.id, s.name]));
-      return (rows ?? []).map((p) => ({
+      // Breeder pens never enter a treatment mean, so Results drops them here.
+      return (rows ?? []).filter((p) => p.role !== "breeder").map((p) => ({
         id: p.id,
         label: siteName.get(p.site_id) ? `${p.label} · ${siteName.get(p.site_id)}` : p.label,
       }));
@@ -106,7 +107,7 @@ function ResultsPage() {
   const assignedPens = useMemo(
     () =>
       (pens.data ?? [])
-        .filter((p) => p.role !== "breeder" && (assignments.data ?? []).some((a) => a.pen_id === p.id))
+        .filter((p) => (assignments.data ?? []).some((a) => a.pen_id === p.id))
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })),
     [pens.data, assignments.data],
   );
