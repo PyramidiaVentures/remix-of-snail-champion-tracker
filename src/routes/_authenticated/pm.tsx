@@ -8,6 +8,8 @@ import { ChecklistBlocker } from "@/components/ChecklistBlocker";
 import { NumberField } from "@/components/NumberField";
 import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
+import { ClosedDayNotice } from "@/components/ClosedDayNotice";
+
 import { useUploads } from "@/lib/photoUploads.store";
 import { upsertRow, OBSERVATIONS_TRIAL_KEY } from "@/lib/upsertRow";
 import { NoActiveTrial, useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
@@ -242,6 +244,9 @@ function PmPage() {
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
           className="mt-1 rounded-lg border border-input bg-card px-3 py-2" />
       </label>
+
+      <ClosedDayNotice calendar={calendar} date={date} siteName={siteName} session="PM" />
+
 
       <Checklist
         storageKey={`pm-checklist-${date}`}
