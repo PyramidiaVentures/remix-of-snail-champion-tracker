@@ -9,8 +9,15 @@ import {
 import { today } from "@/lib/date";
 import { daysBetween } from "@/lib/metrics";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
-import { useSiteCalendar } from "@/lib/operatingDays";
+import { useAllSiteCalendars, useSiteCalendar } from "@/lib/operatingDays";
 import { buildSchedule, overdueAdvisory, type SchedulePen } from "@/lib/weighSchedule";
+import {
+  computeDayReview,
+  fetchDayInputs,
+  lastCompletedDay,
+  summarizeExceptions,
+  type DayReviewPen,
+} from "@/lib/dayExceptions";
 
 
 export const Route = createFileRoute("/_authenticated/home")({
@@ -68,6 +75,31 @@ function HomePage() {
       };
     },
   });
+
+  // The exceptions summary reports the same date the dashboard defaults to —
+  // the last completed operating day — computed by the same shared function so
+  // the two screens can never disagree.
+  const reportDate = lastCompletedDay(calendar);
+  const dayInputs = useQuery({
+    queryKey: ["home-exceptions", trialId, reportDate],
+    enabled: !!trialId,
+    queryFn: () => fetchDayInputs(trialId!, reportDate),
+  });
+  const review = useMemo(
+    () =>
+      dayInputs.data && pens.data
+        ? computeDayReview({
+            pens: pens.data as DayReviewPen[],
+            assignments: assignments.data ?? [],
+            trialInterval: trial.data?.weighing_interval_days,
+            data: dayInputs.data,
+            calendar,
+            date: reportDate,
+            siteName: siteName || "",
+          })
+        : null,
+    [dayInputs.data, pens.data, assignments.data, trial.data?.weighing_interval_days, calendar, reportDate, siteName],
+  );
 
   // Trial pens and breeder pens are always counted apart, so a completion
   // figure never silently mixes the two kinds of pen.
@@ -224,6 +256,30 @@ function HomePage() {
         </section>
       )}
 
+      {trial.data && (
+        <Link
+          to="/dashboard"
+          search={{ date: reportDate }}
+          className="block rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-sm"
+        >
+          {!review ? (
+            <span className="text-muted-foreground">Checking {longDate(reportDate)}…</span>
+          ) : review.exceptions.length === 0 ? (
+            <span className="font-medium text-primary">Every item was closed on {longDate(reportDate)}.</span>
+          ) : (
+            <>
+              <span className="flex items-center gap-2 font-medium">
+                <AlertTriangle className="h-4 w-4 text-earth" />
+                {review.exceptions.length} exception{review.exceptions.length === 1 ? "" : "s"} on {longDate(reportDate)}
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {summarizeExceptions(review.exceptions)}
+              </span>
+            </>
+          )}
+        </Link>
+      )}
+
       <section className="space-y-2">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today</h2>
         <div className="grid grid-cols-2 gap-3">
@@ -252,9 +308,12 @@ function HomePage() {
   );
 }
 
-/** One compact line per other site: trial day and today's feeding completion. */
+/** One compact line per other site: trial day, today's feeding completion and
+ *  the exception count for its last completed day — the same computation the
+ *  dashboard uses, so a problem elsewhere is visible without switching. */
 function OtherSites({ currentSiteId, date }: { currentSiteId: string | null; date: string }) {
   const { sites } = useSiteScope();
+  const { calendarFor } = useAllSiteCalendars();
   const otherIds = sites.filter((s) => s.id !== currentSiteId).map((s) => s.id);
 
   const summary = useQuery({
@@ -263,24 +322,43 @@ function OtherSites({ currentSiteId, date }: { currentSiteId: string | null; dat
     queryFn: async () => {
       const { data: trials } = await supabase
         .from("trials")
-        .select("id,site_id,start_date")
+        .select("id,site_id,start_date,weighing_interval_days")
         .eq("status", "active")
         .in("site_id", otherIds);
       const list = trials ?? [];
-      if (list.length === 0) return [] as { siteId: string; day: number | null; fed: number; expected: number }[];
+      if (list.length === 0)
+        return [] as { siteId: string; day: number | null; fed: number; expected: number; exceptions: number }[];
       const ids = list.map((t) => t.id);
-      const [{ data: pa }, { data: obs }] = await Promise.all([
-        supabase.from("pen_assignments").select("trial_id,pen_id").in("trial_id", ids),
+      const [{ data: pa }, { data: obs }, { data: sitePens }] = await Promise.all([
+        supabase.from("pen_assignments").select("trial_id,pen_id,start_date").in("trial_id", ids),
         supabase.from("observations").select("trial_id,pen_id,offered_g").in("trial_id", ids).eq("obs_date", date),
+        supabase.from("pens").select("id,site_id,label,role,initial_snail_count,weighing_interval_days").in("site_id", otherIds),
       ]);
-      return list.map((t) => ({
-        siteId: t.site_id,
-        day: t.start_date ? daysBetween(t.start_date, date) + 1 : null,
-        expected: new Set((pa ?? []).filter((r) => r.trial_id === t.id).map((r) => r.pen_id)).size,
-        fed: new Set(
-          (obs ?? []).filter((r) => r.trial_id === t.id && r.offered_g != null).map((r) => r.pen_id),
-        ).size,
-      }));
+      return Promise.all(
+        list.map(async (t) => {
+          const calendar = calendarFor(t.site_id);
+          const reportDate = lastCompletedDay(calendar);
+          const inputs = await fetchDayInputs(t.id, reportDate);
+          const review = computeDayReview({
+            pens: (sitePens ?? []).filter((p) => p.site_id === t.site_id) as DayReviewPen[],
+            assignments: (pa ?? []).filter((r) => r.trial_id === t.id),
+            trialInterval: t.weighing_interval_days,
+            data: inputs,
+            calendar,
+            date: reportDate,
+            siteName: sites.find((s) => s.id === t.site_id)?.name ?? "",
+          });
+          return {
+            siteId: t.site_id,
+            day: t.start_date ? daysBetween(t.start_date, date) + 1 : null,
+            expected: new Set((pa ?? []).filter((r) => r.trial_id === t.id).map((r) => r.pen_id)).size,
+            fed: new Set(
+              (obs ?? []).filter((r) => r.trial_id === t.id && r.offered_g != null).map((r) => r.pen_id),
+            ).size,
+            exceptions: review.exceptions.length,
+          };
+        }),
+      );
     },
   });
 
@@ -296,7 +374,11 @@ function OtherSites({ currentSiteId, date }: { currentSiteId: string | null; dat
             <div key={s.id}>
               <span className="font-medium text-foreground">{s.name}</span>{" "}
               {row
-                ? `· Day ${row.day ?? "—"} · fed ${row.fed}/${row.expected} today`
+                ? `· Day ${row.day ?? "—"} · fed ${row.fed}/${row.expected} today · ${
+                    row.exceptions === 0
+                      ? "clean"
+                      : `${row.exceptions} exception${row.exceptions === 1 ? "" : "s"}`
+                  }`
                 : summary.isPending
                   ? "· loading…"
                   : "· no active trial"}

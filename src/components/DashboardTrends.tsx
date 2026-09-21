@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { today } from "@/lib/date";
 import { addDays, roundOut } from "@/lib/metrics";
+import type { OperatingCalendar } from "@/lib/operatingDays";
 
 const REFUSAL_ORDER = ["none_left", "trace", "about_25", "about_50", "most_left"] as const;
 type RefusalScore = (typeof REFUSAL_ORDER)[number];
@@ -45,6 +46,8 @@ type Props = {
   treatmentByPen: Map<string, string>;
   treatments: { id: string; label: string }[];
   breederPenIds: Set<string>;
+  /** The site's operating calendar — closed days never appear on an axis. */
+  calendar: OperatingCalendar;
 };
 
 /** Every date in the window, oldest first. */
@@ -70,7 +73,7 @@ function weekStart(d: string): string {
 const shortDate = (d: string) =>
   new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
-export default function DashboardTrends({ trialId, treatmentByPen, treatments, breederPenIds }: Props) {
+export default function DashboardTrends({ trialId, treatmentByPen, treatments, breederPenIds, calendar }: Props) {
   const [to, setTo] = useState(today());
   const [from, setFrom] = useState(addDays(today(), -13));
   const [treatmentFilter, setTreatmentFilter] = useState<string>("all");
@@ -99,7 +102,12 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
     },
   });
 
-  const days = useMemo(() => (rangeValid ? dateRange(from, to) : []), [from, to, rangeValid]);
+  // Operating days only — a closed day never appears on an axis, never plots
+  // a zero, and never counts toward a weekly mean or a days-outside count.
+  const days = useMemo(
+    () => (rangeValid ? dateRange(from, to).filter((d) => calendar.isOperating(d)) : []),
+    [from, to, rangeValid, calendar],
+  );
 
   /* ------------------------------------------------- refusal distribution */
 
