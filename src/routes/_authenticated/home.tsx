@@ -137,6 +137,10 @@ function HomePage() {
       advisories.push(`${breederExpected - breederAmPhotos} breeder pen morning photo(s) missing for ${yesterday}.`);
     const weighedPens = new Set(trialOnly(daily.data?.biomass ?? []).map((b) => b.pen_id)).size;
     if (expected > 0 && weighedPens < expected) advisories.push(`${expected - weighedPens} pen(s) have never been weighed.`);
+    // Weighings are the only source of growth data and a missed one cannot be
+    // recovered later, so overdue pens are always surfaced.
+    const overdueMsg = overdueAdvisory(scheduleRows);
+    if (overdueMsg) advisories.push(overdueMsg);
   }
 
   return (
