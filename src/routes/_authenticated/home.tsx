@@ -97,11 +97,33 @@ function HomePage() {
   const dayNumber = start ? daysBetween(start, t) + 1 : null;
   const acclimationDays = (trial.data?.acclimation_days as number | undefined) ?? 0;
   const inAcclimation = dayNumber != null && dayNumber <= acclimationDays;
-  const interval = (trial.data?.weighing_interval_days as number | undefined) ?? 7;
-  const elapsed = start ? daysBetween(start, t) : null;
-  const isWeighDay = elapsed != null && elapsed >= 0 && interval > 0 && elapsed % interval === 0;
-  const daysToWeigh =
-    elapsed != null && interval > 0 && !isWeighDay ? interval - (((elapsed % interval) + interval) % interval) : 0;
+  // Weighing runs pen by pen: each pen has its own interval, falling back to
+  // the trial's when it has none.
+  const startDateByPen = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of assignments.data ?? []) if (!m.has(a.pen_id)) m.set(a.pen_id, a.start_date);
+    return m;
+  }, [assignments.data]);
+
+  const scheduleRows = useMemo(
+    () =>
+      buildSchedule({
+        pens: (pens.data ?? []) as SchedulePen[],
+        trialInterval: trial.data?.weighing_interval_days,
+        startDateByPen,
+        events: daily.data?.biomass ?? [],
+        today: t,
+      }),
+    [pens.data, trial.data?.weighing_interval_days, startDateByPen, daily.data?.biomass, t],
+  );
+  const dueTodayCount = scheduleRows.filter((r) => r.dueToday).length;
+  const overdueCount = scheduleRows.filter((r) => r.overdueDays > 0).length;
+  const isWeighDay = dueTodayCount > 0 || overdueCount > 0;
+  const nextDueDate = scheduleRows
+    .map((r) => r.nextDue)
+    .filter((d): d is string => !!d && d > t)
+    .sort()[0] ?? null;
+  const daysToWeigh = nextDueDate ? daysBetween(t, nextDueDate) : null;
 
   const advisories: string[] = [];
   if (trial.data) {
