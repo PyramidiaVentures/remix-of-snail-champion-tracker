@@ -245,7 +245,7 @@ function WeighPage() {
         </div>
       )}
 
-      <Checklist storageKey={`weigh-checklist-${date}`} title="Weighing steps" items={WEIGH_STEPS} overrides={overrides} />
+      <Checklist trialId={trialId} date={date} session="weigh" title="Weighing steps" items={WEIGH_STEPS} overrides={overrides} />
 
       {!!siteId && !trial.isLoading && !trial.data && <NoActiveTrial siteName={siteName} />}
 
