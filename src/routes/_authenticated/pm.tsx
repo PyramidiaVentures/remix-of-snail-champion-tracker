@@ -166,29 +166,36 @@ function PmPage() {
   const rowFor = (penId: string) => (obs.data ?? []).find((o) => o.pen_id === penId);
   const photoUrlFor = (penId: string) => (photos.data ?? []).find((r) => r.pen_id === penId)?.photo_pm_url ?? null;
 
+  const photoSaved = (penId: string) =>
+    !!photoUrlFor(penId) || uploads.get(penPhotoKey(trialId ?? "", penId, date, "pm"))?.status === "saved";
+
   const missingFor = (penId: string) => {
     const row = rowFor(penId);
     const missing: string[] = [];
-    if (row?.offered_g == null) missing.push("grams offered");
+    // Breeder pens get no weighed portion, so grams offered is not asked for.
+    if (!isBreeder(penId) && row?.offered_g == null) missing.push("grams offered");
     if (!row?.dish_action) missing.push("dish action");
-    if (!photoUrlFor(penId) && uploads.get(penPhotoKey(trialId ?? "", penId, date, "pm"))?.status !== "saved") {
-      missing.push("PM photo");
-    }
+    if (!photoSaved(penId)) missing.push("PM photo");
     return missing;
   };
 
   const stateFor = (penId: string): PenCompletion => {
     if (uploads.get(penPhotoKey(trialId ?? "", penId, date, "pm"))?.status === "uploading") return "uploading";
     const missing = missingFor(penId);
+    const total = isBreeder(penId) ? 2 : 3;
     if (missing.length === 0) return "complete";
-    return missing.length === 3 ? "empty" : "partial";
+    return missing.length === total ? "empty" : "partial";
   };
 
-  const photosDone = trialPens.filter(
-    (p) => photoUrlFor(p.id) || uploads.get(penPhotoKey(trialId ?? "", p.id, date, "pm"))?.status === "saved",
-  ).length;
+  const countPhotos = (list: StepperPen[]) => list.filter((p) => photoSaved(p.id)).length;
+  const photosDone = countPhotos(trialPens);
   const photosNeeded = trialPens.length;
-  const allPhotos = photosNeeded > 0 && photosDone === photosNeeded;
+  const breederPhotosDone = countPhotos(breederPens);
+  const breederPhotosNeeded = breederPens.length;
+  const allPhotos =
+    photosNeeded + breederPhotosNeeded > 0 &&
+    photosDone === photosNeeded &&
+    breederPhotosDone === breederPhotosNeeded;
 
   const [checklistDone, setChecklistDone] = useState(0);
   const [checklistAll, setChecklistAll] = useState(false);
