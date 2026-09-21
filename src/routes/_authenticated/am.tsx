@@ -399,6 +399,8 @@ function AmPage() {
                   date={date}
                   welfareRow={welfareFor(pen.id)}
                   photoUrl={photoUrlFor(pen.id)}
+                  pmPhotoUrl={pmPhotoUrlFor(pen.id)}
+                  fedLabel={displayDate(date)}
                   sessionTemp={temp}
                   sessionHumidity={humidity}
                   penEvents={eventsForPenDate(pen.id)}
@@ -415,12 +417,15 @@ function AmPage() {
                 obsRow={obsFor(pen.id)}
                 welfareRow={welfareFor(pen.id)}
                 photoUrl={photoUrlFor(pen.id)}
+                pmPhotoUrl={pmPhotoUrlFor(pen.id)}
+                fedLabel={displayDate(date)}
                 sessionTemp={temp}
                 sessionHumidity={humidity}
                 penEvents={eventsForPenDate(pen.id)}
                 liveCountValue={liveCountFor(pen.id)}
                 onSaved={refresh}
               />
+
               )
             }
           />
