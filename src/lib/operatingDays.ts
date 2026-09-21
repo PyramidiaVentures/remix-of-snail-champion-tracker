@@ -131,6 +131,45 @@ export function useSiteCalendar() {
   return { calendar, closures: closures.data ?? [], closuresQuery: closures, weekly };
 }
 
+/**
+ * Calendars for every site, keyed by site id — used by Results and Export,
+ * which are not scoped to the header's site.
+ */
+export function useAllSiteCalendars() {
+  const sites = useQuery({
+    queryKey: ["all-site-calendars"],
+    queryFn: async () => {
+      const [s, c] = await Promise.all([
+        supabase.from("sites").select("id,non_operating_weekdays"),
+        supabase.from("site_closures").select("site_id,closure_date,reason"),
+      ]);
+      if (s.error) throw s.error;
+      if (c.error) throw c.error;
+      return { sites: s.data ?? [], closures: c.data ?? [] };
+    },
+  });
+
+  const bySite = useMemo(() => {
+    const map = new Map<string, OperatingCalendar>();
+    for (const site of sites.data?.sites ?? []) {
+      const closures = (sites.data?.closures ?? []).filter(
+        (c) => (c as { site_id: string }).site_id === site.id,
+      ) as Closure[];
+      map.set(
+        site.id,
+        makeCalendar((site as { non_operating_weekdays?: number[] }).non_operating_weekdays ?? [], closures),
+      );
+    }
+    return map;
+  }, [sites.data]);
+
+  const calendarFor = (siteId: string | null | undefined) =>
+    (siteId && bySite.get(siteId)) || ALWAYS_OPERATING;
+
+  return { calendarFor, bySite };
+}
+
+
 /** "Closed on Sundays" — the sentence used on the Field Guide and Trial screen. */
 export function operatingDaysSentence(cal: OperatingCalendar): string {
   const closed = cal.nonOperatingWeekdays;
