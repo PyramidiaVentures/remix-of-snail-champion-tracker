@@ -49,7 +49,7 @@ function ChipIcon({ state }: { state: PenCompletion }) {
   return <Circle className="h-3.5 w-3.5" />;
 }
 
-export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = "pen", summaryFooter }: Props) {
+export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = "pen", summaryFooter, summaryComplete }: Props) {
   // Stable order: trial pens first, then breeder pens, each by label —
   // matching the walk down the beds.
   const ordered = useMemo(
