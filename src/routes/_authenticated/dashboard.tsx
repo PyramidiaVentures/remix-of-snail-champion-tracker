@@ -204,7 +204,8 @@ function DashboardPage() {
     if (!photoFor(id)?.photo_am_url) miss.push("AM photo");
     return miss;
   };
-  const amTotal = (id: string) => 2;
+  // Trial pens: refusal score, activity and photo. Breeder pens: substrate and photo.
+  const amTotal = (id: string) => (isBreeder(id) ? 2 : 3);
 
   const pmComplete = (list: typeof allPens) => list.filter((p) => pmMissing(p.id).length === 0).length;
   const amComplete = (list: typeof allPens) => list.filter((p) => amMissing(p.id).length === 0).length;
