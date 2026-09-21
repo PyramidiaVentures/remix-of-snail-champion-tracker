@@ -575,6 +575,35 @@ function DashboardPage() {
             )}
           </section>
 
+          {/* 1b — IN PROGRESS */}
+          {!loading && inProgress.length > 0 && (
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide">In progress</h2>
+              <p className="text-xs text-muted-foreground">
+                {pmInProgress
+                  ? "This evening's feeding has not happened yet — nothing here is late."
+                  : "The morning check for this feeding happens this morning — nothing here is late."}
+              </p>
+              <ul className="divide-y divide-border text-sm">
+                {inProgress.map((e) => (
+                  <li key={e.key} className="py-2">
+                    <Link to={e.to!} search={e.penId ? { pen: e.penId } : { pen: "" }} className="flex items-start justify-between gap-3">
+                      <span>
+                        <span className="mr-2 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                          {e.group}
+                        </span>
+                        {e.text}
+                      </span>
+                      <span className="shrink-0 text-xs text-primary underline">open</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+
+
           {/* 2 — COMPLETENESS */}
           <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
