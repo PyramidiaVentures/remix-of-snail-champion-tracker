@@ -122,6 +122,7 @@ function PhotosPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/photos" });
   const { siteId, siteName } = useSiteScope();
+  const { calendar } = useSiteCalendar();
   const pens = useSitePens();
   const allPens = useMemo(() => pens.data ?? [], [pens.data]);
 
