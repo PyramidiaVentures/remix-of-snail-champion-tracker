@@ -231,3 +231,12 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
     </div>
   );
 }
+
+/** Marks a pen card as a breeder pen, outside the trial. */
+export function BreederBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      <Sprout className="h-3 w-3" /> Breeder pen
+    </span>
+  );
+}
