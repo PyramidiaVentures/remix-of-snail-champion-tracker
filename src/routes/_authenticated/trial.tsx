@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { Plus, Trash2, AlertTriangle, CheckCircle2, Lock } from "lucide-react";
 import { usePensWithData, TREATMENT_LOCK_MESSAGE } from "@/lib/penDataLock";
 import { useSiteFeeds, useSitePens, useSiteScope, useSiteTrials } from "@/lib/siteScope";
+import { buildSchedule, overdueAdvisory, type SchedulePen } from "@/lib/weighSchedule";
 
 
 import { today } from "@/lib/date";
@@ -32,6 +33,7 @@ type Pen = {
   label: string;
   initial_snail_count: number;
   area_m2: number | null;
+  weighing_interval_days?: number | null;
   /** Derived from population events; see @/lib/liveCount */
   live_count: number;
 };
