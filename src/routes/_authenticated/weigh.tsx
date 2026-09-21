@@ -279,7 +279,7 @@ function fmt(n: number, digits = 1) {
 }
 
 function PenCard({
-  trialId, pen, date, row, previous, ledger, onSaved,
+  trialId, pen, date, row, previous, ledger, schedule, onSaved,
 }: {
   trialId: string;
   pen: StepperPen;
@@ -287,6 +287,7 @@ function PenCard({
   row: BiomassRow | undefined;
   previous: BiomassRow | null;
   ledger: { count: number; hadAddition: boolean };
+  schedule: PenSchedule | null;
   onSaved: () => void;
 }) {
   const [state, setState] = useState<SaveState>("idle");
@@ -375,6 +376,27 @@ function PenCard({
         <div className="text-lg font-bold">{pen.label}</div>
         <StatusPill state={state === "idle" && row ? "saved" : state} />
       </div>
+
+      {schedule && (
+        <div
+          className={`rounded-lg border px-3 py-2 text-xs ${
+            schedule.overdueDays > 0
+              ? "border-destructive/40 bg-destructive/5 text-destructive"
+              : schedule.dueToday
+                ? "border-primary/40 bg-primary/5 text-primary"
+                : "border-border text-muted-foreground"
+          }`}
+        >
+          {schedule.overdueDays > 0
+            ? `Overdue by ${schedule.overdueDays} day${schedule.overdueDays === 1 ? "" : "s"}`
+            : schedule.dueToday
+              ? "Due today"
+              : schedule.nextDue
+                ? `Next due ${schedule.nextDue}`
+                : "No weighing schedule set"}
+          {schedule.isBaseline && schedule.nextDue ? " · baseline weighing" : ""}
+        </div>
+      )}
 
       <NumberField
         label="Live count"
