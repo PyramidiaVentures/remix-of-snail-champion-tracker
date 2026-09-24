@@ -3,9 +3,8 @@
  * Nothing here is persisted, so correcting an input or adding a dry-matter %
  * retroactively updates every figure.
  *
- * Headline conversion: "FCR (feed eaten)" — feed offered minus the weighed
- * leftover (corrected for water loss on the control feed), per kg gain.
- * Secondary: "Feed offered per kg gain" — never labelled FCR.
+ * Biological FCR: feed eaten per gain. Economic FCR: feed offered per gain.
+ * Biological FCR (dry matter): dry matter eaten per gain.
  *
  * Interval feed window: the team weighs BEFORE the evening feed, so an
  * interval from weighing A to weighing B counts feedings A <= obs_date < B.
@@ -151,8 +150,23 @@ export function observationBand(
   return null;
 }
 
-/** Minimum coverage of weighed leftovers before FCR (feed eaten) is shown. */
+/** Minimum coverage of weighed leftovers before Biological FCR is shown. */
 export const EATEN_COVERAGE_MIN = 0.9;
+
+/** Canonical user-facing metric names and their first-use explanations. */
+export const METRIC_LABELS = {
+  economicFcr: "Economic FCR",
+  biologicalFcr: "Biological FCR",
+  biologicalFcrDm: "Biological FCR (dry matter)",
+  sgr: "SGR (% body weight per day)",
+} as const;
+
+export const METRIC_EXPLANATIONS = {
+  economicFcr: "feed offered ÷ gain",
+  biologicalFcr: "feed eaten ÷ gain",
+  biologicalFcrDm: "dry matter eaten ÷ gain",
+  sgr: "daily percentage change in weight per snail",
+} as const;
 
 export interface MetricsInput {
   trial: { id: string; start_date: string; acclimation_days: number };
@@ -185,20 +199,25 @@ export interface IntervalMetrics {
   days: number;
   meanWeight1: number;
   meanWeight2: number;
+  growthPerSnail_g: number;
+  growthPerSnailPerDay_g: number;
   survivingCount: number;
   gain_g: number | null;
+  gainPerDay_g: number | null;
   offered_g: number;
+  offeredPerDay_g: number;
   /** kg feed offered (fresh) per kg gain — null when gain is not positive. */
   offeredPerKgGain: number | null;
   /** Sum of eaten_g over feedings with a weighed leftover. */
   eaten_g: number;
+  eatenPerDay_g: number;
   eatenDm_g: number | null;
   feedingDays: number;
   leftoverDays: number;
   leftoverCoverage: number | null;
-  /** FCR (feed eaten) — null when gain <= 0 or coverage < 90%. */
+  /** Biological FCR — null when gain <= 0 or coverage < 90%. */
   eatenPerKgGain: number | null;
-  /** FCR (dry matter eaten) — same rules; null also when dm_percent is missing. */
+  /** Biological FCR (dry matter) — same rules; null also when dm_percent is missing. */
   eatenDmPerKgGain: number | null;
   /** The pen's feed has no dm_percent. */
   dmMissing: boolean;
@@ -244,7 +263,7 @@ export interface TreatmentMetrics {
   eatenPerKgGain: number | null;
   eatenDmPerKgGain: number | null;
   dmMissing: boolean;
-  /** Pens with a complete FCR (feed eaten) / pens in the treatment. */
+  /** Pens with a complete Biological FCR / pens in the treatment. */
   eatenCompletePens: number;
   meanShareLeft: number | null;
   meanSgr: number | null;
@@ -429,6 +448,7 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
 
       const meanWeight1 = valid ? a.net_biomass_g / a.live_count : NaN;
       const meanWeight2 = valid ? b.net_biomass_g / b.live_count : NaN;
+      const growthPerSnail = meanWeight2 - meanWeight1;
       // Gain = change in MEAN weight × surviving count.
       const gain_g = valid ? (meanWeight2 - meanWeight1) * b.live_count : null;
 
@@ -460,11 +480,16 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
         days,
         meanWeight1,
         meanWeight2,
+        growthPerSnail_g: growthPerSnail,
+        growthPerSnailPerDay_g: growthPerSnail / days,
         survivingCount: b.live_count,
         gain_g,
+        gainPerDay_g: gain_g == null ? null : gain_g / days,
         offered_g: offered,
+        offeredPerDay_g: offered / days,
         offeredPerKgGain: perKg(offered, gain_g),
         eaten_g: eaten,
+        eatenPerDay_g: eaten / days,
         eatenDm_g: eatenDm,
         feedingDays,
         leftoverDays,
@@ -571,7 +596,7 @@ export function roundOut(v: number | null | undefined, dp: number): number | nul
   return Number(v.toFixed(dp));
 }
 
-/** Label for an incomplete FCR (feed eaten). */
+/** Label for an incomplete Biological FCR. */
 export function incompleteLabel(leftoverDays: number, feedingDays: number): string {
   return `incomplete (${leftoverDays} of ${feedingDays} days weighed)`;
 }

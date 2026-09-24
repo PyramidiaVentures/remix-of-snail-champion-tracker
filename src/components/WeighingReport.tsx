@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
 import {
   computeMetrics, incompleteLabel, meanOf, EATEN_COVERAGE_MIN,
+  METRIC_EXPLANATIONS, METRIC_LABELS,
   type IntervalMetrics, type MetricsInput,
 } from "@/lib/metrics";
 
@@ -16,7 +17,7 @@ type Row = {
 type Fig = { v: number | null; why?: string };
 
 function growth(iv: IntervalMetrics) {
-  return iv.meanWeight2 - iv.meanWeight1;
+  return iv.growthPerSnail_g;
 }
 function growthPct(iv: IntervalMetrics) {
   return iv.meanWeight1 > 0 ? (growth(iv) / iv.meanWeight1) * 100 : null;
@@ -32,21 +33,26 @@ const COLUMNS: { label: string; dp: number; get: (iv: IntervalMetrics) => Fig; f
   { label: "Weight/snail before (g)", dp: 2, get: (iv) => ({ v: iv.meanWeight1 }) },
   { label: "Weight/snail after (g)", dp: 2, get: (iv) => ({ v: iv.meanWeight2 }) },
   { label: "Growth/snail (g)", dp: 2, get: (iv) => ({ v: growth(iv) }) },
+  { label: "Growth/snail/day (g)", dp: 2, get: (iv) => ({ v: iv.growthPerSnailPerDay_g }) },
   { label: "Growth (%)", dp: 1, get: (iv) => ({ v: growthPct(iv) }) },
-  { label: "SGR (%/day)", dp: 2, get: (iv) => ({ v: iv.sgr, why: iv.sgr == null ? "not calculable" : undefined }) },
+  { label: METRIC_LABELS.sgr, dp: 2, get: (iv) => ({ v: iv.sgr, why: iv.sgr == null ? "not calculable" : undefined }) },
   { label: "Survival (%)", dp: 1, get: (iv) => ({ v: iv.survival }) },
+  { label: "Pen gain (g)", dp: 1, get: (iv) => ({ v: iv.gain_g }) },
+  { label: "Pen gain/day (g)", dp: 1, get: (iv) => ({ v: iv.gainPerDay_g }) },
   { label: "Feed offered (g)", dp: 0, get: (iv) => ({ v: iv.offered_g }) },
+  { label: "Feed offered/day (g)", dp: 1, get: (iv) => ({ v: iv.offeredPerDay_g }) },
   { label: "Feed eaten (g)", dp: 0, get: (iv) => ({ v: iv.leftoverDays > 0 ? iv.eaten_g : null, why: iv.leftoverDays > 0 ? undefined : "eaten not yet measured for this period" }) },
-  { label: "FCR (feed eaten)", dp: 2, get: (iv) => ({ v: iv.eatenPerKgGain, why: iv.eatenPerKgGain == null ? eatenWhy(iv) : undefined }) },
+  { label: "Feed eaten/day (g)", dp: 1, get: (iv) => ({ v: iv.leftoverDays > 0 ? iv.eatenPerDay_g : null, why: iv.leftoverDays > 0 ? undefined : "eaten not yet measured for this period" }) },
+  { label: METRIC_LABELS.economicFcr, dp: 2, get: (iv) => ({ v: iv.offeredPerKgGain, why: iv.offeredPerKgGain == null ? "no weight gain in this interval" : undefined }) },
+  { label: METRIC_LABELS.biologicalFcr, dp: 2, get: (iv) => ({ v: iv.eatenPerKgGain, why: iv.eatenPerKgGain == null ? eatenWhy(iv) : undefined }) },
   {
-    label: "FCR (dry matter eaten)", dp: 2,
+    label: METRIC_LABELS.biologicalFcrDm, dp: 2,
     get: (iv) => ({
       v: iv.eatenDmPerKgGain,
       why: iv.eatenDmPerKgGain != null ? undefined : iv.dmMissing ? "add dry-matter % in Setup" : eatenWhy(iv),
     }),
     flag: (v) => v < 1,
   },
-  { label: "Feed offered per kg gain", dp: 2, get: (iv) => ({ v: iv.offeredPerKgGain, why: iv.offeredPerKgGain == null ? "no weight gain in this interval" : undefined }) },
 ];
 
 function fmt(v: number, dp: number) {
@@ -68,11 +74,16 @@ function meanInterval(ivs: IntervalMetrics[]): IntervalMetrics | null {
     days: m((i) => i.days) ?? 0,
     meanWeight1: m((i) => i.meanWeight1) ?? 0,
     meanWeight2: m((i) => i.meanWeight2) ?? 0,
+    growthPerSnail_g: m((i) => i.growthPerSnail_g) ?? 0,
+    growthPerSnailPerDay_g: m((i) => i.growthPerSnailPerDay_g) ?? 0,
     sgr: m((i) => i.sgr),
     survival: m((i) => i.survival),
     offered_g: m((i) => i.offered_g) ?? 0,
+    offeredPerDay_g: m((i) => i.offeredPerDay_g) ?? 0,
     eaten_g: m((i) => i.eaten_g) ?? 0,
+    eatenPerDay_g: m((i) => i.eatenPerDay_g) ?? 0,
     gain_g: m((i) => i.gain_g),
+    gainPerDay_g: m((i) => i.gainPerDay_g),
     feedingDays: ivs.reduce((s, i) => s + i.feedingDays, 0),
     leftoverDays: ivs.reduce((s, i) => s + i.leftoverDays, 0),
     leftoverCoverage: m((i) => i.leftoverCoverage),
@@ -97,6 +108,7 @@ export function WeighingReport({
   const tLabel = new Map((input?.treatments ?? []).map((t) => [t.id, t.label]));
 
   const rows: Row[] = [];
+  const headlines: { key: string; label: string; interval: IntervalMetrics }[] = [];
   for (const t of metrics?.treatments ?? []) {
     const penRows: Row[] = [];
     for (const p of t.pens) {
@@ -108,11 +120,13 @@ export function WeighingReport({
     if (penRows.length === 0) continue;
     rows.push(...penRows);
     const prevs = penRows.map((r) => r.prev).filter((x): x is IntervalMetrics => !!x);
+    const treatmentMean = meanInterval(penRows.map((r) => r.cur!));
+    if (treatmentMean) headlines.push({ key: t.treatmentId, label: t.label, interval: treatmentMean });
     rows.push({
       key: `mean-${t.treatmentId}`,
       label: `${tLabel.get(t.treatmentId) ?? t.label} — mean`,
       treatment: t.label,
-      cur: meanInterval(penRows.map((r) => r.cur!)),
+      cur: treatmentMean,
       prev: prevs.length === penRows.length ? meanInterval(prevs) : null,
       isMean: true,
     });
@@ -132,7 +146,20 @@ export function WeighingReport({
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No pen has a completed interval ending on this date.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+          <div className="space-y-3">
+            {headlines.map((h) => (
+              <div key={h.key} className="rounded-lg border border-border p-3">
+                <h3 className="mb-2 text-sm font-semibold">{h.label}</h3>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <Headline label={METRIC_LABELS.economicFcr} explanation={METRIC_EXPLANATIONS.economicFcr} value={h.interval.offeredPerKgGain} />
+                  <Headline label={METRIC_LABELS.biologicalFcr} explanation={METRIC_EXPLANATIONS.biologicalFcr} value={h.interval.eatenPerKgGain} fallback={eatenWhy(h.interval)} />
+                  <Headline label={METRIC_LABELS.sgr} explanation={METRIC_EXPLANATIONS.sgr} value={h.interval.sgr} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-muted-foreground">
@@ -175,8 +202,19 @@ export function WeighingReport({
             </tbody>
           </table>
           <p className="mt-1 text-[10px] text-muted-foreground">Arrows compare with the same pen's previous interval.</p>
-        </div>
+          </div>
+        </>
       )}
     </section>
+  );
+}
+
+function Headline({ label, explanation, value, fallback }: { label: string; explanation: string; value: number | null; fallback?: string }) {
+  return (
+    <div className="min-w-0 rounded-lg bg-muted/50 p-2">
+      <div className="text-lg font-semibold tabular-nums">{value == null ? <span className="text-xs font-normal text-muted-foreground">{fallback ?? "—"}</span> : fmt(value, 2)}</div>
+      <div className="text-[11px] font-medium leading-tight">{label}</div>
+      <div className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{explanation}</div>
+    </div>
   );
 }
