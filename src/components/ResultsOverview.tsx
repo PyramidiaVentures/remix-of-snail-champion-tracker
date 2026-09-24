@@ -225,8 +225,8 @@ export function ResultsOverview(p: ResultsOverviewProps) {
           </Card>
 
           <WeightChart metrics={metrics} groups={groups} colorOf={colorOf} date={p.date} next={p.nextWeighing} b={sgrB} />
-          <FcrChart kind="bio" metrics={metrics} colorOf={colorOf} date={p.date} next={p.nextWeighing} b={bfcrB} />
-          <FcrChart kind="eco" metrics={metrics} colorOf={colorOf} date={p.date} next={p.nextWeighing} b={null} />
+          <FcrChart kind="bio" metrics={metrics} groups={groups} colorOf={colorOf} date={p.date} next={p.nextWeighing} b={bfcrB} />
+          <FcrChart kind="eco" metrics={metrics} groups={groups} colorOf={colorOf} date={p.date} next={p.nextWeighing} b={null} />
           <PortionsOverview
             treatments={groups.map((g) => ({ id: g.t.treatmentId, label: g.t.label, penIds: g.t.pens.map((x) => x.penId) }))}
             colorOf={colorOf}
@@ -335,12 +335,13 @@ function ChartTip({ active, payload, label, b }: { active?: boolean; payload?: {
   );
 }
 
-function WeightChart({ metrics, groups, colorOf, date, next, b }: { metrics: Metrics; groups: Group[]; colorOf: (id: string) => string; date: string; next: string | null; b: Benchmark | null }) {
+function WeightChart({ groups, colorOf, date, next, b }: { metrics?: Metrics; groups: Group[]; colorOf: (id: string) => string; date: string; next: string | null; b: Benchmark | null }) {
   const data = useMemo(() => {
-    const dates = Array.from(new Set(metrics.pens.flatMap((p) => p.weightSeries.map((w) => w.date)))).filter((d) => d <= date).sort();
+    const pens = groups.flatMap((g) => g.t.pens);
+    const dates = Array.from(new Set(pens.flatMap((p) => p.weightSeries.map((w) => w.date)))).filter((d) => d <= date).sort();
     if (!dates.length) return { rows: [], start: null as string | null, w0: null as number | null };
     const start = dates[0]!;
-    const w0 = meanOf(metrics.pens.map((p) => p.weightSeries.find((w) => w.date === start)?.meanWeight));
+    const w0 = meanOf(pens.map((p) => p.weightSeries.find((w) => w.date === start)?.meanWeight));
     const xs = [...dates];
     if (next && next > date) xs.push(next);
     const rows = xs.map((d) => {
@@ -356,7 +357,7 @@ function WeightChart({ metrics, groups, colorOf, date, next, b }: { metrics: Met
       return row;
     });
     return { rows, start, w0 };
-  }, [metrics, groups, date, next, b]);
+  }, [groups, date, next, b]);
 
   const ours = groups.map((g) => ({ g, v: data.rows.find((r) => r["x"] === ms(date))?.[g.t.treatmentId] as number | null }));
   const litAtDate = data.rows.find((r) => r["x"] === ms(date))?.["lit"] as number | undefined;
@@ -389,15 +390,15 @@ function WeightChart({ metrics, groups, colorOf, date, next, b }: { metrics: Met
   );
 }
 
-function FcrChart({ kind, metrics, colorOf, date, next, b }: { kind: "bio" | "eco"; metrics: Metrics; colorOf: (id: string) => string; date: string; next: string | null; b: Benchmark | null }) {
+function FcrChart({ kind, metrics, groups, colorOf, date, next, b }: { kind: "bio" | "eco"; metrics: Metrics; groups: Group[]; colorOf: (id: string) => string; date: string; next: string | null; b: Benchmark | null }) {
   const { rows, any } = useMemo(() => {
-    const ends = Array.from(new Set(metrics.pens.flatMap((p) => p.intervals.map((i) => i.to)))).filter((d) => d <= date).sort();
+    const ends = Array.from(new Set(groups.flatMap((g) => g.t.pens).flatMap((p) => p.intervals.map((i) => i.to)))).filter((d) => d <= date).sort();
     const xs = [...ends];
     if (next && next > date) xs.push(next);
     let any = false;
     const rows = xs.map((d) => {
       const row: Record<string, number | [number, number] | null> = { x: ms(d) };
-      for (const t of metrics.treatments) {
+      for (const { t } of groups) {
         const ivs = t.pens.map((p) => p.intervals.find((i) => i.to === d)).filter((i): i is IntervalMetrics => !!i);
         const pooled = ivs.length ? pooledFcr(ivs) : null;
         const v = pooled ? (kind === "bio" ? pooled.biologicalFcrDm : pooled.economicFcr) : null;
@@ -409,7 +410,7 @@ function FcrChart({ kind, metrics, colorOf, date, next, b }: { kind: "bio" | "ec
     });
     // A band needs width: pad a single date on both sides.
     return { rows, any };
-  }, [metrics, date, next, kind, b]);
+  }, [groups, date, next, kind, b]);
 
   const title = kind === "bio" ? "Biological FCR (dry matter) per weighing" : "Economic FCR per weighing";
   const sub = kind === "bio" ? "Dry feed eaten per g gained. Lower is better." : "Feed offered per g gained. Lower is better.";
@@ -419,7 +420,7 @@ function FcrChart({ kind, metrics, colorOf, date, next, b }: { kind: "bio" | "ec
 
   return (
     <Card title={title} sub={sub}>
-      <Legend items={metrics.treatments.map((t) => ({ label: t.label, color: colorOf(t.treatmentId) }))} />
+      <Legend items={groups.map(({ t }) => ({ label: t.label, color: colorOf(t.treatmentId) }))} />
       <div className="relative h-48">
         <ResponsiveContainer>
           <ComposedChart data={rows} margin={{ top: 10, right: 12, left: -12, bottom: 0 }}>
@@ -428,7 +429,7 @@ function FcrChart({ kind, metrics, colorOf, date, next, b }: { kind: "bio" | "ec
             <YAxis tick={{ fontSize: 10 }} domain={[0, (max: number) => Math.max(Math.ceil(max * 1.2), b ? Math.ceil(b.high * 1.4) : 5)]} width={40} />
             <Tooltip content={<ChartTip b={b} />} />
             {b && <Area dataKey="band" name={`Literature range ${f(b.low, 1)}–${f(b.high, 1)}`} stroke="none" fill={LIT_BAND} fillOpacity={0.9} isAnimationActive={false} />}
-            {metrics.treatments.map((t) => (
+            {groups.map(({ t }) => (
               <Line key={t.treatmentId} dataKey={t.treatmentId} name={t.label} stroke={colorOf(t.treatmentId)} strokeWidth={2} connectNulls dot={{ r: 4, fill: colorOf(t.treatmentId) }} isAnimationActive={false} />
             ))}
           </ComposedChart>
