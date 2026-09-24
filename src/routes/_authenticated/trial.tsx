@@ -192,6 +192,7 @@ function TrialPage() {
       <OperatingDaysEditor />
 
       {current && <WaterLossTest trial={current} feeds={feeds.data ?? []} onSaved={invalidate} />}
+      {current && <TargetLeftBand trial={current} onSaved={invalidate} />}
 
       <DesignIntegrityPanel
         pens={penList}
@@ -1285,6 +1286,57 @@ function WaterLossTest({
         />
       </label>
       <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm">{summary}</p>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </section>
+  );
+}
+
+/** Target share left in the dish — drives the evening portion suggestion. */
+function TargetLeftBand({ trial, onSaved }: { trial: Trial; onSaved: () => void }) {
+  const t = trial as Trial & { target_left_min_pct: number; target_left_max_pct: number };
+  const [error, setError] = useState<string | null>(null);
+  const save = async (patch: Record<string, number>) => {
+    setError(null);
+    const { error: e } = await supabase.from("trials").update(patch as never).eq("id", t.id);
+    if (e) setError("Could not save. Try again.");
+    onSaved();
+  };
+  const field = (label: string, key: "target_left_min_pct" | "target_left_max_pct") => (
+    <label className="block">
+      <span className="text-sm font-medium">{label}</span>
+      <input
+        key={`${key}-${t[key]}`}
+        type="number"
+        inputMode="decimal"
+        step="0.5"
+        min="0"
+        max="100"
+        defaultValue={t[key]}
+        onBlur={(e) => {
+          const v = Number(e.currentTarget.value);
+          const other = key === "target_left_min_pct" ? Number(t.target_left_max_pct) : Number(t.target_left_min_pct);
+          const ok = key === "target_left_min_pct" ? v <= other : v >= other;
+          if (!Number.isFinite(v) || v < 0 || v >= 100 || !ok) {
+            setError("Minimum must be at or below maximum, both between 0 and 100.");
+            return;
+          }
+          if (v !== Number(t[key])) void save({ [key]: v });
+        }}
+        className="num-input mt-1"
+      />
+    </label>
+  );
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
+      <h2 className="font-semibold">Target leftover</h2>
+      <p className="text-xs text-muted-foreground">
+        The share of the portion you want left in the dish. The evening feed suggests portions aiming for the middle
+        of this band.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        {field("Minimum (%)", "target_left_min_pct")}
+        {field("Maximum (%)", "target_left_max_pct")}
+      </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
     </section>
   );
