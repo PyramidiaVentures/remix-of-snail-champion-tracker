@@ -13,27 +13,14 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 import { today } from "@/lib/date";
-import { addDays, roundOut } from "@/lib/metrics";
+import { addDays, roundOut, makeRetention, observationBand, SHARE_BANDS, type ShareBand } from "@/lib/metrics";
+import { retentionContext } from "@/lib/retention";
 import type { OperatingCalendar } from "@/lib/operatingDays";
 
-const REFUSAL_ORDER = ["none_left", "trace", "about_25", "about_50", "most_left"] as const;
-type RefusalScore = (typeof REFUSAL_ORDER)[number];
-
-const REFUSAL_LABEL: Record<RefusalScore, string> = {
-  none_left: "None left",
-  trace: "Trace",
-  about_25: "About 25%",
-  about_50: "About 50%",
-  most_left: "Most left",
-};
-
-const REFUSAL_MEANING: Record<RefusalScore, string> = {
-  none_left: "Dishes emptied — a rising line means the snails may be feed-limited, consider larger portions.",
-  trace: "Almost all eaten — portions are close to right.",
-  about_25: "A quarter left — portions are slightly generous.",
-  about_50: "Half left — portions are generous.",
-  most_left: "Most left — a rising line means cut portions.",
-};
+type Band = ShareBand;
+const BAND_ORDER = SHARE_BANDS.map((b) => b.key);
+const BAND_LABEL = Object.fromEntries(SHARE_BANDS.map((b) => [b.key, b.label])) as Record<Band, string>;
+const BAND_MEANING = Object.fromEntries(SHARE_BANDS.map((b) => [b.key, b.meaning])) as Record<Band, string>;
 
 const TEMP_MIN = 25;
 const TEMP_MAX = 30;
@@ -48,6 +35,8 @@ type Props = {
   breederPenIds: Set<string>;
   /** The site's operating calendar — closed days never appear on an axis. */
   calendar: OperatingCalendar;
+  /** The trial's control feed — leftovers of this feed are corrected for water loss. */
+  controlFeedId?: string | null;
 };
 
 /** Every date in the window, oldest first. */
@@ -73,7 +62,7 @@ function weekStart(d: string): string {
 const shortDate = (d: string) =>
   new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
-export default function DashboardTrends({ trialId, treatmentByPen, treatments, breederPenIds, calendar }: Props) {
+export default function DashboardTrends({ trialId, treatmentByPen, treatments, breederPenIds, calendar, controlFeedId }: Props) {
   const [to, setTo] = useState(today());
   const [from, setFrom] = useState(addDays(today(), -13));
   const [treatmentFilter, setTreatmentFilter] = useState<string>("all");
@@ -84,10 +73,10 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
     queryKey: ["dash-trends", trialId, from, to],
     enabled: !!trialId && rangeValid,
     queryFn: async () => {
-      const [obs, welfare] = await Promise.all([
+      const [obs, welfare, controls] = await Promise.all([
         supabase
           .from("observations")
-          .select("pen_id,obs_date,refusal_score")
+          .select("pen_id,feed_id,obs_date,offered_g,leftover_g,refusal_score")
           .eq("trial_id", trialId!)
           .gte("obs_date", from)
           .lte("obs_date", to),
@@ -97,8 +86,12 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
           .eq("trial_id", trialId!)
           .gte("obs_date", from)
           .lte("obs_date", to),
+        supabase
+          .from("moisture_controls")
+          .select("obs_date,offered_g,remaining_g,feed_id")
+          .eq("trial_id", trialId!),
       ]);
-      return { obs: obs.data ?? [], welfare: welfare.data ?? [] };
+      return { obs: obs.data ?? [], welfare: welfare.data ?? [], controls: controls.data ?? [] };
     },
   });
 
@@ -117,21 +110,31 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
       if (treatmentFilter === "all") return true;
       return treatmentByPen.get(o.pen_id) === treatmentFilter;
     });
-    const byScore: Record<RefusalScore, { date: string; pens: number }[]> = {
-      none_left: [], trace: [], about_25: [], about_50: [], most_left: [],
-    };
-    for (const score of REFUSAL_ORDER) {
-      byScore[score] = days.map((day) => ({
-        date: day,
-        pens: rows.filter((o) => o.obs_date === day && o.refusal_score === score).length,
-      }));
+    const retentionFor = makeRetention(
+      retentionContext(
+        controlFeedId,
+        (trends.data?.controls ?? [])
+          .filter((c) => c.feed_id === controlFeedId)
+          .map((c) => ({ obs_date: c.obs_date, offered_g: Number(c.offered_g), remaining_g: c.remaining_g == null ? null : Number(c.remaining_g) })),
+        calendar,
+      ),
+    );
+    const banded = rows
+      .map((o) => ({ o, b: observationBand(o, retentionFor) }))
+      .filter((x) => x.b != null);
+    const byScore = {} as Record<Band, { date: string; pens: number; visual: number }[]>;
+    for (const band of BAND_ORDER) {
+      byScore[band] = days.map((day) => {
+        const hits = banded.filter((x) => x.o.obs_date === day && x.b!.band === band);
+        return { date: day, pens: hits.length, visual: hits.filter((x) => x.b!.visual).length };
+      });
     }
     return byScore;
-  }, [trends.data?.obs, days, treatmentFilter, treatmentByPen, breederPenIds]);
+  }, [trends.data?.obs, trends.data?.controls, controlFeedId, calendar, days, treatmentFilter, treatmentByPen, breederPenIds]);
 
   const refusalMax = useMemo(() => {
     let max = 0;
-    for (const score of REFUSAL_ORDER)
+    for (const score of BAND_ORDER)
       for (const p of refusalSeries[score]) if (p.pens > max) max = p.pens;
     return Math.max(max, 1);
   }, [refusalSeries]);
@@ -262,12 +265,12 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
               </label>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              {REFUSAL_ORDER.map((score) => (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              {BAND_ORDER.map((score) => (
                 <div key={score} className="rounded-xl border border-border p-2">
-                  <div className="text-xs font-semibold">{REFUSAL_LABEL[score]}</div>
+                  <div className="text-xs font-semibold">{BAND_LABEL[score]}</div>
                   <div className="mb-1 text-[10px] leading-tight text-muted-foreground">
-                    {REFUSAL_MEANING[score]}
+                    {BAND_MEANING[score]}
                   </div>
                   <div className="h-36">
                     <ResponsiveContainer width="100%" height="100%">
@@ -289,7 +292,10 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
                         />
                         <Tooltip
                           labelFormatter={(v) => shortDate(String(v))}
-                          formatter={(v) => [`${v} pens`, REFUSAL_LABEL[score]]}
+                          formatter={(v, _n, item) => {
+                            const visual = (item?.payload as { visual?: number } | undefined)?.visual ?? 0;
+                            return [`${v} pens${visual ? ` (${visual} visual estimate)` : ""}`, BAND_LABEL[score]];
+                          }}
                         />
                         <Line
                           type="monotone"
