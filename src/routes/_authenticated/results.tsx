@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { retentionContext } from "@/lib/retention";
 import {
-  computeMetrics, daysBetween, intervalExtras, meanOf, addDays, incompleteLabel,
+  computeMetrics, daysBetween, intervalExtras, meanOf, addDays, incompleteLabel, makeRetention,
   type PenMetrics, type TrialMetrics,
 } from "@/lib/metrics";
 import { readIncludeAcclimation } from "@/lib/acclimation";
@@ -389,6 +389,17 @@ function ResultsPage() {
       )}
 
       {metrics && <SummaryTable metrics={metrics} />}
+      {metrics && trial.data?.control_feed_id && (
+        <p className="text-xs text-muted-foreground">
+          Water-loss correction for {(feeds.data ?? []).find((f) => f.id === trial.data?.control_feed_id)?.name ?? "the control feed"}:{" "}
+          {(() => {
+            const r = makeRetention(retention)(trial.data?.control_feed_id, rangeEnd ?? "");
+            return r.status === "not tested"
+              ? "not tested — leftovers are not corrected."
+              : `${r.status}, ${(r.retentionNight * 100).toFixed(1)}% of weight kept per night. Every observation's status is in the observations export.`;
+          })()}
+        </p>
+      )}
     </div>
   );
 }
