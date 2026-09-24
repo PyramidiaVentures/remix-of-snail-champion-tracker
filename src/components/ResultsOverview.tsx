@@ -312,7 +312,7 @@ function Source({ b, fallback }: { b: Benchmark | null; fallback: string }) {
 }
 
 type Metrics = ReturnType<typeof computeMetrics>;
-type Group = { t: Metrics["treatments"][number] };
+type Group = { t: Metrics["treatments"][number]; rows: { pen: Metrics["pens"][number] }[] };
 
 function ChartTip({ active, payload, label, b }: { active?: boolean; payload?: { name?: string; value?: unknown; color?: string; payload?: Record<string, unknown> }[]; label?: number | string; b?: Benchmark | null }) {
   if (!active || !payload?.length) return null;
@@ -337,7 +337,8 @@ function ChartTip({ active, payload, label, b }: { active?: boolean; payload?: {
 
 function WeightChart({ groups, colorOf, date, next, b }: { metrics?: Metrics; groups: Group[]; colorOf: (id: string) => string; date: string; next: string | null; b: Benchmark | null }) {
   const data = useMemo(() => {
-    const pens = groups.flatMap((g) => g.t.pens);
+    // Only the pens reported for this weighing, so the start matches the Growth table.
+    const pens = groups.flatMap((g) => g.rows.map((r) => r.pen));
     const dates = Array.from(new Set(pens.flatMap((p) => p.weightSeries.map((w) => w.date)))).filter((d) => d <= date).sort();
     if (!dates.length) return { rows: [], start: null as string | null, w0: null as number | null };
     const start = dates[0]!;
@@ -347,7 +348,7 @@ function WeightChart({ groups, colorOf, date, next, b }: { metrics?: Metrics; gr
     const rows = xs.map((d) => {
       const row: Record<string, number | [number, number] | null> = { x: ms(d) };
       for (const g of groups) {
-        row[g.t.treatmentId] = d <= date ? meanOf(g.t.pens.map((p) => p.weightSeries.find((w) => w.date === d)?.meanWeight)) : null;
+        row[g.t.treatmentId] = d <= date ? meanOf(g.rows.map((r) => r.pen).map((p) => p.weightSeries.find((w) => w.date === d)?.meanWeight)) : null;
       }
       if (b && w0 != null) {
         const n = daysBetween(start, d);
@@ -399,7 +400,7 @@ function FcrChart({ kind, metrics, groups, colorOf, date, next, b }: { kind: "bi
     const rows = xs.map((d) => {
       const row: Record<string, number | [number, number] | null> = { x: ms(d) };
       for (const { t } of groups) {
-        const ivs = t.pens.map((p) => p.intervals.find((i) => i.to === d)).filter((i): i is IntervalMetrics => !!i);
+        const ivs = groups.find((g) => g.t.treatmentId === t.treatmentId)!.rows.map((r) => r.pen).map((p) => p.intervals.find((i) => i.to === d)).filter((i): i is IntervalMetrics => !!i);
         const pooled = ivs.length ? pooledFcr(ivs) : null;
         const v = pooled ? (kind === "bio" ? pooled.biologicalFcrDm : pooled.economicFcr) : null;
         if (v != null) any = true;
