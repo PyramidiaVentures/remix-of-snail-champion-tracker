@@ -35,16 +35,7 @@ const DISH_ACTIONS: { value: DishAction; label: string }[] = [
   { value: "emptied_spoiled", label: "Emptied — spoiled" },
 ];
 
-const PM_STEPS = [
-  "Cut/collect every feed fresh today — no overnight leaves (bran/dry goods exempt).",
-  "Check each dish against the discard criteria. If the remaining feed is sound, top up. If it fails any criterion, empty and clean the dish first.",
-  "Weigh the portion for each pen and enter grams offered.",
-  "Record the dish action: topped up, emptied and refilled, or emptied because spoiled.",
-  "Place feed in each pen, rotating the dish position from yesterday.",
-  "Top up calcium and water dishes (never weighed, always present).",
-  "Upload one PM photo per pen, dish and paper tag in frame.",
-];
-const PM_PHOTO_STEP_INDEX = 6;
+import { PM_STEPS, PM_PHOTO_STEP_INDEX, PM_CONTROL_STEP_INDEX } from "@/lib/dayExceptions";
 
 type SaveState = "idle" | "saving" | "saved" | "failed";
 
@@ -120,6 +111,10 @@ function PmPage() {
       (await supabase.from("session_photos").select("pen_id,photo_pm_url").eq("trial_id", trialId!).eq("obs_date", date)).data ?? [],
   });
 
+  const controlOn = !!trial.data?.control_active && !!trial.data?.control_feed_id;
+  const controlFeedName =
+    (feeds.data ?? []).find((f) => f.id === trial.data?.control_feed_id)?.name ?? "the control feed";
+
   const feedByPen = useMemo(() => {
     const treatmentById = new Map((treatments.data ?? []).map((t) => [t.id, t]));
     const feedById = new Map((feeds.data ?? []).map((f) => [f.id, f]));
@@ -182,7 +177,8 @@ function PmPage() {
     const missing: string[] = [];
     // Breeder pens get no weighed portion, so grams offered is not asked for.
     if (!isBreeder(penId) && row?.offered_g == null) missing.push("grams offered");
-    if (!row?.dish_action) missing.push("dish action");
+    // Trial-pen dishes are emptied and cleaned every morning; only breeders record a dish action.
+    if (isBreeder(penId) && !row?.dish_action) missing.push("dish action");
     if (!photoSaved(penId)) missing.push("PM photo");
     return missing;
   };
@@ -190,7 +186,7 @@ function PmPage() {
   const stateFor = (penId: string): PenCompletion => {
     if (uploads.get(penPhotoKey(trialId ?? "", penId, date, "pm"))?.status === "uploading") return "uploading";
     const missing = missingFor(penId);
-    const total = isBreeder(penId) ? 2 : 3;
+    const total = 2;
     if (missing.length === 0) return "complete";
     return missing.length === total ? "empty" : "partial";
   };
@@ -224,7 +220,9 @@ function PmPage() {
                 ? ` · ${breederPhotosDone} of ${breederPhotosNeeded} breeder pen photos uploaded.`
                 : "."),
         }
-      : undefined,
+      : i === PM_CONTROL_STEP_INDEX && !controlOn
+        ? { forced: true, locked: true, subtitle: "No water-loss test running — nothing to do." }
+        : undefined,
   );
 
   const refresh = () => {
@@ -273,6 +271,13 @@ function PmPage() {
           paramName="pen"
           summaryComplete={sessionCompleted}
           summaryFooter={
+            <>
+            {controlOn && (
+              <p className="rounded-lg border border-dashed border-primary/60 bg-primary/5 px-3 py-2 text-sm">
+                Put {Number(trial.data.control_portion_g)} g of {controlFeedName} in the control dish: same dish type,
+                covered box, no snails, same room.
+              </p>
+            )}
             <SessionCompleteButton
               label="Complete PM Feed"
               session="pm"
@@ -284,6 +289,7 @@ function PmPage() {
                 checklistAll
               }
             />
+            </>
           }
           renderPen={(pen) =>
             pen.role === "breeder" ? (
@@ -304,7 +310,6 @@ function PmPage() {
                 feed={feedByPen.get(pen.id)!}
                 date={date}
                 row={rowFor(pen.id)}
-                carryOver={carryOverByPen.get(pen.id) ?? 0}
                 photoUrl={photoUrlFor(pen.id)}
                 onSaved={refresh}
               />
@@ -329,7 +334,6 @@ function PenCard({
   feed,
   date,
   row,
-  carryOver,
   photoUrl,
   onSaved,
 }: {
@@ -338,14 +342,10 @@ function PenCard({
   feed: { feed_id: string; name: string };
   date: string;
   row: ObsRow | undefined;
-  carryOver: number;
   photoUrl: string | null;
   onSaved: () => void;
 }) {
   const [offeredState, setOfferedState] = useState<SaveState>("idle");
-  const [actionState, setActionState] = useState<SaveState>("idle");
-  const [action, setAction] = useState<DishAction | null>(row?.dish_action ?? null);
-
   const isAcclimation =
     trial.acclimation_days > 0 && date < addDays(trial.start_date, trial.acclimation_days);
 
@@ -378,11 +378,7 @@ function PenCard({
         <div className="text-sm text-muted-foreground">
           Assigned feed: <span className="font-medium text-foreground">{feed.name}</span>
         </div>
-        <div className={`mt-1 text-xs ${carryOver > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
-          {carryOver === 0
-            ? "Fresh dish"
-            : `${carryOver} day${carryOver === 1 ? "" : "s"} since the dish was last emptied — check against the discard criteria`}
-        </div>
+        <div className="mt-1 text-xs text-muted-foreground">Clean dish — emptied and cleaned at the morning check.</div>
 
       </div>
 
@@ -401,30 +397,6 @@ function PenCard({
             if (v !== "") void saveField({ offered_g: Number(v) }, setOfferedState);
           }}
         />
-      </div>
-
-      <div className="space-y-1">
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm font-medium">Dish action</span>
-          <StatusPill state={actionState === "idle" && row?.dish_action ? "saved" : actionState} />
-        </div>
-        <div className="grid grid-cols-1 gap-2">
-          {DISH_ACTIONS.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              onClick={() => {
-                setAction(o.value);
-                void saveField({ dish_action: o.value }, setActionState);
-              }}
-              className={`rounded-xl border py-3 text-sm font-medium ${
-                action === o.value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"
-              }`}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       <PenPhotoSlot
