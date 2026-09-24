@@ -307,7 +307,7 @@ function ResultsPage() {
 
         <button
           type="button"
-          onClick={() => navigate({ search: { pen: "", from: "", to: "", hide: "", hs: "" }, replace: true })}
+          onClick={() => navigate({ search: { pen: "", from: "", to: "", hide: "", hs: "", weighing: search.weighing }, replace: true })}
           className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium"
         >
           Reset view
