@@ -10,6 +10,7 @@ const out = (v: number | null | undefined, dp: number): number | "" => roundOut(
 import { liveCount } from "@/lib/liveCount";
 import { readIncludeAcclimation } from "@/lib/acclimation";
 import { today } from "@/lib/date";
+import { useSiteScope, useSiteTrial } from "@/lib/siteScope";
 
 export const Route = createFileRoute("/_authenticated/export")({
   component: ExportPage,
@@ -82,10 +83,10 @@ const DESCRIPTIONS: Record<ExportName, string> = {
   population_events: "+ pen label",
   welfare_checks: "+ pen label, flags as a list",
   session_photos: "all columns",
-  interval_summary: "computed analysis sheet",
+  interval_summary: "computed analysis sheet — selected site's active trial",
 };
 
-async function buildRows(name: ExportName): Promise<Row[]> {
+async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]> {
   const [pens, feeds, trials, treatments, assignments, popEvents, sites] = await Promise.all([
     all("pens"), all("feeds"), all("trials"), all("treatments"), all("pen_assignments"), all("population_events"),
     all("sites"),
@@ -196,8 +197,11 @@ async function buildRows(name: ExportName): Promise<Row[]> {
       });
     }
     case "interval_summary": {
-      const trial = trials.find((t) => t['status'] === "active") ?? null;
+      // The active trial of the site selected in the header — never another site's.
+      const trial = trials.find((t) => t['status'] === "active" && t['site_id'] === siteId) ?? null;
       if (!trial) return [];
+      const trialSiteName = siteName.get(trial['site_id'] as string) ?? "";
+      const trialName = (trial['name'] as string) ?? "";
       const trialId = trial['id'] as string;
       // Closed days are not expected to carry a feeding, so they never count
       // as a missing feeding day.
@@ -271,6 +275,8 @@ async function buildRows(name: ExportName): Promise<Row[]> {
           const extras = intervalExtras(iv, penObs, dateIncluded, calendar.isOperating);
           const usable = iv.gain_g != null && iv.gain_g > 0;
           rows.push({
+            site_name: trialSiteName,
+            trial_name: trialName,
             pen_label: pen.label,
             treatment_label: treatment?.label ?? "",
             feed_name: treatment ? feedName.get(treatmentFeed.get(treatment.id) ?? "") ?? "" : "",
@@ -306,12 +312,18 @@ async function buildRows(name: ExportName): Promise<Row[]> {
 function ExportPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { siteId, siteName } = useSiteScope();
+  const siteTrial = useSiteTrial();
 
   const run = async (name: ExportName) => {
     setBusy(name);
     setError(null);
     try {
-      const rows = await buildRows(name);
+      if (name === "interval_summary" && !siteTrial.data) {
+        setError(`No active trial at ${siteName || "this site"}`);
+        return;
+      }
+      const rows = await buildRows(name, siteId);
       downloadCsv(fileFor(name), toCsv(rows));
     } catch (e) {
       console.error(`Export ${name} failed`, e);
