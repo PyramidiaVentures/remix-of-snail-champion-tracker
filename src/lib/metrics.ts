@@ -554,3 +554,83 @@ export function roundOut(v: number | null | undefined, dp: number): number | nul
 export function incompleteLabel(leftoverDays: number, feedingDays: number): string {
   return `incomplete (${leftoverDays} of ${feedingDays} days weighed)`;
 }
+
+/**
+ * Representative share left for a historical visual score, used only to plot
+ * and summarise "visual estimate" days. Never used in eaten_g or any FCR.
+ */
+export const SCORE_SHARE: Record<string, number> = {
+  none_left: 0,
+  trace: 0.035,
+  about_25: 0.25,
+  about_50: 0.5,
+  most_left: 0.75,
+};
+
+export type CorrectionStatus = "measured" | "estimated" | "uncorrected";
+
+/** Plain-language correction status for a retention lookup. */
+export function correctionStatus(status: RetentionStatus): CorrectionStatus {
+  if (status === "measured") return "measured";
+  if (status === "from test") return "estimated";
+  return "uncorrected";
+}
+
+export interface FeedingShare {
+  obs_date: string;
+  offered_g: number;
+  eaten_g: number | null;
+  shareLeft: number | null;
+  /** True when shareLeft comes from the historical visual score. */
+  visual: boolean;
+}
+
+/** Offered, eaten and share left for one feeding: weighed first, else visual. */
+export function feedingShare(
+  o: { feed_id?: string | null; obs_date: string; offered_g: number | null; leftover_g?: number | null; refusal_score?: string | null },
+  retentionFor: ReturnType<typeof makeRetention>,
+): FeedingShare | null {
+  if (o.offered_g == null || !(Number(o.offered_g) > 0)) return null;
+  const offered = Number(o.offered_g);
+  const e = feedEaten(offered, o.leftover_g == null ? null : Number(o.leftover_g), retentionFor(o.feed_id, o.obs_date).retention);
+  if (e) return { obs_date: o.obs_date, offered_g: offered, eaten_g: e.eaten_g, shareLeft: e.shareLeft, visual: false };
+  const s = o.refusal_score != null ? SCORE_SHARE[o.refusal_score] : undefined;
+  return { obs_date: o.obs_date, offered_g: offered, eaten_g: null, shareLeft: s ?? null, visual: s != null };
+}
+
+export interface PortionChange {
+  date: string;
+  previous_g: number;
+  new_g: number;
+  change_g: number;
+  change_pct: number;
+  /** Mean share left over the up-to-3 feedings before the change. */
+  meanShareLeftBefore: number | null;
+  basisBefore: "weighed" | "visual" | "mixed" | "";
+}
+
+/**
+ * Portion changes are derived, never entered: any feeding whose offered_g
+ * differs from the pen's previous feeding's offered_g.
+ */
+export function portionChanges(feedings: FeedingShare[]): PortionChange[] {
+  const sorted = [...feedings].sort((a, b) => a.obs_date.localeCompare(b.obs_date));
+  const out: PortionChange[] = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1]!;
+    const cur = sorted[i]!;
+    if (cur.offered_g === prev.offered_g) continue;
+    const before = sorted.slice(Math.max(0, i - 3), i).filter((f) => f.shareLeft != null);
+    const kinds = new Set(before.map((f) => (f.visual ? "visual" : "weighed")));
+    out.push({
+      date: cur.obs_date,
+      previous_g: prev.offered_g,
+      new_g: cur.offered_g,
+      change_g: cur.offered_g - prev.offered_g,
+      change_pct: ((cur.offered_g - prev.offered_g) / prev.offered_g) * 100,
+      meanShareLeftBefore: meanOf(before.map((f) => f.shareLeft)),
+      basisBefore: kinds.size === 0 ? "" : kinds.size > 1 ? "mixed" : (Array.from(kinds)[0] as "weighed" | "visual"),
+    });
+  }
+  return out;
+}

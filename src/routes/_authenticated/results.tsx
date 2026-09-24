@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { retentionContext } from "@/lib/retention";
 import {
-  computeMetrics, daysBetween, intervalExtras, meanOf, addDays, incompleteLabel, makeRetention,
+  computeMetrics, daysBetween, intervalExtras, meanOf, addDays, incompleteLabel, makeRetention, feedingShare, portionChanges, meanOf as meanOfValues,
   type PenMetrics, type TrialMetrics,
 } from "@/lib/metrics";
 import { readIncludeAcclimation } from "@/lib/acclimation";
@@ -13,7 +13,7 @@ import { useAllSiteCalendars } from "@/lib/operatingDays";
 
 import {
   XAxis, YAxis, ResponsiveContainer, Tooltip, Legend,
-  LineChart, Line, CartesianGrid,
+  LineChart, Line, CartesianGrid, ComposedChart, Bar, Cell, ReferenceArea, Scatter,
 } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/results")({
@@ -100,7 +100,7 @@ function ResultsPage() {
   });
   const observations = useQuery({
     queryKey: ["trial-observations", trialId], enabled: !!trialId,
-    queryFn: async () => (await supabase.from("observations").select("pen_id,feed_id,obs_date,offered_g,dish_action,leftover_g").eq("trial_id", trialId!)).data ?? [],
+    queryFn: async () => (await supabase.from("observations").select("pen_id,feed_id,obs_date,offered_g,dish_action,leftover_g,refusal_score").eq("trial_id", trialId!)).data ?? [],
   });
   const biomass = useQuery({
     queryKey: ["trial-biomass", trialId], enabled: !!trialId,
@@ -385,6 +385,20 @@ function ResultsPage() {
           includeAcclimation={includeAcclimation}
           hiddenSeries={hiddenSeries}
           onToggleSeries={toggleSeries}
+        />
+      )}
+
+      {metrics && trial.data && (
+        <PortionsChart
+          metrics={metrics}
+          view={view}
+          observations={observations.data ?? []}
+          retentionFor={makeRetention(retention)}
+          isOperating={isOperating}
+          from={search.from}
+          to={search.to}
+          targetMin={Number(trial.data.target_left_min_pct)}
+          targetMax={Number(trial.data.target_left_max_pct)}
         />
       )}
 
@@ -990,3 +1004,141 @@ function PenDetail({
   );
 }
 
+
+/* ---------- portions and leftovers ---------- */
+
+interface PortionPoint {
+  date: string;
+  offered: number | null;
+  eaten: number | null;
+  sharePct: number | null;
+  visual: boolean;
+  changes: string[];
+  changeMark: number | null;
+}
+
+function PortionsChart({
+  metrics, view, observations, retentionFor, isOperating, from, to, targetMin, targetMax,
+}: {
+  metrics: TrialMetrics;
+  view: View;
+  observations: { pen_id: string; feed_id: string | null; obs_date: string; offered_g: number | null; leftover_g: number | null; refusal_score: string | null }[];
+  retentionFor: ReturnType<typeof makeRetention>;
+  isOperating: (d: string) => boolean;
+  from: string;
+  to: string;
+  targetMin: number;
+  targetMax: number;
+}) {
+  const groups =
+    view === "pen"
+      ? metrics.pens.map((p) => ({ name: p.label, pens: [p] }))
+      : metrics.treatments.map((t) => ({ name: t.label, pens: t.pens }));
+
+  const pct = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(Math.round(v))}%`;
+
+  const seriesFor = (pens: PenMetrics[]): PortionPoint[] => {
+    const byDate = new Map<string, { offered: number[]; eaten: number[]; share: number[]; visual: boolean[]; changes: string[] }>();
+    for (const pen of pens) {
+      const shares = observations
+        .filter((o) => o.pen_id === pen.penId && o.feed_id != null && isOperating(o.obs_date)
+          && (!from || o.obs_date >= from) && (!to || o.obs_date <= to))
+        .map((o) => feedingShare(o, retentionFor))
+        .filter((x): x is NonNullable<typeof x> => x != null);
+      for (const f of shares) {
+        const b = byDate.get(f.obs_date) ?? { offered: [], eaten: [], share: [], visual: [], changes: [] };
+        b.offered.push(f.offered_g);
+        if (f.eaten_g != null) b.eaten.push(f.eaten_g);
+        if (f.shareLeft != null) { b.share.push(f.shareLeft * 100); b.visual.push(f.visual); }
+        byDate.set(f.obs_date, b);
+      }
+      for (const c of portionChanges(shares)) {
+        const b = byDate.get(c.date);
+        if (!b) continue;
+        const txt = `${Math.round(c.previous_g)} g → ${Math.round(c.new_g)} g (${pct(c.change_pct)})`;
+        b.changes.push(pens.length > 1 ? `${pen.label}: ${txt}` : txt);
+      }
+    }
+    return Array.from(byDate.keys()).sort().map((date) => {
+      const b = byDate.get(date)!;
+      const offered = meanOfValues(b.offered);
+      return {
+        date,
+        offered,
+        eaten: meanOfValues(b.eaten),
+        sharePct: meanOfValues(b.share),
+        visual: b.visual.length > 0 && b.visual.every(Boolean),
+        changes: b.changes,
+        changeMark: b.changes.length ? offered : null,
+      };
+    });
+  };
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-4">
+      <div>
+        <h2 className="font-semibold">Portions and leftovers</h2>
+        <p className="text-xs text-muted-foreground">
+          Portion offered and eaten (g, left axis), share left (%, bars, right axis) with the {targetMin}–{targetMax}%
+          target shaded. A dot marks every date the portion changed. Closed days are left out.
+        </p>
+      </div>
+      {groups.map((g) => {
+        const data = seriesFor(g.pens);
+        if (!data.length) return null;
+        return (
+          <div key={g.name}>
+            <div className="text-sm font-medium mb-1">{g.name}</div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={data} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                  <XAxis dataKey="date" tickFormatter={fmtShort} tick={{ fontSize: 10 }} />
+                  <YAxis yAxisId="g" tick={{ fontSize: 10 }} />
+                  <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
+                  <ReferenceArea yAxisId="pct" y1={targetMin} y2={targetMax} fill="var(--color-primary)" fillOpacity={0.12} />
+                  <Bar yAxisId="pct" dataKey="sharePct" name="Share left (%)" barSize={10}>
+                    {data.map((d) => (
+                      <Cell
+                        key={d.date}
+                        fill={d.visual ? "transparent" : "#b45309"}
+                        fillOpacity={d.visual ? 0 : 0.45}
+                        stroke="#b45309"
+                        strokeWidth={d.visual ? 1.5 : 0}
+                      />
+                    ))}
+                  </Bar>
+                  <Line yAxisId="g" type="linear" dataKey="offered" name="Offered (g)" stroke="var(--color-primary)" dot={false} connectNulls />
+                  <Line yAxisId="g" type="linear" dataKey="eaten" name="Eaten (g)" stroke="#0369a1" dot={false} connectNulls />
+                  <Scatter yAxisId="g" dataKey="changeMark" name="Portion changed" fill="var(--color-foreground)" shape="diamond" />
+                  <Tooltip content={<PortionTooltip />} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        );
+      })}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-4 bg-primary" />Offered (g)</span>
+        <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-4" style={{ background: "#0369a1" }} />Eaten (g)</span>
+        <span className="flex items-center gap-1"><span className="inline-block h-3 w-2" style={{ background: "#b45309", opacity: 0.45 }} />Share left, weighed</span>
+        <span className="flex items-center gap-1"><span className="inline-block h-3 w-2 border" style={{ borderColor: "#b45309" }} />visual estimate (before weighed leftovers)</span>
+        <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rotate-45 bg-foreground" />Portion changed</span>
+      </div>
+    </section>
+  );
+}
+
+function PortionTooltip({ active, payload }: { active?: boolean; payload?: { payload: PortionPoint }[] }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0]!.payload;
+  return (
+    <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-sm space-y-0.5">
+      <div className="font-medium">{fmtShort(d.date)}</div>
+      {d.offered != null && <div>Offered: {d.offered.toFixed(1)} g</div>}
+      {d.eaten != null && <div>Eaten: {d.eaten.toFixed(1)} g</div>}
+      {d.sharePct != null && <div>Share left: {d.sharePct.toFixed(1)}%{d.visual ? " (visual estimate)" : ""}</div>}
+      {d.changes.map((c) => <div key={c} className="font-medium">{c}</div>)}
+    </div>
+  );
+}
