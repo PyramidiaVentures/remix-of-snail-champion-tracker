@@ -3,6 +3,7 @@ import { useSiteTrial } from "@/lib/siteScope";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
+import { retentionContext } from "@/lib/retention";
 import {
   computeMetrics, daysBetween, intervalExtras, meanOf, addDays,
   type PenMetrics, type TrialMetrics,
@@ -99,12 +100,28 @@ function ResultsPage() {
   });
   const observations = useQuery({
     queryKey: ["trial-observations", trialId], enabled: !!trialId,
-    queryFn: async () => (await supabase.from("observations").select("pen_id,feed_id,obs_date,offered_g,dish_action").eq("trial_id", trialId!)).data ?? [],
+    queryFn: async () => (await supabase.from("observations").select("pen_id,feed_id,obs_date,offered_g,dish_action,leftover_g").eq("trial_id", trialId!)).data ?? [],
   });
   const biomass = useQuery({
     queryKey: ["trial-biomass", trialId], enabled: !!trialId,
     queryFn: async () => (await supabase.from("biomass_events").select("pen_id,event_date,net_biomass_g,live_count").eq("trial_id", trialId!)).data ?? [],
   });
+
+  const controlReadings = useQuery({
+    queryKey: ["moisture-controls", trialId, trial.data?.control_feed_id], enabled: !!trialId,
+    queryFn: async () => (await supabase.from("moisture_controls").select("obs_date,offered_g,remaining_g,feed_id").eq("trial_id", trialId!)).data ?? [],
+  });
+  const siteCalendar = calendarFor(trial.data?.site_id);
+  const retention = useMemo(
+    () => retentionContext(
+      trial.data?.control_feed_id,
+      (controlReadings.data ?? [])
+        .filter((c) => c.feed_id === trial.data?.control_feed_id)
+        .map((c) => ({ obs_date: c.obs_date, offered_g: Number(c.offered_g), remaining_g: c.remaining_g == null ? null : Number(c.remaining_g) })),
+      siteCalendar,
+    ),
+    [controlReadings.data, trial.data?.control_feed_id, siteCalendar],
+  );
 
   // Breeder pens are never part of a treatment mean, so Results never sees them.
   const assignedPens = useMemo(
@@ -151,7 +168,7 @@ function ResultsPage() {
       rangeStart && rangeEnd
         ? (observations.data ?? [])
             .filter(
-              (o) => o.feed_id != null && o.obs_date > rangeStart && o.obs_date <= rangeEnd && selectedPenIds.has(o.pen_id),
+              (o) => o.feed_id != null && o.obs_date >= rangeStart && o.obs_date < rangeEnd && selectedPenIds.has(o.pen_id),
             )
             .map((o) => ({ ...o, feed_id: o.feed_id as string }))
         : [],
@@ -171,8 +188,9 @@ function ResultsPage() {
       biomass: scopedBiomass,
       includeAcclimation,
       dryMatter,
+      retention,
     });
-  }, [trial.data, pens.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, assignedPens, selectedPenIds, scopedObservations, scopedBiomass, selectedIntervals.length, includeAcclimation, dryMatter]);
+  }, [retention, trial.data, pens.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, assignedPens, selectedPenIds, scopedObservations, scopedBiomass, selectedIntervals.length, includeAcclimation, dryMatter]);
 
 
   if (!trial.isLoading && !trial.data) {
@@ -574,8 +592,12 @@ function Charts({
 
   const acclimationEnd = addDays(startDate, acclimationDays ?? 0);
   const dateIncluded = (d: string) => includeAcclimation || d >= acclimationEnd;
-  const extrasFor = (pen: PenMetrics, iv: { from: string; to: string }) =>
-    intervalExtras(iv, observations.filter((o) => o.pen_id === pen.penId), dateIncluded, isOperating);
+  
+  const eatenPerInterval = spanSeriesFor(metrics, view, (p) =>
+    p.intervals.map((i) => ({ from: i.from, to: i.to, y: i.eatenPerKgGain })));
+
+  const shareLeft = spanSeriesFor(metrics, view, (p) =>
+    p.intervals.map((i) => ({ from: i.from, to: i.to, y: i.meanShareLeft != null ? i.meanShareLeft * 100 : null })));
 
   const perInterval = spanSeriesFor(metrics, view, (p) =>
     p.intervals.map((i) => ({ from: i.from, to: i.to, y: i.offeredPerKgGain })));
@@ -602,17 +624,24 @@ function Charts({
   const feedingRate = spanSeriesFor(metrics, view, (p) =>
     p.intervals.map((i) => ({ from: i.from, to: i.to, y: i.feedingRate })));
 
-  const carryOver = spanSeriesFor(metrics, view, (p) =>
-    p.intervals.map((i) => ({ from: i.from, to: i.to, y: extrasFor(p, i).meanCarryOverDays })));
-
-  const spoilage = spanSeriesFor(metrics, view, (p) =>
-    p.intervals.map((i) => ({ from: i.from, to: i.to, y: extrasFor(p, i).spoilageRate })));
-
   const cumulativeOffered = seriesFor(metrics, view, (p) =>
     p.offeredSeries.map((o) => ({ x: o.date, y: o.cumulative })));
 
   return (
     <>
+      <IntervalChartCard
+        title="FCR (feed eaten) — each weighing interval"
+        note={`kg of feed eaten (${basisLabel}, offered minus the weighed leftover, leaves corrected for water loss) per kg of snail gained. Shown only where at least 90% of feedings had a weighed leftover — otherwise eaten is not yet measured for this period.`}
+        series={eatenPerInterval}
+        {...toggles}
+      />
+      <IntervalChartCard
+        title="Mean share left per interval"
+        note="Leftover as a share of feed offered. Target band 5–10%."
+        series={shareLeft}
+        unit="%"
+        {...toggles}
+      />
       <IntervalChartCard
         title="Feed offered per kg gain — each weighing interval"
         note={`kg of feed offered (${basisLabel}) for every kg of snail gained, held flat across the interval it covers. Lower is better. Tap a name in the key to hide or show it.`}
@@ -660,19 +689,6 @@ function Charts({
         unit=" g"
         {...toggles}
       />
-      <IntervalChartCard
-        title="Carry-over per interval"
-        note="Mean number of days in a row a dish is topped up before being emptied."
-        series={carryOver}
-        {...toggles}
-      />
-      <IntervalChartCard
-        title="Spoilage per interval"
-        note="Percentage of dishes emptied because the feed had spoiled."
-        series={spoilage}
-        unit="%"
-        {...toggles}
-      />
     </>
   );
 }
@@ -699,6 +715,9 @@ function SummaryTable({ metrics }: { metrics: TrialMetrics }) {
           <thead>
             <tr className="text-left text-xs uppercase text-muted-foreground">
               <th className="py-2 pr-3">Treatment</th>
+              <th className="py-2 pr-3">FCR (feed eaten)</th>
+              <th className="py-2 pr-3">Feed eaten (g)</th>
+              <th className="py-2 pr-3">Share left (%)</th>
               <th className="py-2 pr-3">Feed offered (g)</th>
               <th className="py-2 pr-3">Total gain (g)</th>
               <th className="py-2 pr-3">Feed offered per kg gain</th>
@@ -710,6 +729,15 @@ function SummaryTable({ metrics }: { metrics: TrialMetrics }) {
             {metrics.treatments.map((t) => (
               <tr key={t.treatmentId}>
                 <td className="py-2 pr-3 font-medium">{t.label}</td>
+                <td className="py-2 pr-3">
+                  {t.eatenPerKgGain != null ? cell(t.eatenPerKgGain) : (
+                    <span className="text-xs text-muted-foreground">
+                      {cell(t.offeredPerKgGain)} offered — eaten not yet measured for this period ({t.eatenCompletePens} of {t.pens.length} pens complete)
+                    </span>
+                  )}
+                </td>
+                <td className="py-2 pr-3">{cell(t.cumEaten_g, 1)}</td>
+                <td className="py-2 pr-3">{cell(t.meanShareLeft != null ? t.meanShareLeft * 100 : null, 1)}</td>
                 <td className="py-2 pr-3">{cell(t.cumOffered_g, 1)}</td>
                 <td className="py-2 pr-3">{cell(t.totalGain_g, 1)}</td>
                 <td className="py-2 pr-3">{cell(t.offeredPerKgGain)}</td>
@@ -718,7 +746,7 @@ function SummaryTable({ metrics }: { metrics: TrialMetrics }) {
               </tr>
             ))}
             {metrics.treatments.length === 0 && (
-              <tr><td colSpan={6} className="py-3 text-muted-foreground">No treatments yet.</td></tr>
+              <tr><td colSpan={9} className="py-3 text-muted-foreground">No treatments yet.</td></tr>
             )}
           </tbody>
         </table>
@@ -754,14 +782,16 @@ const PEN_COLUMNS = [
   { key: "mwStart", label: "Mean wt start (g)" },
   { key: "mwEnd", label: "Mean wt end (g)" },
   { key: "gain", label: "Gain (g)" },
+  { key: "fcrEaten", label: "FCR (feed eaten)" },
+  { key: "eaten", label: "Feed eaten (g)" },
+  { key: "coverage", label: "Leftover coverage (%)" },
+  { key: "shareLeft", label: "Share left (%)" },
   { key: "offered", label: "Feed offered (g)" },
-  { key: "perKgFresh", label: "Feed / kg gain" },
-  { key: "perKgDm", label: "Feed / kg gain (DM)" },
+  { key: "perKgFresh", label: "Feed offered / kg gain" },
+  { key: "perKgDm", label: "Feed offered / kg gain (DM)" },
   { key: "sgr", label: "SGR (%/day)" },
   { key: "survival", label: "Survival (%)" },
   { key: "missing", label: "Missing feeding days" },
-  { key: "maxCarry", label: "Max carry-over days" },
-  { key: "spoilage", label: "Spoilage (%)" },
 ] as const;
 
 function PenDetail({
@@ -811,8 +841,12 @@ function PenDetail({
         sgr: pen.meanSgr,
         survival: pen.survival,
         missing: rows.reduce((s, r) => s + r.extras.missingFeedingDays, 0),
-        maxCarry: pen.maxCarryOverDays,
-        spoilage: meanOf(rows.map((r) => r.extras.spoilageRate)),
+        fcrEaten: pen.eatenPerKgGain,
+        eaten: pen.cumEaten_g,
+        leftoverDays: pen.leftoverDays,
+        feedingDays: pen.feedingDays,
+        coverage: pen.leftoverCoverage,
+        shareLeft: pen.meanShareLeft,
       };
       return { pen, rows, totals };
     });
@@ -839,8 +873,10 @@ function PenDetail({
       case "sgr": return cell(r.iv.sgr);
       case "survival": return cell(r.iv.survival, 1);
       case "missing": return r.extras.missingFeedingDays;
-      case "maxCarry": return cell(r.extras.maxCarryOverDays, 0);
-      case "spoilage": return cell(r.extras.spoilageRate, 1);
+      case "fcrEaten": return r.iv.eatenPerKgGain != null ? cell(r.iv.eatenPerKgGain) : r.iv.gain_g != null && r.iv.gain_g > 0 ? incompleteLabel(r.iv.leftoverDays, r.iv.feedingDays) : "—";
+      case "eaten": return cell(r.iv.eaten_g, 1);
+      case "coverage": return cell(r.iv.leftoverCoverage != null ? r.iv.leftoverCoverage * 100 : null, 0);
+      case "shareLeft": return cell(r.iv.meanShareLeft != null ? r.iv.meanShareLeft * 100 : null, 1);
       default: return "";
     }
   };
@@ -862,8 +898,10 @@ function PenDetail({
       case "sgr": return cell(totals.sgr);
       case "survival": return cell(totals.survival, 1);
       case "missing": return totals.missing;
-      case "maxCarry": return cell(totals.maxCarry, 0);
-      case "spoilage": return cell(totals.spoilage, 1);
+      case "fcrEaten": return totals.fcrEaten != null ? cell(totals.fcrEaten) : totals.gain != null && totals.gain > 0 ? incompleteLabel(totals.leftoverDays, totals.feedingDays) : "—";
+      case "eaten": return cell(totals.eaten, 1);
+      case "coverage": return cell(totals.coverage != null ? totals.coverage * 100 : null, 0);
+      case "shareLeft": return cell(totals.shareLeft != null ? totals.shareLeft * 100 : null, 1);
       default: return "";
     }
   };
