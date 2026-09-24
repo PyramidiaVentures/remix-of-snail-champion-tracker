@@ -57,6 +57,13 @@
       "when": 1790259123000,
       "tag": "0007_weighing_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790260254277,
+      "tag": "0008_add_welfare_environment_ranges",
+      "breakpoints": true
     }
   ]
 }
