@@ -95,6 +95,7 @@ function TrialPage() {
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["trials"] });
+    qc.invalidateQueries({ queryKey: ["active-trial"] });
     qc.invalidateQueries({ queryKey: ["treatments"] });
     qc.invalidateQueries({ queryKey: ["pen_assignments"] });
   };
