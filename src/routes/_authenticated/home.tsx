@@ -119,7 +119,18 @@ function HomePage() {
   const fedToday = new Set(
     trialOnly((daily.data?.obs ?? []).filter((o) => o.obs_date === t && o.offered_g != null)).map((o) => o.pen_id),
   ).size;
-  const checked = new Set(trialOnly(daily.data?.welfare ?? []).map((w) => w.pen_id)).size;
+  // While the water-loss test runs, the control dish counts as one more AM check.
+  const controlOn = !!trial.data?.control_active && !!trial.data?.control_feed_id;
+  const controlReading = useQuery({
+    queryKey: ["moisture-control", trialId, feedDay],
+    enabled: !!trialId && controlOn,
+    queryFn: async () =>
+      (await supabase.from("moisture_controls").select("remaining_g").eq("trial_id", trialId!).eq("obs_date", feedDay).maybeSingle()).data,
+  });
+  const checked =
+    new Set(trialOnly(daily.data?.welfare ?? []).map((w) => w.pen_id)).size +
+    (controlOn && controlReading.data?.remaining_g != null ? 1 : 0);
+  const checksExpected = expected + (controlOn ? 1 : 0);
   const pmPhotos = new Set(
     trialOnly((daily.data?.photos ?? []).filter((p) => p.obs_date === t && p.photo_pm_url)).map((p) => p.pen_id),
   ).size;
@@ -196,7 +207,7 @@ function HomePage() {
 
           <dl className="grid grid-cols-3 gap-2 text-center">
             <Stat label="Fed today" value={`${fedToday}/${expected}`} />
-            <Stat label={`Checks (${feedDay.slice(5)})`} value={`${checked}/${expected}`} />
+            <Stat label={`Checks (${feedDay.slice(5)})`} value={`${checked}/${checksExpected}`} />
             <Stat label="Photos today" value={`${pmPhotos + amPhotos}/${expected * 2}`} />
           </dl>
 
