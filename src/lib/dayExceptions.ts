@@ -333,15 +333,15 @@ export function computeDayReview(args: {
   // SOP steps still unticked.
   const ticksFor = (session: string) => new Set(d.checklists.find((c) => c.session === session)?.checked_step_keys ?? []);
   const pmTicks = ticksFor("pm");
-  const pmSteps = checklistSteps("pm", date);
+  const pmSteps = checklistSteps("pm", date).filter((step) => step.key !== PM_CONTROL_STEP_KEY || controlActive);
   (pmExpected && !pmInProgress ? pmSteps : []).forEach((step, i) => {
-    const done = step.key === PM_PHOTO_STEP_KEY ? pmPhotosAll : step.key === PM_CONTROL_STEP_KEY && !controlActive ? true : pmTicks.has(step.key);
+    const done = step.key === PM_PHOTO_STEP_KEY ? pmPhotosAll : pmTicks.has(step.key);
     if (!done) exceptions.push({ key: `pmstep-${step.key}`, group: "PM checklist", text: `Step ${i + 1} not ticked — ${step.label}`, to: "/pm" });
   });
   const amTicks = ticksFor("am");
-  const amSteps = checklistSteps("am", date);
+  const amSteps = checklistSteps("am", date).filter((step) => step.key !== AM_CONTROL_STEP_KEY || controlActive);
   (amExpected && !amInProgress ? amSteps : []).forEach((step, i) => {
-    const done = step.key === AM_PHOTO_STEP_KEY ? amPhotosAll : step.key === AM_CONTROL_STEP_KEY && !controlActive ? true : amTicks.has(step.key);
+    const done = step.key === AM_PHOTO_STEP_KEY ? amPhotosAll : step.key === AM_CONTROL_STEP_KEY ? !controlMissing : amTicks.has(step.key);
     if (!done) exceptions.push({ key: `amstep-${step.key}`, group: "AM checklist", text: `Step ${i + 1} not ticked — ${step.label}`, to: "/am" });
   });
 

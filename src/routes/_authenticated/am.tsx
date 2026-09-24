@@ -264,7 +264,7 @@ function AmPage() {
     setChecklistAll(all);
   }, []);
 
-  const checklistItems = checklistSteps("am", date);
+  const checklistItems = checklistSteps("am", date).filter((step) => step.key !== AM_CONTROL_STEP_KEY || controlOn);
   const overrides = checklistItems.map((step) =>
     step.key === AM_PHOTO_STEP_KEY
       ? {
@@ -278,8 +278,14 @@ function AmPage() {
                 : ".") +
               (allPhotos ? "" : " Take them before disturbing the dish."),
         }
-      : step.key === AM_CONTROL_STEP_KEY && !controlOn
-        ? { forced: true, locked: true, subtitle: "No water-loss test running — nothing to do." }
+      : step.key === AM_CONTROL_STEP_KEY
+        ? {
+            forced: control.data?.remaining_g != null,
+            locked: true,
+            subtitle: control.data?.remaining_g != null
+              ? "Control leftover saved."
+              : "Enter the leftover on the Control dish step below.",
+          }
         : undefined,
   );
 

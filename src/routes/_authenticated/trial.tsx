@@ -1195,7 +1195,7 @@ function Field({ label, children, className }: { label: string; children: React.
   );
 }
 
-/** Water-loss test (leaves): one covered control dish with no snails. */
+/** Water-loss test (leaves): one control dish in an empty matching pen. */
 function WaterLossTest({
   trial, feeds, onSaved,
 }: {
@@ -1243,7 +1243,7 @@ function WaterLossTest({
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
       <h2 className="font-semibold">Water-loss test (leaves)</h2>
       <p className="text-xs text-muted-foreground">
-        One covered control dish with no snails shows how much weight the leaves lose overnight. The team puts the
+        Put the control dish in an empty pen of the same build, same lid and substrate, no snails. This shows how much weight the leaves lose overnight. The team puts the
         portion in every evening and only weighs what is left in the morning.
       </p>
       <label className="block">
