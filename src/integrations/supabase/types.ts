@@ -517,6 +517,7 @@ export type Database = {
       }
       sop_checklists: {
         Row: {
+          checked_step_keys: string[]
           created_at: string
           id: string
           obs_date: string
@@ -527,6 +528,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          checked_step_keys?: string[]
           created_at?: string
           id?: string
           obs_date: string
@@ -537,6 +539,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          checked_step_keys?: string[]
           created_at?: string
           id?: string
           obs_date?: string
