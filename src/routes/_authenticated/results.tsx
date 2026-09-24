@@ -204,7 +204,6 @@ function ResultsPage() {
     );
   }
 
-  const basis = metrics?.dmBasis ? "dry matter" : "fresh";
   const setSearch = (patch: Partial<typeof search>) =>
     navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
   const toggleSeries = (name: string) => {
@@ -336,9 +335,9 @@ function ResultsPage() {
             onChange={(e) => setDryMatter(e.target.checked)}
           />
           <span>
-            Show feed on a dry-matter basis
+            Show FCR on a dry-matter-eaten basis
             <span className="block text-xs text-muted-foreground">
-              {metrics?.dmAvailable ? `Currently showing ${basis} weight.` : "Add dry-matter % to all feeds to enable."}
+              {metrics?.dmAvailable ? metrics.dmBasis ? "Headline is FCR (dry matter eaten). Feed offered stays fresh weight." : "Headline is FCR (feed eaten), fresh weight." : "Add dry-matter % to all feeds to enable."}
             </span>
           </span>
         </label>
@@ -612,14 +611,14 @@ function Charts({
   acclimationDays: number;
   includeAcclimation: boolean;
 } & ToggleProps) {
-  const basisLabel = metrics.dmBasis ? "dry matter" : "fresh weight";
+  const dm = metrics.dmBasis;
   const toggles = { hiddenSeries, onToggleSeries, domain };
 
   const acclimationEnd = addDays(startDate, acclimationDays ?? 0);
   const dateIncluded = (d: string) => includeAcclimation || d >= acclimationEnd;
   
   const eatenPerInterval = spanSeriesFor(metrics, view, (p) =>
-    p.intervals.map((i) => ({ from: i.from, to: i.to, y: i.eatenPerKgGain })));
+    p.intervals.map((i) => ({ from: i.from, to: i.to, y: dm ? i.eatenDmPerKgGain : i.eatenPerKgGain })));
 
   const shareLeft = spanSeriesFor(metrics, view, (p) =>
     p.intervals.map((i) => ({ from: i.from, to: i.to, y: i.meanShareLeft != null ? i.meanShareLeft * 100 : null })));
@@ -631,7 +630,7 @@ function Charts({
     let offered = 0;
     let gain = 0;
     return p.intervals.map((i) => {
-      offered += metrics.dmBasis ? (i.offeredDm_g ?? 0) : i.offered_g;
+      offered += i.offered_g;
       gain += i.gain_g ?? 0;
       return { x: i.to, y: gain > 0 ? offered / gain : null };
     });
@@ -655,8 +654,8 @@ function Charts({
   return (
     <>
       <IntervalChartCard
-        title="FCR (feed eaten) — each weighing interval"
-        note={`kg of feed eaten (${basisLabel}, offered minus the weighed leftover, leaves corrected for water loss) per kg of snail gained. Shown only where at least 90% of feedings had a weighed leftover — otherwise eaten is not yet measured for this period.`}
+        title={dm ? "FCR (dry matter eaten) — each weighing interval" : "FCR (feed eaten) — each weighing interval"}
+        note={`kg of ${dm ? "dry matter eaten (feed eaten × the feed's dry-matter %" : "feed eaten (fresh weight"}, offered minus the weighed leftover, leaves corrected for water loss) per kg of snail gained. Shown only where at least 90% of feedings had a weighed leftover — otherwise eaten is not yet measured for this period.`}
         series={eatenPerInterval}
         {...toggles}
       />
@@ -669,13 +668,13 @@ function Charts({
       />
       <IntervalChartCard
         title="Feed offered per kg gain — each weighing interval"
-        note={`kg of feed offered (${basisLabel}) for every kg of snail gained, held flat across the interval it covers. Lower is better. Tap a name in the key to hide or show it.`}
+        note={`kg of feed offered (fresh weight) for every kg of snail gained, held flat across the interval it covers. Lower is better. Tap a name in the key to hide or show it.`}
         series={perInterval}
         {...toggles}
       />
       <LineChartCard
         title="Feed offered per kg gain — cumulative"
-        note={`Running total since the first weighing in range (${basisLabel}).`}
+        note="Running total since the first weighing in range (fresh weight)."
         series={cumulativeConversion}
         {...toggles}
       />
@@ -732,6 +731,7 @@ function cell(v: number | null | undefined, dp = 2, suffix = "") {
 }
 
 function SummaryTable({ metrics }: { metrics: TrialMetrics }) {
+  const dm = metrics.dmBasis;
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <h2 className="font-semibold mb-2">Treatment summary</h2>
@@ -740,8 +740,8 @@ function SummaryTable({ metrics }: { metrics: TrialMetrics }) {
           <thead>
             <tr className="text-left text-xs uppercase text-muted-foreground">
               <th className="py-2 pr-3">Treatment</th>
-              <th className="py-2 pr-3">FCR (feed eaten)</th>
-              <th className="py-2 pr-3">Feed eaten (g)</th>
+              <th className="py-2 pr-3">{dm ? "FCR (dry matter eaten)" : "FCR (feed eaten)"}</th>
+              <th className="py-2 pr-3">{dm ? "Dry matter eaten (g)" : "Feed eaten (g)"}</th>
               <th className="py-2 pr-3">Share left (%)</th>
               <th className="py-2 pr-3">Feed offered (g)</th>
               <th className="py-2 pr-3">Total gain (g)</th>
@@ -755,13 +755,15 @@ function SummaryTable({ metrics }: { metrics: TrialMetrics }) {
               <tr key={t.treatmentId}>
                 <td className="py-2 pr-3 font-medium">{t.label}</td>
                 <td className="py-2 pr-3">
-                  {t.eatenPerKgGain != null ? cell(t.eatenPerKgGain) : (
+                  {dm && t.dmMissing ? (
+                    <span className="text-xs text-muted-foreground">add dry-matter % in Setup</span>
+                  ) : (dm ? t.eatenDmPerKgGain : t.eatenPerKgGain) != null ? cell(dm ? t.eatenDmPerKgGain : t.eatenPerKgGain) : (
                     <span className="text-xs text-muted-foreground">
                       {cell(t.offeredPerKgGain)} offered — eaten not yet measured for this period ({t.eatenCompletePens} of {t.pens.length} pens complete)
                     </span>
                   )}
                 </td>
-                <td className="py-2 pr-3">{cell(t.cumEaten_g, 1)}</td>
+                <td className="py-2 pr-3">{cell(dm ? t.cumEatenDm_g : t.cumEaten_g, 1)}</td>
                 <td className="py-2 pr-3">{cell(t.meanShareLeft != null ? t.meanShareLeft * 100 : null, 1)}</td>
                 <td className="py-2 pr-3">{cell(t.cumOffered_g, 1)}</td>
                 <td className="py-2 pr-3">{cell(t.totalGain_g, 1)}</td>
@@ -813,7 +815,8 @@ const PEN_COLUMNS = [
   { key: "shareLeft", label: "Share left (%)" },
   { key: "offered", label: "Feed offered (g)" },
   { key: "perKgFresh", label: "Feed offered / kg gain" },
-  { key: "perKgDm", label: "Feed offered / kg gain (DM)" },
+  { key: "fcrDm", label: "FCR (dry matter eaten)" },
+  { key: "eatenDm", label: "Dry matter eaten (g)" },
   { key: "sgr", label: "SGR (%/day)" },
   { key: "survival", label: "Survival (%)" },
   { key: "missing", label: "Missing feeding days" },
@@ -844,7 +847,6 @@ function PenDetail({
             liveStart:
               biomass.find((b) => b.pen_id === pen.penId && b.event_date === iv.from)?.live_count ?? null,
             perKgFresh: usable ? iv.offered_g / iv.gain_g! : null,
-            perKgDm: usable && iv.offeredDm_g != null ? iv.offeredDm_g / iv.gain_g! : null,
           };
         });
       const first = rows[0];
@@ -859,10 +861,9 @@ function PenDetail({
         gain: totalGain,
         offered: pen.cumOffered_g,
         perKgFresh: totalGain != null && totalGain > 0 ? pen.cumOffered_g / totalGain : null,
-        perKgDm:
-          totalGain != null && totalGain > 0 && pen.cumOfferedDm_g != null
-            ? pen.cumOfferedDm_g / totalGain
-            : null,
+        fcrDm: pen.eatenDmPerKgGain,
+        eatenDm: pen.cumEatenDm_g,
+        dmMissing: pen.dmMissing,
         sgr: pen.meanSgr,
         survival: pen.survival,
         missing: rows.reduce((s, r) => s + r.extras.missingFeedingDays, 0),
@@ -894,7 +895,8 @@ function PenDetail({
       case "gain": return cell(r.iv.gain_g, 1);
       case "offered": return cell(r.iv.offered_g, 1);
       case "perKgFresh": return cell(r.perKgFresh);
-      case "perKgDm": return cell(r.perKgDm);
+      case "fcrDm": return r.iv.dmMissing ? "add dry-matter % in Setup" : r.iv.eatenDmPerKgGain != null ? cell(r.iv.eatenDmPerKgGain) : r.iv.gain_g != null && r.iv.gain_g > 0 ? incompleteLabel(r.iv.leftoverDays, r.iv.feedingDays) : "—";
+      case "eatenDm": return r.iv.dmMissing ? "add dry-matter % in Setup" : cell(r.iv.eatenDm_g, 1);
       case "sgr": return cell(r.iv.sgr);
       case "survival": return cell(r.iv.survival, 1);
       case "missing": return r.extras.missingFeedingDays;
@@ -919,7 +921,8 @@ function PenDetail({
       case "gain": return cell(totals.gain, 1);
       case "offered": return cell(totals.offered, 1);
       case "perKgFresh": return cell(totals.perKgFresh);
-      case "perKgDm": return cell(totals.perKgDm);
+      case "fcrDm": return totals.dmMissing ? "add dry-matter % in Setup" : totals.fcrDm != null ? cell(totals.fcrDm) : totals.gain != null && totals.gain > 0 ? incompleteLabel(totals.leftoverDays, totals.feedingDays) : "—";
+      case "eatenDm": return totals.dmMissing ? "add dry-matter % in Setup" : cell(totals.eatenDm, 1);
       case "sgr": return cell(totals.sgr);
       case "survival": return cell(totals.survival, 1);
       case "missing": return totals.missing;
