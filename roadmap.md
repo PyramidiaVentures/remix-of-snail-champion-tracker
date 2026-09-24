@@ -50,3 +50,9 @@
 - [x] Map stored positional ticks using the checklist version live on each date
 - [x] Save and read shared and offline ticks by key
 - [x] Preserve retired keys without showing them in current checklists
+
+## Water-loss checklist steps (2026-09-24)
+- [x] Show keyed PM control step only while the test runs and require a manual tick
+- [x] Show keyed AM control step only while the test runs and complete it from the saved reading
+- [x] Replace the PM summary reminder with linked tick status
+- [x] Correct the control setup wording and remove “covered box”
