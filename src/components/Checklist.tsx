@@ -3,11 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Lock, CloudOff } from "lucide-react";
 import {
   fetchChecklist,
-  normalizeSteps,
   readLocal,
   saveChecklist,
+  visibleTicks,
   writeLocal,
   type SopSession,
+  type SopStep,
 } from "@/lib/sopChecklist";
 
 export interface ChecklistItemOverride {
@@ -33,13 +34,13 @@ export function Checklist({
   date: string;
   session: SopSession;
   title: string;
-  items: string[];
+  items: SopStep[];
   overrides?: (ChecklistItemOverride | undefined)[];
   /** Reports (number ticked, all ticked) whenever progress changes. */
   onProgress?: (doneCount: number, allDone: boolean) => void;
 }) {
   const qc = useQueryClient();
-  const [pending, setPending] = useState<boolean[] | null>(null);
+  const [pending, setPending] = useState<string[] | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
 
   const saved = useQuery({
@@ -50,10 +51,8 @@ export function Checklist({
 
   // Whichever we have: the optimistic value being saved, the shared value from
   // the database, or the local mirror while the connection is down.
-  const done = normalizeSteps(
-    pending ?? saved.data ?? readLocal(trialId ?? "", date, session, items.length),
-    items.length,
-  );
+  const checkedKeys = pending ?? saved.data ?? readLocal(trialId ?? "", date, session) ?? [];
+  const done = visibleTicks(checkedKeys, items);
 
   // Reset the optimistic value when the date or session changes.
   useEffect(() => {
@@ -62,7 +61,7 @@ export function Checklist({
   }, [trialId, date, session]);
 
   const save = useMutation({
-    mutationFn: (next: boolean[]) => saveChecklist(trialId!, date, session, next),
+    mutationFn: (next: string[]) => saveChecklist(trialId!, date, session, next),
     onSuccess: async () => {
       setSaveFailed(false);
       await qc.invalidateQueries({ queryKey: ["sop-checklist", trialId, date, session] });
@@ -73,7 +72,11 @@ export function Checklist({
 
   const toggle = (i: number) => {
     if (overrides?.[i]?.locked || !trialId) return;
-    const next = done.map((v, idx) => (idx === i ? !v : v));
+    const key = items[i]?.key;
+    if (!key) return;
+    const next = done[i]
+      ? checkedKeys.filter((savedKey) => savedKey !== key)
+      : [...new Set([...checkedKeys, key])];
     setPending(next);
     writeLocal(trialId, date, session, next);
     save.mutate(next);
@@ -112,7 +115,7 @@ export function Checklist({
           const isDone = effective[i];
           const locked = !!o?.locked;
           return (
-            <li key={i}>
+            <li key={item.key}>
               <button
                 type="button"
                 onClick={() => toggle(i)}
@@ -129,7 +132,7 @@ export function Checklist({
                 <span className="flex-1">
                   <span className={`block text-sm leading-snug ${isDone ? "text-muted-foreground line-through" : "text-foreground"}`}>
                     <span className="font-semibold mr-1">{i + 1}.</span>
-                    {item}
+                    {item.label}
                   </span>
                   {o?.subtitle && (
                     <span className={`mt-0.5 block text-xs ${isDone ? "text-primary" : "text-amber-600"}`}>
