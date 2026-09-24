@@ -27,7 +27,6 @@ export const Route = createFileRoute("/_authenticated/am")({
     typeof search['pen'] === "string" ? { pen: search['pen'] } : {},
 });
 
-type RefusalScore = Database["public"]["Enums"]["refusal_score"];
 type SnailActivity = Database["public"]["Enums"]["snail_activity"];
 type HealthFlag = Database["public"]["Enums"]["health_flag"];
 type SubstrateCondition = Database["public"]["Enums"]["substrate_condition"];
@@ -35,13 +34,6 @@ type PopulationEventType = Database["public"]["Enums"]["population_event_type"];
 type WelfareRow = Database["public"]["Tables"]["welfare_checks"]["Row"];
 type ObsRow = Database["public"]["Tables"]["observations"]["Row"];
 
-const REFUSAL: { value: RefusalScore; label: string }[] = [
-  { value: "none_left", label: "None left" },
-  { value: "trace", label: "Trace" },
-  { value: "about_25", label: "About 25%" },
-  { value: "about_50", label: "About 50%" },
-  { value: "most_left", label: "Most left" },
-];
 const ACTIVITY: { value: SnailActivity; label: string }[] = [
   { value: "active", label: "Active" },
   { value: "mixed", label: "Mixed" },
@@ -63,15 +55,7 @@ const SUBSTRATE: { value: SubstrateCondition; label: string }[] = [
   { value: "mouldy", label: "Mouldy" },
 ];
 
-const AM_STEPS = [
-  "Upload the AM photos (one per pen) — dish untouched, tag in frame.",
-  "Record the refusal score for each pen by eye. Do not weigh.",
-  "Record snail activity and any signs of sickness.",
-  "Record temperature and humidity.",
-  "Log any deaths, escapes or removals.",
-  "Empty and clean any dish whose remaining feed fails the discard criteria.",
-];
-const AM_PHOTO_STEP_INDEX = 0;
+import { AM_STEPS, AM_PHOTO_STEP_INDEX, AM_CONTROL_STEP_INDEX } from "@/lib/dayExceptions";
 
 const EVENT_LABEL: Record<string, string> = {
   mortality: "Death",
@@ -100,6 +84,15 @@ function displayDate(date: string) {
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${weekdays[value.getUTCDay()]} ${value.getUTCDate()} ${months[value.getUTCMonth()]}`;
 }
+
+function longDate(date: string) {
+  const value = new Date(`${date}T00:00:00Z`);
+  const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
+  return `${weekdays[value.getUTCDay()]} ${value.getUTCDate()} ${months[value.getUTCMonth()]}`;
+}
+
+const CONTROL_ID = "control";
 
 function AmPage() {
   const qc = useQueryClient();
@@ -172,6 +165,21 @@ function AmPage() {
       (await supabase.from("session_photos").select("pen_id,photo_am_url,photo_pm_url").eq("trial_id", trialId!).eq("obs_date", date)).data ?? [],
   });
 
+  // One control dish per trial, only while the water-loss test is running.
+  const controlOn = !!trial.data?.control_active && !!trial.data?.control_feed_id;
+  const controlFeedId = trial.data?.control_feed_id ?? null;
+  const controlFeed = useQuery({
+    queryKey: ["feed", controlFeedId],
+    enabled: !!controlFeedId,
+    queryFn: async () => (await supabase.from("feeds").select("id,name").eq("id", controlFeedId!).maybeSingle()).data,
+  });
+  const control = useQuery({
+    queryKey: ["moisture-control", trialId, date],
+    enabled: !!trialId && controlOn,
+    queryFn: async () =>
+      (await supabase.from("moisture_controls").select("*").eq("trial_id", trialId!).eq("feed_id", controlFeedId!).eq("obs_date", date).maybeSingle()).data,
+  });
+
   const feedByPen = useMemo(() => {
     const treatmentById = new Map((treatments.data ?? []).map((t) => [t.id, t]));
     const map = new Map<string, string>();
@@ -199,7 +207,14 @@ function AmPage() {
     [pens.data],
   );
 
-  const stepperPens = useMemo(() => [...trialPens, ...breederPens], [trialPens, breederPens]);
+  const stepperPens = useMemo(
+    () => [
+      ...trialPens,
+      ...breederPens,
+      ...(controlOn ? [{ id: CONTROL_ID, label: "Control dish", role: "control" as const }] : []),
+    ],
+    [trialPens, breederPens, controlOn],
+  );
   const isBreeder = (penId: string) => breederPens.some((p) => p.id === penId);
 
   const anyPmForDate = (obs.data ?? []).some((o) => o.offered_g != null);
@@ -213,12 +228,13 @@ function AmPage() {
     !!photoUrlFor(penId) || uploads.get(penPhotoKey(trialId ?? "", penId, date, "am"))?.status === "saved";
 
   const missingFor = (penId: string) => {
+    if (penId === CONTROL_ID) return control.data?.remaining_g != null ? [] : ["control leftover"];
     const w = welfareFor(penId);
     const breeder = isBreeder(penId);
     const missing: string[] = [];
     if (!photoSaved(penId)) missing.push("AM photo");
     // A breeder pen has no assigned feed, so there is no refusal to score.
-    if (!breeder && !obsFor(penId)?.refusal_score) missing.push("refusal score");
+    if (!breeder && obsFor(penId)?.leftover_g == null) missing.push("leftover (g)");
     if (!breeder && !w?.activity) missing.push("activity");
     if (!w?.substrate_condition) missing.push("substrate condition");
     return missing;
@@ -227,7 +243,7 @@ function AmPage() {
   const stateFor = (penId: string): PenCompletion => {
     if (uploads.get(penPhotoKey(trialId ?? "", penId, date, "am"))?.status === "uploading") return "uploading";
     const missing = missingFor(penId);
-    const total = isBreeder(penId) ? 2 : 4;
+    const total = penId === CONTROL_ID ? 1 : isBreeder(penId) ? 2 : 4;
     if (missing.length === 0) return "complete";
     return missing.length === total ? "empty" : "partial";
   };
@@ -261,7 +277,9 @@ function AmPage() {
                 : ".") +
               (allPhotos ? "" : " Take them before disturbing the dish."),
         }
-      : undefined,
+      : i === AM_CONTROL_STEP_INDEX && !controlOn
+        ? { forced: true, locked: true, subtitle: "No water-loss test running — nothing to do." }
+        : undefined,
   );
 
   // One site reading per session, written to every pen's welfare row for the date.
@@ -277,6 +295,7 @@ function AmPage() {
     void qc.invalidateQueries({ queryKey: ["welfare", trialId, date] });
     void qc.invalidateQueries({ queryKey: ["trial-photos", trialId, date] });
     void qc.invalidateQueries({ queryKey: ["pop-events", trialId] });
+    void qc.invalidateQueries({ queryKey: ["moisture-control", trialId, date] });
   };
 
   /** Rewrite the session reading on every welfare row already saved for this date. */
@@ -301,13 +320,13 @@ function AmPage() {
       <header className="flex items-start justify-between">
         <div>
           <div className="text-xs uppercase tracking-wide text-muted-foreground">AM Check · ~9:00 AM</div>
-          <h1 className="text-2xl font-bold">Look, don't weigh.</h1>
+          <h1 className="text-2xl font-bold">Photo first, then weigh the leftover.</h1>
         </div>
         <Link to="/guide" className="text-primary flex items-center gap-1 text-sm"><BookOpen className="h-4 w-4" />Guide</Link>
       </header>
 
       <div className={`rounded-lg border p-3 text-sm ${isDefault ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
-        <span className="font-semibold">{displayDate(checkDate)} <span className="font-normal text-muted-foreground">(checking feed from {displayDate(date)})</span></span>
+        <span className="font-semibold">{displayDate(checkDate)} <span className="font-normal text-muted-foreground">(Leftover from {longDate(date)} evening feed)</span></span>
         <div className="text-xs text-muted-foreground mt-0.5">
           {isDefault
             ? `Defaults to today (${displayDate(defaultCheckDate)}), checking the last feeding day at ${siteName} (${displayDate(date)}). Pick another check date below to catch up.`
@@ -393,7 +412,19 @@ function AmPage() {
               />
             }
             renderPen={(pen) =>
-              pen.role === "breeder" ? (
+              pen.role === "control" ? (
+                <ControlCard
+                  key={`${CONTROL_ID}-${date}`}
+                  trialId={trial.data!.id}
+                  siteId={trial.data!.site_id}
+                  feedId={controlFeedId!}
+                  feedName={controlFeed.data?.name ?? "the control feed"}
+                  portionG={Number(trial.data!.control_portion_g)}
+                  date={date}
+                  remainingG={control.data?.remaining_g != null ? Number(control.data.remaining_g) : null}
+                  onSaved={refresh}
+                />
+              ) : pen.role === "breeder" ? (
                 <BreederCard
                   key={pen.id}
                   trialId={trial.data!.id}
@@ -482,28 +513,29 @@ function PenCard({
   liveCountValue: number;
   onSaved: () => void;
 }) {
-  const [refusalState, setRefusalState] = useState<SaveState>("idle");
+  const [leftoverState, setLeftoverState] = useState<SaveState>("idle");
   const [welfareState, setWelfareState] = useState<SaveState>("idle");
   const [notesState, setNotesState] = useState<SaveState>("idle");
   const [eventState, setEventState] = useState<SaveState>("idle");
 
-  const [refusal, setRefusal] = useState<RefusalScore | null>(obsRow?.refusal_score ?? null);
+  const [leftover, setLeftover] = useState<number | null>(obsRow?.leftover_g != null ? Number(obsRow.leftover_g) : null);
+  const offered = obsRow?.offered_g != null ? Number(obsRow.offered_g) : null;
   const [activity, setActivity] = useState<SnailActivity | null>(welfareRow?.activity ?? null);
   const [flags, setFlags] = useState<HealthFlag[]>((welfareRow?.health_flags as HealthFlag[] | null) ?? []);
   const [substrate, setSubstrate] = useState<SubstrateCondition | null>(welfareRow?.substrate_condition ?? null);
 
-  const saveRefusal = async (value: RefusalScore) => {
-    setRefusalState("saving");
+  const saveLeftover = async (value: number | null) => {
+    setLeftoverState("saving");
     try {
       await upsertRow(
         "observations",
-        { trial_id: trialId, pen_id: pen.id, feed_id: feedId, obs_date: date, refusal_score: value },
+        { trial_id: trialId, pen_id: pen.id, feed_id: feedId, obs_date: date, leftover_g: value },
         OBSERVATIONS_TRIAL_KEY,
       );
-      setRefusalState("saved");
+      setLeftoverState("saved");
       onSaved();
     } catch {
-      setRefusalState("failed");
+      setLeftoverState("failed");
     }
   };
 
@@ -600,11 +632,31 @@ function PenCard({
       />
 
       <div className="space-y-1">
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm font-medium">Refusal score (by eye)</span>
-          <StatusPill state={refusalState === "idle" && obsRow?.refusal_score ? "saved" : refusalState} />
+        <div className="flex justify-end">
+          <StatusPill state={leftoverState === "idle" && obsRow?.leftover_g != null ? "saved" : leftoverState} />
         </div>
-        <OptionRow options={REFUSAL} value={refusal} onPick={(v) => { setRefusal(v); void saveRefusal(v); }} />
+        <NumberField
+          key={`${pen.id}-${date}-leftover`}
+          label="Leftover (g)"
+          suffix="g"
+          min={0}
+          step="0.1"
+          defaultValue={obsRow?.leftover_g ?? ""}
+          hint="Take out everything left in the dish, weigh it on the zeroed scale, enter the grams, then throw it away and clean the dish. Enter 0 if nothing is left."
+          onBlur={(e) => {
+            const raw = e.currentTarget.value;
+            const v = raw === "" ? null : Number(raw);
+            if (v != null && (!Number.isFinite(v) || v < 0)) return;
+            if (v === leftover) return;
+            setLeftover(v);
+            void saveLeftover(v);
+          }}
+        />
+        {leftover != null && offered != null && leftover > offered && (
+          <p className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+            More left than was offered. Check the scale zero and the entry.
+          </p>
+        )}
       </div>
 
       <div className="space-y-1">
@@ -922,6 +974,63 @@ function BreederCard({
           className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm"
         />
       </div>
+    </section>
+  );
+}
+
+/** The one control dish: the team only weighs what is left of last evening's portion. */
+function ControlCard({
+  trialId, siteId, feedId, feedName, portionG, date, remainingG, onSaved,
+}: {
+  trialId: string;
+  siteId: string;
+  feedId: string;
+  feedName: string;
+  portionG: number;
+  date: string;
+  remainingG: number | null;
+  onSaved: () => void;
+}) {
+  const [state, setState] = useState<SaveState>("idle");
+  const save = async (value: number | null) => {
+    setState("saving");
+    try {
+      // offered_g is copied from the current setting at save time, so a later
+      // change to the portion never rewrites history.
+      await upsertRow(
+        "moisture_controls",
+        { site_id: siteId, trial_id: trialId, feed_id: feedId, obs_date: date, offered_g: portionG, remaining_g: value },
+        "trial_id,feed_id,obs_date",
+      );
+      setState("saved");
+      onSaved();
+    } catch {
+      setState("failed");
+    }
+  };
+  return (
+    <section className="rounded-2xl border border-dashed border-primary/60 bg-card p-4 shadow-sm space-y-3">
+      <div className="flex items-baseline justify-between">
+        <div className="text-lg font-bold">Control dish</div>
+        <StatusPill state={state === "idle" && remainingG != null ? "saved" : state} />
+      </div>
+      <p className="text-sm text-muted-foreground">This dish got {portionG} g of {feedName} last evening.</p>
+      <NumberField
+        key={`control-${date}`}
+        label="Control leftover (g)"
+        suffix="g"
+        min={0}
+        step="0.1"
+        defaultValue={remainingG ?? ""}
+        hint="Weigh everything left in the control dish on the zeroed scale, enter the grams, then throw it away."
+        onBlur={(e) => {
+          const raw = e.currentTarget.value;
+          const v = raw === "" ? null : Number(raw);
+          if (v != null && (!Number.isFinite(v) || v < 0)) return;
+          if (v === remainingG) return;
+          void save(v);
+        }}
+      />
     </section>
   );
 }
