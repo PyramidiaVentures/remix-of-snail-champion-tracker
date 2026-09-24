@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { computeMetrics, daysBetween, intervalExtras, roundOut, makeRetention, feedEaten, incompleteLabel } from "@/lib/metrics";
+import { computeMetrics, daysBetween, intervalExtras, roundOut, makeRetention, feedEaten, incompleteLabel, correctionStatus, feedingShare, portionChanges } from "@/lib/metrics";
 import { retentionContext } from "@/lib/retention";
 import { makeCalendar } from "@/lib/operatingDays";
 
@@ -69,6 +69,8 @@ const EXPORTS = [
   "welfare_checks",
   "session_photos",
   "interval_summary",
+  "portion_changes",
+  "moisture_controls",
 ] as const;
 
 type ExportName = (typeof EXPORTS)[number];
@@ -85,6 +87,8 @@ const DESCRIPTIONS: Record<ExportName, string> = {
   welfare_checks: "+ pen label, flags as a list",
   session_photos: "all columns",
   interval_summary: "computed analysis sheet — selected site's active trial",
+  portion_changes: "one row per portion change, derived from grams offered",
+  moisture_controls: "+ nights and retention per night",
 };
 
 async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]> {
@@ -202,8 +206,8 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
         const e = feedEaten(offered, leftover, r.retention);
         return {
           ...o,
-          retention: leftover == null ? "" : out(r.retention, 4),
-          retention_status: leftover == null ? "" : r.status,
+          retention_used: leftover == null ? "" : out(r.retention, 4),
+          correction_status: leftover == null ? "" : correctionStatus(r.status),
           leftover_as_offered_g: out(e?.leftoverAsOffered_g, 1),
           eaten_g: out(e?.eaten_g, 1),
           share_left_percent: out(e ? e.shareLeft * 100 : null, 1),
@@ -212,6 +216,68 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
           pen_label: penLabel.get(o['pen_id'] as string) ?? "",
           treatment_label: labelOfTreatmentForPen(o['trial_id'], o['pen_id']),
           feed_name: feedName.get(o['feed_id'] as string) ?? "",
+        };
+      });
+    }
+    case "portion_changes": {
+      const obs = (await all("observations")).filter((o) => o['feed_id'] != null);
+      const trialIds = new Set(obs.map((o) => o['trial_id'] as string));
+      const rows: Row[] = [];
+      for (const tid of trialIds) {
+        const trial = trials.find((t) => t['id'] === tid);
+        const retentionFor = makeRetention(await retentionCtxFor(tid));
+        const trialObs = obs.filter((o) => o['trial_id'] === tid);
+        const penIds = Array.from(new Set(trialObs.map((o) => o['pen_id'] as string)))
+          .sort((a, b) => (penLabel.get(a) ?? "").localeCompare(penLabel.get(b) ?? "", undefined, { numeric: true }));
+        for (const penId of penIds) {
+          const penObs = trialObs.filter((o) => o['pen_id'] === penId);
+          const shares = penObs
+            .map((o) => feedingShare({
+              feed_id: o['feed_id'] as string,
+              obs_date: o['obs_date'] as string,
+              offered_g: o['offered_g'] == null ? null : Number(o['offered_g']),
+              leftover_g: o['leftover_g'] == null ? null : Number(o['leftover_g']),
+              refusal_score: (o['refusal_score'] as string) ?? null,
+            }, retentionFor))
+            .filter((x): x is NonNullable<typeof x> => x != null);
+          for (const c of portionChanges(shares)) {
+            const feedId = penObs.find((o) => o['obs_date'] === c.date)?.['feed_id'] as string | undefined;
+            rows.push({
+              site_name: siteName.get(trial?.['site_id'] as string) ?? "",
+              trial_name: (trial?.['name'] as string) ?? "",
+              pen_label: penLabel.get(penId) ?? "",
+              treatment_label: labelOfTreatmentForPen(tid, penId),
+              feed_name: feedName.get(feedId ?? "") ?? "",
+              date: c.date,
+              previous_g: out(c.previous_g, 1),
+              new_g: out(c.new_g, 1),
+              change_g: out(c.change_g, 1),
+              change_pct: out(c.change_pct, 1),
+              mean_share_left_before_percent: out(c.meanShareLeftBefore != null ? c.meanShareLeftBefore * 100 : null, 1),
+              share_left_basis: c.basisBefore,
+            });
+          }
+        }
+      }
+      return rows;
+    }
+    case "moisture_controls": {
+      const rows = await all("moisture_controls");
+      const lookups = new Map<string, ReturnType<typeof makeRetention>>();
+      for (const tid of new Set(rows.map((c) => c['trial_id'] as string))) {
+        lookups.set(tid, makeRetention(await retentionCtxFor(tid)));
+      }
+      return rows.map((c) => {
+        const r = lookups.get(c['trial_id'] as string)!(c['feed_id'] as string, c['obs_date'] as string);
+        const measured = r.status === "measured";
+        const trial = trials.find((t) => t['id'] === c['trial_id']);
+        return {
+          ...c,
+          site_name: siteName.get(c['site_id'] as string) ?? "",
+          trial_name: (trial?.['name'] as string) ?? "",
+          feed_name: feedName.get(c['feed_id'] as string) ?? "",
+          nights: r.nights,
+          retention_per_night: measured ? out(r.retentionNight, 4) : "",
         };
       });
     }
