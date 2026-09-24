@@ -613,6 +613,8 @@ export type Database = {
           site_id: string
           start_date: string
           status: Database["public"]["Enums"]["trial_status"]
+          target_left_max_pct: number
+          target_left_min_pct: number
           weighing_interval_days: number
         }
         Insert: {
@@ -629,6 +631,8 @@ export type Database = {
           site_id?: string
           start_date: string
           status?: Database["public"]["Enums"]["trial_status"]
+          target_left_max_pct?: number
+          target_left_min_pct?: number
           weighing_interval_days?: number
         }
         Update: {
@@ -645,6 +649,8 @@ export type Database = {
           site_id?: string
           start_date?: string
           status?: Database["public"]["Enums"]["trial_status"]
+          target_left_max_pct?: number
+          target_left_min_pct?: number
           weighing_interval_days?: number
         }
         Relationships: [
