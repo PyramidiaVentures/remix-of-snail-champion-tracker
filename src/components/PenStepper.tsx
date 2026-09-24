@@ -3,13 +3,15 @@ import { ChevronLeft, ChevronRight, CheckCircle2, CircleDashed, Loader2, Circle,
 
 export type PenCompletion = "complete" | "partial" | "empty" | "uploading";
 
-export type PenRole = "trial" | "breeder" | "control";
+export type PenRole = "trial" | "breeder";
+/** A stepper step: a pen, or the control dish (never a pen). */
+export type StepRole = PenRole | "control";
 
 export interface StepperPen {
   id: string;
   label: string;
   /** Breeder pens are monitored but sit outside the trial. Defaults to "trial". */
-  role?: PenRole;
+  role?: StepRole;
   /** Weighing schedule marker, used on Weigh Day only. */
   dueState?: "due" | "overdue";
 }
@@ -43,7 +45,7 @@ const CHIP_STYLES: Record<PenCompletion, string> = {
 };
 
 // Trial pens, then breeder pens, then the control dish (never a pen) last.
-const rank = (role: PenRole | undefined) => (role === "control" ? 2 : role === "breeder" ? 1 : 0);
+const rank = (role: StepRole | undefined) => (role === "control" ? 2 : role === "breeder" ? 1 : 0);
 
 function ChipIcon({ state }: { state: PenCompletion }) {
   if (state === "complete") return <CheckCircle2 className="h-3.5 w-3.5" />;
