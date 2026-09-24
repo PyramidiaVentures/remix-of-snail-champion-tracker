@@ -100,9 +100,10 @@ function HomePage() {
             calendar,
             date: reportDate,
             siteName: siteName || "",
+            controlActive: !!trial.data?.control_active && !!trial.data?.control_feed_id,
           })
         : null,
-    [dayInputs.data, pens.data, assignments.data, trial.data?.weighing_interval_days, calendar, reportDate, siteName],
+    [dayInputs.data, pens.data, assignments.data, trial.data?.weighing_interval_days, trial.data?.control_active, trial.data?.control_feed_id, calendar, reportDate, siteName],
   );
 
   // Trial pens and breeder pens are always counted apart, so a completion
@@ -291,7 +292,7 @@ function OtherSites({ currentSiteId, date }: { currentSiteId: string | null; dat
     queryFn: async () => {
       const { data: trials } = await supabase
         .from("trials")
-        .select("id,site_id,start_date,weighing_interval_days")
+        .select("id,site_id,start_date,weighing_interval_days,control_active,control_feed_id")
         .eq("status", "active")
         .in("site_id", otherIds);
       const list = trials ?? [];
@@ -322,6 +323,7 @@ function OtherSites({ currentSiteId, date }: { currentSiteId: string | null; dat
                 calendar,
                 date: reportDate,
                 siteName: sites.find((s) => s.id === t.site_id)?.name ?? "",
+                controlActive: !!t.control_active && !!t.control_feed_id,
               });
           return {
             siteId: t.site_id,

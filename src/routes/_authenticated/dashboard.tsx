@@ -117,9 +117,10 @@ function DashboardPage() {
             calendar,
             date,
             siteName: siteName || "",
+            controlActive: !!trial.data?.control_active && !!trial.data?.control_feed_id,
           })
         : null,
-    [data.data, allPens, assignments.data, trial.data?.weighing_interval_days, calendar, date, siteName],
+    [data.data, allPens, assignments.data, trial.data?.weighing_interval_days, trial.data?.control_active, trial.data?.control_feed_id, calendar, date, siteName],
   );
 
   const {
@@ -367,6 +368,9 @@ function DashboardPage() {
               <Figure label="Trial pens · AM" value={amExpected ? `${amComplete(trialPens)}/${trialPens.length}` : "not expected"} />
               <Figure label="Breeder pens · PM" value={pmExpected ? `${pmComplete(breederPens)}/${breederPens.length}` : "not expected"} />
               <Figure label="Breeder pens · AM" value={amExpected ? `${amComplete(breederPens)}/${breederPens.length}` : "not expected"} />
+              {review?.controlActive && (
+                <Figure label="Control dish · AM" value={amExpected ? (review.controlMissing ? "0/1" : "1/1") : "not expected"} />
+              )}
             </div>
             <ul className="divide-y divide-border text-sm">
               {watched
