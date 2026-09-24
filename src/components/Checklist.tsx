@@ -11,6 +11,8 @@ import {
   type SopStep,
 } from "@/lib/sopChecklist";
 
+const NO_CHECKED_KEYS: string[] = [];
+
 export interface ChecklistItemOverride {
   /** Force this item complete (or not) regardless of user toggle. */
   forced?: boolean;
@@ -25,6 +27,7 @@ export function Checklist({
   date,
   session,
   title,
+  id,
   items,
   overrides,
   onProgress,
@@ -34,10 +37,11 @@ export function Checklist({
   date: string;
   session: SopSession;
   title: string;
+  id?: string;
   items: SopStep[];
   overrides?: (ChecklistItemOverride | undefined)[];
-  /** Reports (number ticked, all ticked) whenever progress changes. */
-  onProgress?: (doneCount: number, allDone: boolean) => void;
+  /** Reports visible progress and the full saved key set whenever it changes. */
+  onProgress?: (doneCount: number, allDone: boolean, checkedKeys: string[]) => void;
 }) {
   const qc = useQueryClient();
   const [pending, setPending] = useState<string[] | null>(null);
@@ -51,7 +55,7 @@ export function Checklist({
 
   // Whichever we have: the optimistic value being saved, the shared value from
   // the database, or the local mirror while the connection is down.
-  const checkedKeys = pending ?? saved.data ?? readLocal(trialId ?? "", date, session) ?? [];
+  const checkedKeys = pending ?? saved.data ?? readLocal(trialId ?? "", date, session) ?? NO_CHECKED_KEYS;
   const done = visibleTicks(checkedKeys, items);
 
   // Reset the optimistic value when the date or session changes.
@@ -91,11 +95,11 @@ export function Checklist({
   const allDone = completeCount === items.length;
 
   useEffect(() => {
-    onProgress?.(completeCount, allDone);
-  }, [completeCount, allDone, onProgress]);
+    onProgress?.(completeCount, allDone, checkedKeys);
+  }, [completeCount, allDone, checkedKeys, onProgress]);
 
   return (
-    <section className="rounded-xl border border-border bg-card shadow-sm">
+    <section id={id} className="scroll-mt-4 rounded-xl border border-border bg-card shadow-sm">
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
         <span className="flex items-center gap-2">

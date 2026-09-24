@@ -1,7 +1,7 @@
 import { AM_STEPS, PM_STEPS, WEIGH_STEPS } from "@/lib/sopSteps";
 import { createFileRoute } from "@tanstack/react-router";
 import { today } from "@/lib/date";
-import { useSiteScope } from "@/lib/siteScope";
+import { useSiteFeeds, useSiteScope, useSiteTrial } from "@/lib/siteScope";
 import { operatingDaysSentence, useSiteCalendar } from "@/lib/operatingDays";
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -30,24 +30,6 @@ const List = ({ items, ordered }: { items: string[]; ordered?: boolean }) => {
 };
 
 const SECTIONS: { title: string; body: React.ReactNode }[] = [
-  {
-    title: "PM checklist (feeding)",
-    body: (
-      <List
-        ordered
-         items={PM_STEPS.map((step) => step.label)}
-      />
-    ),
-  },
-  {
-    title: "AM checklist (check)",
-    body: (
-      <List
-        ordered
-         items={AM_STEPS.map((step) => step.label)}
-      />
-    ),
-  },
   {
     title: "Weighing checklist",
     body: (
@@ -138,6 +120,23 @@ function OperatingDaysLine() {
 }
 
 function GuidePage() {
+  const trial = useSiteTrial();
+  const feeds = useSiteFeeds();
+  const controlOn = !!trial.data?.control_active && !!trial.data?.control_feed_id;
+  const controlFeedName = (feeds.data ?? []).find((feed) => feed.id === trial.data?.control_feed_id)?.name ?? "the control feed";
+  const pmSteps = PM_STEPS
+    .filter((step) => step.key !== "pm.control_dish" || controlOn)
+    .map((step) => step.key === "pm.control_dish"
+      ? `Put ${Number(trial.data?.control_portion_g ?? 0)} g of ${controlFeedName} in the control dish. Place it in an empty pen of the same build, same lid and substrate, no snails. Keep humidity and every other condition the same as in the snail pens.`
+      : step.label);
+  const amSteps = AM_STEPS
+    .filter((step) => step.key !== "am.control_dish" || controlOn)
+    .map((step) => step.label);
+  const sections = [
+    { title: "PM checklist (feeding)", body: <List ordered items={pmSteps} /> },
+    { title: "AM checklist (check)", body: <List ordered items={amSteps} /> },
+    ...SECTIONS,
+  ];
   return (
     <div className="space-y-4">
       <header>
@@ -147,7 +146,7 @@ function GuidePage() {
 
       <OperatingDaysLine />
       <div className="space-y-2">
-        {SECTIONS.map((s) => (
+        {sections.map((s) => (
           <Collapsible key={s.title} title={s.title} defaultOpen={s.title === "PM checklist (feeding)"}>
             {s.body}
           </Collapsible>

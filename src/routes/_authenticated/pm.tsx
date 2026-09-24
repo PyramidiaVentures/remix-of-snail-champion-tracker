@@ -235,12 +235,21 @@ function PmPage() {
 
   const [checklistDone, setChecklistDone] = useState(0);
   const [checklistAll, setChecklistAll] = useState(false);
-  const onChecklistProgress = useCallback((done: number, all: boolean) => {
+  const [controlTicked, setControlTicked] = useState(false);
+  const onChecklistProgress = useCallback((done: number, all: boolean, checkedKeys: string[]) => {
     setChecklistDone(done);
     setChecklistAll(all);
+    setControlTicked(checkedKeys.includes(PM_CONTROL_STEP_KEY));
   }, []);
 
-  const checklistItems = checklistSteps("pm", date);
+  const checklistItems = checklistSteps("pm", date)
+    .filter((step) => step.key !== PM_CONTROL_STEP_KEY || controlOn)
+    .map((step) => step.key === PM_CONTROL_STEP_KEY
+      ? {
+          ...step,
+          label: `Put ${Number(trial.data?.control_portion_g ?? 0)} g of ${controlFeedName} in the control dish. Keep humidity and every other condition the same as in the snail pens.`,
+        }
+      : step);
   const overrides = checklistItems.map((step) =>
     step.key === PM_PHOTO_STEP_KEY
       ? {
@@ -253,9 +262,7 @@ function PmPage() {
                 ? ` · ${breederPhotosDone} of ${breederPhotosNeeded} breeder pen photos uploaded.`
                 : "."),
         }
-      : step.key === PM_CONTROL_STEP_KEY && !controlOn
-        ? { forced: true, locked: true, subtitle: "No water-loss test running — nothing to do." }
-        : undefined,
+      : undefined,
   );
 
   const refresh = () => {
@@ -287,6 +294,7 @@ function PmPage() {
         date={date}
         session="pm"
         title="PM steps"
+        id="pm-checklist"
         items={checklistItems}
         overrides={overrides}
         onProgress={onChecklistProgress}
@@ -306,10 +314,9 @@ function PmPage() {
           summaryFooter={
             <>
             {controlOn && (
-              <p className="rounded-lg border border-dashed border-primary/60 bg-primary/5 px-3 py-2 text-sm">
-                Put {Number(trial.data.control_portion_g)} g of {controlFeedName} in the control dish: same dish type,
-                covered box, no snails, same room.
-              </p>
+              <a href="#pm-checklist" className={`block text-sm underline ${controlTicked ? "text-primary" : "text-amber-600"}`}>
+                Control dish: {controlTicked ? "ticked" : "not ticked yet"}
+              </a>
             )}
             <SessionCompleteButton
               label="Complete PM Feed"

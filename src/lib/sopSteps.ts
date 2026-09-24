@@ -10,7 +10,7 @@ export const PM_STEPS: SopStep[] = [
   { key: "pm.collect_fresh", label: "Cut/collect fresh feed." },
   { key: "pm.weigh_portion", label: "Weigh each pen's portion and enter grams." },
   { key: "pm.place_feed", label: "Put the feed in the clean dish, rotating the dish position." },
-  { key: "pm.control_portion", label: "Only during a water-loss test: put the standard amount of leaves in the control dish (nothing to enter)." },
+  { key: "pm.control_dish", label: "Put the control portion in the control dish." },
   { key: "pm.calcium_water", label: "Calcium and water." },
   { key: "pm.photo", label: "PM photo." },
 ];
@@ -18,7 +18,7 @@ export const PM_STEPS: SopStep[] = [
 export const AM_STEPS: SopStep[] = [
   { key: "am.photo", label: "Photo each dish untouched, tag in frame." },
   { key: "am.weigh_leftover", label: "Take out all leftover feed, weigh it on the zeroed scale, enter grams, throw it away, clean the dish." },
-  { key: "am.control_leftover", label: "Only during a water-loss test: weigh what is left in the control dish, enter grams, throw it away." },
+  { key: "am.control_dish", label: "Weigh what is left in the control dish and enter it on the Control dish step." },
   { key: "am.activity_health_environment", label: "Activity, health flags, minimum and maximum temperature and humidity." },
   { key: "am.population", label: "Log any deaths, escapes or removals." },
 ];
@@ -33,9 +33,9 @@ export const WEIGH_STEPS: SopStep[] = [
 ];
 
 export const PM_PHOTO_STEP_KEY = "pm.photo";
-export const PM_CONTROL_STEP_KEY = "pm.control_portion";
+export const PM_CONTROL_STEP_KEY = "pm.control_dish";
 export const AM_PHOTO_STEP_KEY = "am.photo";
-export const AM_CONTROL_STEP_KEY = "am.control_leftover";
+export const AM_CONTROL_STEP_KEY = "am.control_dish";
 export const WEIGH_PHOTO_STEP_KEY = "weigh.photo_scale";
 
 const OLD_PM_STEPS: SopStep[] = [
