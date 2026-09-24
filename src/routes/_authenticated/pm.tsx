@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { today } from "@/lib/date";
 import { Checklist } from "@/components/Checklist";
 import { ChecklistBlocker } from "@/components/ChecklistBlocker";
@@ -14,7 +14,9 @@ import { ClosedDayNotice } from "@/components/ClosedDayNotice";
 import { useUploads } from "@/lib/photoUploads.store";
 import { upsertRow, OBSERVATIONS_TRIAL_KEY } from "@/lib/upsertRow";
 import { NoActiveTrial, useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
-import { daysBetween } from "@/lib/metrics";
+import { daysBetween, makeRetention } from "@/lib/metrics";
+import { retentionContext } from "@/lib/retention";
+import { portionHistory, suggestPortion, type PortionHistory, type PortionSuggestion } from "@/lib/portionSuggestion";
 import { useSiteCalendar } from "@/lib/operatingDays";
 
 
@@ -98,7 +100,7 @@ function PmPage() {
     queryFn: async () =>
       (await supabase
         .from("observations")
-        .select("pen_id,obs_date,dish_action")
+        .select("pen_id,obs_date,dish_action,feed_id,offered_g,leftover_g")
         .eq("trial_id", trialId!)
         .lt("obs_date", date)
         .order("obs_date", { ascending: false })).data ?? [],
@@ -110,6 +112,36 @@ function PmPage() {
     queryFn: async () =>
       (await supabase.from("session_photos").select("pen_id,photo_pm_url").eq("trial_id", trialId!).eq("obs_date", date)).data ?? [],
   });
+
+  const controls = useQuery({
+    queryKey: ["moisture-controls-all", trialId],
+    enabled: !!trialId,
+    queryFn: async () =>
+      (await supabase.from("moisture_controls").select("obs_date,offered_g,remaining_g").eq("trial_id", trialId!)).data ?? [],
+  });
+
+  const retentionFor = useMemo(
+    () =>
+      makeRetention(
+        retentionContext(
+          trial.data?.control_feed_id,
+          (controls.data ?? []).map((c) => ({ obs_date: c.obs_date, offered_g: Number(c.offered_g), remaining_g: c.remaining_g == null ? null : Number(c.remaining_g) })),
+          calendar,
+        ),
+      ),
+    [trial.data?.control_feed_id, controls.data, calendar],
+  );
+  const nightsToday = Math.max(1, daysBetween(date, calendar.checkDayFor(date)));
+
+  const portionFor = (penId: string): { history: PortionHistory | null; suggestion: PortionSuggestion | null } => {
+    const rows = (history.data ?? []).filter((r) => r.pen_id === penId);
+    const h = portionHistory(rows, date, retentionFor);
+    if (!h || !trial.data) return { history: h, suggestion: null };
+    return {
+      history: h,
+      suggestion: suggestPortion(h, Number(trial.data.target_left_min_pct), Number(trial.data.target_left_max_pct), nightsToday),
+    };
+  };
 
   const controlOn = !!trial.data?.control_active && !!trial.data?.control_feed_id;
   const controlFeedName =
@@ -308,6 +340,7 @@ function PmPage() {
                 trial={trial.data!}
                 pen={pen}
                 feed={feedByPen.get(pen.id)!}
+                portion={portionFor(pen.id)}
                 date={date}
                 row={rowFor(pen.id)}
                 photoUrl={photoUrlFor(pen.id)}
@@ -332,6 +365,7 @@ function PenCard({
   trial,
   pen,
   feed,
+  portion,
   date,
   row,
   photoUrl,
@@ -340,12 +374,14 @@ function PenCard({
   trial: TrialRow;
   pen: StepperPen;
   feed: { feed_id: string; name: string };
+  portion: { history: PortionHistory | null; suggestion: PortionSuggestion | null };
   date: string;
   row: ObsRow | undefined;
   photoUrl: string | null;
   onSaved: () => void;
 }) {
   const [offeredState, setOfferedState] = useState<SaveState>("idle");
+  const offeredRef = useRef<HTMLInputElement>(null);
   const isAcclimation =
     trial.acclimation_days > 0 && date < addDays(trial.start_date, trial.acclimation_days);
 
@@ -387,7 +423,15 @@ function PenCard({
           <span className="text-xs text-muted-foreground">Offered</span>
           <StatusPill state={offeredState === "idle" && row?.offered_g != null ? "saved" : offeredState} />
         </div>
+        <PortionHint
+          portion={portion}
+          onUse={(g) => {
+            if (offeredRef.current) offeredRef.current.value = String(g);
+            void saveField({ offered_g: g }, setOfferedState);
+          }}
+        />
         <NumberField
+          ref={offeredRef}
           label="Grams offered"
           suffix="g"
           defaultValue={row?.offered_g ?? ""}
@@ -519,5 +563,39 @@ function BreederCard({
         />
       </div>
     </section>
+  );
+}
+
+function PortionHint({
+  portion,
+  onUse,
+}: {
+  portion: { history: PortionHistory | null; suggestion: PortionSuggestion | null };
+  onUse: (grams: number) => void;
+}) {
+  const { history: h, suggestion: s } = portion;
+  if (!h) {
+    return <p className="text-xs text-muted-foreground">Not enough weighed leftovers yet</p>;
+  }
+  const per = h.perNight ? " per night" : "";
+  return (
+    <div className="space-y-1.5 pb-1">
+      <p className="text-xs text-muted-foreground">
+        Last 3 feedings: {Math.round(h.lastOffered)} g offered{per}, avg {Math.round(h.meanEaten)} g eaten{per},{" "}
+        {Math.round(h.meanShareLeft * 100)}% left
+      </p>
+      {s && (
+        <>
+          <button
+            type="button"
+            onClick={() => onUse(s.grams)}
+            className="rounded-full border border-primary bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary"
+          >
+            Suggested: {s.grams} g{s.nights > 1 ? `, covers ${s.nights} nights` : ""}, tap to use
+          </button>
+          <p className="text-xs text-muted-foreground">{s.reason}</p>
+        </>
+      )}
+    </div>
   );
 }
