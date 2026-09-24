@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { computeMetrics, daysBetween, intervalExtras, roundOut, makeRetention, feedEaten, incompleteLabel, correctionStatus, feedingShare, portionChanges } from "@/lib/metrics";
+import { computeMetrics, daysBetween, intervalExtras, roundOut, makeRetention, feedEaten, incompleteLabel, correctionStatus, eatenDryMatter, feedingShare, portionChanges } from "@/lib/metrics";
 import { retentionContext } from "@/lib/retention";
 import { makeCalendar } from "@/lib/operatingDays";
 
@@ -105,6 +105,7 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
     }),
   );
   const feedName = new Map(feeds.map((f) => [f['id'] as string, f['name'] as string]));
+  const dmPercent = new Map(feeds.map((f) => [f['id'] as string, f['dm_percent'] == null ? null : Number(f['dm_percent'])]));
   const treatmentLabel = new Map(treatments.map((t) => [t['id'] as string, t['label'] as string]));
 
   const treatmentByPen = new Map(
@@ -210,6 +211,7 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
           correction_status: leftover == null ? "" : correctionStatus(r.status),
           leftover_as_offered_g: out(e?.leftoverAsOffered_g, 1),
           eaten_g: out(e?.eaten_g, 1),
+          eaten_dm_g: out(eatenDryMatter(e?.eaten_g, dmPercent.get(o['feed_id'] as string)), 1),
           share_left_percent: out(e ? e.shareLeft * 100 : null, 1),
           pen_photo_am_url: ph?.am ?? "",
           pen_photo_pm_url: ph?.pm ?? "",
@@ -390,10 +392,10 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
             leftover_coverage_percent: out(iv.leftoverCoverage != null ? iv.leftoverCoverage * 100 : null, 1),
             mean_share_left_percent: out(iv.meanShareLeft != null ? iv.meanShareLeft * 100 : null, 1),
             feed_offered_per_kg_gain_fresh: usable ? out(iv.offered_g / iv.gain_g!, 2) : "",
-            feed_offered_per_kg_gain_dm: usable && iv.offeredDm_g != null ? out(iv.offeredDm_g / iv.gain_g!, 2) : "",
+            fcr_dry_matter_eaten: iv.dmMissing ? "add dry-matter % in Setup" : iv.eatenDmPerKgGain != null ? out(iv.eatenDmPerKgGain, 2) : usable ? incompleteLabel(iv.leftoverDays, iv.feedingDays) : "",
             note: iv.eatenPerKgGain == null && usable ? "eaten not yet measured for this period" : "",
             cum_offered_g: out(iv.offered_g, 1),
-            cum_offered_dm_g: out(iv.offeredDm_g, 1),
+            cum_eaten_dm_g: iv.dmMissing ? "" : out(iv.eatenDm_g, 1),
             mean_weight_start_g: out(iv.meanWeight1, 2),
             mean_weight_end_g: out(iv.meanWeight2, 2),
             live_count_start:

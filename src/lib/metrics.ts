@@ -100,6 +100,16 @@ export function feedEaten(
   return { leftoverAsOffered_g, eaten_g, shareLeft: leftoverAsOffered_g / offered_g };
 }
 
+/**
+ * Dry matter eaten for one feeding. eaten_g is already "as offered" (the
+ * leftover was corrected for water loss), so the fresh feed's dm_percent
+ * applies. Never multiply the weighed leftover itself by dm_percent.
+ */
+export function eatenDryMatter(eaten_g: number | null | undefined, dm_percent: number | null | undefined): number | null {
+  if (eaten_g == null || dm_percent == null) return null;
+  return eaten_g * (Number(dm_percent) / 100);
+}
+
 /** Share-left bands used by charts and advisories. */
 export const SHARE_BANDS = [
   { key: "b0_2", label: "0–2%", meaning: "Rising means feed-limited — portions may be too small." },
@@ -178,8 +188,7 @@ export interface IntervalMetrics {
   survivingCount: number;
   gain_g: number | null;
   offered_g: number;
-  offeredDm_g: number | null;
-  /** kg feed offered per kg gain — null when gain is not positive. */
+  /** kg feed offered (fresh) per kg gain — null when gain is not positive. */
   offeredPerKgGain: number | null;
   /** Sum of eaten_g over feedings with a weighed leftover. */
   eaten_g: number;
@@ -189,6 +198,10 @@ export interface IntervalMetrics {
   leftoverCoverage: number | null;
   /** FCR (feed eaten) — null when gain <= 0 or coverage < 90%. */
   eatenPerKgGain: number | null;
+  /** FCR (dry matter eaten) — same rules; null also when dm_percent is missing. */
+  eatenDmPerKgGain: number | null;
+  /** The pen's feed has no dm_percent. */
+  dmMissing: boolean;
   meanShareLeft: number | null;
   sgr: number | null;
   survival: number | null;
@@ -201,12 +214,14 @@ export interface PenMetrics {
   treatmentId: string | null;
   intervals: IntervalMetrics[];
   cumOffered_g: number;
-  cumOfferedDm_g: number | null;
   cumEaten_g: number;
+  cumEatenDm_g: number | null;
   feedingDays: number;
   leftoverDays: number;
   leftoverCoverage: number | null;
   eatenPerKgGain: number | null;
+  eatenDmPerKgGain: number | null;
+  dmMissing: boolean;
   meanShareLeft: number | null;
   totalGain_g: number | null;
   offeredPerKgGain: number | null;
@@ -223,9 +238,12 @@ export interface TreatmentMetrics {
   pens: PenMetrics[];
   cumOffered_g: number | null;
   cumEaten_g: number | null;
+  cumEatenDm_g: number | null;
   totalGain_g: number | null;
   offeredPerKgGain: number | null;
   eatenPerKgGain: number | null;
+  eatenDmPerKgGain: number | null;
+  dmMissing: boolean;
   /** Pens with a complete FCR (feed eaten) / pens in the treatment. */
   eatenCompletePens: number;
   meanShareLeft: number | null;
@@ -359,7 +377,6 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
     const dayFigures = (date: string) => {
       const rows = penObs.filter((o) => o.obs_date === date);
       let fresh = 0;
-      let dm: number | null = 0;
       let fed = false;
       let eaten = 0;
       let eatenDm: number | null = 0;
@@ -370,21 +387,24 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
         const pct = dmByFeed.get(o.feed_id);
         if (o.offered_g != null) fed = true;
         fresh += o.offered_g ?? 0;
-        dm = dm == null || pct == null ? null : dm + (o.offered_g ?? 0) * (pct / 100);
         const e = feedEaten(o.offered_g, o.leftover_g, retentionFor(o.feed_id, o.obs_date).retention);
         if (e) {
           weighed = true;
           eaten += e.eaten_g;
-          eatenDm = eatenDm == null || pct == null ? null : eatenDm + e.eaten_g * (pct / 100);
+          const edm = eatenDryMatter(e.eaten_g, pct);
+          eatenDm = eatenDm == null || edm == null ? null : eatenDm + edm;
           offeredWeighed += o.offered_g!;
           leftWeighed += e.leftoverAsOffered_g;
         }
       }
       return {
-        fresh, dm, fed, eaten, eatenDm, weighed,
+        fresh, fed, eaten, eatenDm, weighed,
         shareLeft: weighed && offeredWeighed > 0 ? leftWeighed / offeredWeighed : null,
       };
     };
+
+    const penTreatment = treatments.find((t) => t.id === treatmentByPen.get(pen.id));
+    const penDmMissing = !penTreatment || dmByFeed.get(penTreatment.feed_id) == null;
 
     const weighings = biomass
       .filter((b) => b.pen_id === pen.id)
@@ -413,7 +433,6 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
       const gain_g = valid ? (meanWeight2 - meanWeight1) * b.live_count : null;
 
       let offered = 0;
-      let offeredDm: number | null = 0;
       let eaten = 0;
       let eatenDm: number | null = 0;
       let feedingDays = 0;
@@ -424,7 +443,6 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
         if (!dateIncluded(d)) continue;
         const f = dayFigures(d);
         offered += f.fresh;
-        offeredDm = offeredDm == null || f.dm == null ? null : offeredDm + f.dm;
         if (f.fed) feedingDays += 1;
         if (f.weighed) {
           leftoverDays += 1;
@@ -435,8 +453,7 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
       }
 
       const coverage = feedingDays > 0 ? leftoverDays / feedingDays : null;
-      const basisOffered = dmBasis ? offeredDm : offered;
-      const basisEaten = dmBasis ? eatenDm : eaten;
+      const covered = coverage != null && coverage >= EATEN_COVERAGE_MIN;
       intervals.push({
         from: a.event_date,
         to: b.event_date,
@@ -446,14 +463,15 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
         survivingCount: b.live_count,
         gain_g,
         offered_g: offered,
-        offeredDm_g: offeredDm,
-        offeredPerKgGain: perKg(basisOffered, gain_g),
+        offeredPerKgGain: perKg(offered, gain_g),
         eaten_g: eaten,
         eatenDm_g: eatenDm,
         feedingDays,
         leftoverDays,
         leftoverCoverage: coverage,
-        eatenPerKgGain: coverage != null && coverage >= EATEN_COVERAGE_MIN ? perKg(basisEaten, gain_g) : null,
+        eatenPerKgGain: covered ? perKg(eaten, gain_g) : null,
+        eatenDmPerKgGain: covered && !penDmMissing ? perKg(eatenDm, gain_g) : null,
+        dmMissing: penDmMissing,
         meanShareLeft: meanOf(shares),
         sgr: valid ? specificGrowthRate(meanWeight1, meanWeight2, days) : null,
         survival: valid ? (b.live_count / a.live_count) * 100 : null,
@@ -463,10 +481,6 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
     }
 
     const cumOffered = intervals.reduce((s, i) => s + i.offered_g, 0);
-    const cumOfferedDm = intervals.reduce<number | null>(
-      (s, i) => (s == null || i.offeredDm_g == null ? null : s + i.offeredDm_g),
-      0,
-    );
     const cumEaten = intervals.reduce((s, i) => s + i.eaten_g, 0);
     const cumEatenDm = intervals.reduce<number | null>(
       (s, i) => (s == null || i.eatenDm_g == null ? null : s + i.eatenDm_g),
@@ -501,16 +515,19 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
       treatmentId: treatmentByPen.get(pen.id) ?? null,
       intervals,
       cumOffered_g: cumOffered,
-      cumOfferedDm_g: cumOfferedDm,
       cumEaten_g: cumEaten,
+      cumEatenDm_g: penDmMissing ? null : cumEatenDm,
       feedingDays,
       leftoverDays,
       leftoverCoverage: coverage,
       eatenPerKgGain:
-        coverage != null && coverage >= EATEN_COVERAGE_MIN ? perKg(dmBasis ? cumEatenDm : cumEaten, totalGain) : null,
+        coverage != null && coverage >= EATEN_COVERAGE_MIN ? perKg(cumEaten, totalGain) : null,
+      eatenDmPerKgGain:
+        coverage != null && coverage >= EATEN_COVERAGE_MIN && !penDmMissing ? perKg(cumEatenDm, totalGain) : null,
+      dmMissing: penDmMissing,
       meanShareLeft: meanOf(intervals.map((i) => i.meanShareLeft)),
       totalGain_g: totalGain,
-      offeredPerKgGain: perKg(dmBasis ? cumOfferedDm : cumOffered, totalGain),
+      offeredPerKgGain: perKg(cumOffered, totalGain),
       meanSgr: meanOf(intervals.map((i) => i.sgr)),
       survival,
       meanFeedingRate: meanOf(intervals.map((i) => i.feedingRate)),
@@ -523,16 +540,20 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
   const treatmentMetrics: TreatmentMetrics[] = treatments.map((t) => {
     const group = penMetrics.filter((p) => p.treatmentId === t.id);
     const complete = group.filter((p) => p.eatenPerKgGain != null);
+    const completeDm = group.filter((p) => p.eatenDmPerKgGain != null);
     return {
       treatmentId: t.id,
       label: t.label,
       pens: group,
-      cumOffered_g: meanOf(group.map((p) => (dmBasis ? p.cumOfferedDm_g : p.cumOffered_g))),
+      cumOffered_g: meanOf(group.map((p) => p.cumOffered_g)),
       cumEaten_g: meanOf(group.map((p) => p.cumEaten_g)),
+      cumEatenDm_g: meanOf(group.map((p) => p.cumEatenDm_g)),
       totalGain_g: meanOf(group.map((p) => p.totalGain_g)),
       offeredPerKgGain: meanOf(group.map((p) => p.offeredPerKgGain)),
       // Only shown once every pen in the treatment has a complete figure.
       eatenPerKgGain: group.length && complete.length === group.length ? meanOf(complete.map((p) => p.eatenPerKgGain)) : null,
+      eatenDmPerKgGain: group.length && completeDm.length === group.length ? meanOf(completeDm.map((p) => p.eatenDmPerKgGain)) : null,
+      dmMissing: group.some((p) => p.dmMissing),
       eatenCompletePens: complete.length,
       meanShareLeft: meanOf(group.map((p) => p.meanShareLeft)),
       meanSgr: meanOf(group.map((p) => p.meanSgr)),
