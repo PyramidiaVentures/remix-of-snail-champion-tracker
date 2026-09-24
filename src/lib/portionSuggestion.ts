@@ -69,7 +69,7 @@ export function suggestPortion(
   const lo = h.lastOffered * 0.8;
   const hi = h.lastOffered * 1.2;
   let s = round5(h.meanEaten / (1 - targetLeft));
-  if (h.hungry) s = Math.max(s, h.lastOffered * 1.1);
+  if (h.hungry) s = Math.max(s, Math.ceil((h.lastOffered * 1.1) / 5) * 5);
   // Keep a multiple of 5 inside the ±20% band when one exists.
   if (s > hi) s = Math.floor(hi / 5) * 5 >= lo ? Math.floor(hi / 5) * 5 : Math.round(hi);
   if (s < lo) s = Math.ceil(lo / 5) * 5 <= hi ? Math.ceil(lo / 5) * 5 : Math.round(lo);
