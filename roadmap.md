@@ -16,3 +16,11 @@
 - [x] Home exceptions summary block + OtherSites counts
 - [x] Typecheck
 - [x] Playwright verify /home + /dashboard consistency, then feature summary to user
+
+## Leftover + leaf control in calculations (2026-09-24)
+- [x] 1. Water-loss retention per night, statuses
+- [x] 2. eaten_g / share_left per observation
+- [x] 3. Interval feed window obs_date >= A and < B (Pens 1–5 = 1,035 g)
+- [x] 4. cum_eaten, coverage, FCR (feed eaten) headline, mean share left
+- [x] 5. Replace refusal_score rules with share-left rules/bands
+- [x] 6. Remove carry-over/spoilage for trial pens in Results + interval_summary

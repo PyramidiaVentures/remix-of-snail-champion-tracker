@@ -1,3 +1,5 @@
+import { feedEaten, makeRetention } from "@/lib/metrics";
+import { retentionContext } from "@/lib/retention";
 import { supabase } from "@/integrations/supabase/client";
 import { today } from "@/lib/date";
 import { addDays, roundOut } from "@/lib/metrics";
@@ -29,6 +31,11 @@ export const FLAG_LABEL: Record<string, string> = {
   mould_in_dish: "Mould in dish",
   visible_dead: "Visible dead",
 };
+/** Over-portioning: share left above 15% on 3 consecutive feedings. */
+export const OVER_PORTION_SHARE = 0.15;
+/** Under-portioning: share left below 2% on 2 consecutive feedings. */
+export const UNDER_PORTION_SHARE = 0.02;
+
 export const REFUSAL_LABEL: Record<string, string> = {
   none_left: "None left",
   trace: "Trace",
@@ -103,11 +110,13 @@ export type DayInputs = {
   checklists: { session: string; steps: boolean[] | null }[];
   /** The control dish reading for the date (null when none saved). */
   control: { remaining_g: number | null } | null;
+  /** Every control-dish reading for the trial up to the date. */
+  controlReadings: { obs_date: string; offered_g: number; remaining_g: number | null; feed_id: string }[];
 };
 
 /** Fetch every dataset the day review reads, for one trial and date. */
 export async function fetchDayInputs(trialId: string, date: string): Promise<DayInputs> {
-  const [obs, welfare, photos, pop, biomass, checklists, control] = await Promise.all([
+  const [obs, welfare, photos, pop, biomass, checklists, control, controlReadings] = await Promise.all([
     supabase.from("observations")
       .select("pen_id,obs_date,offered_g,dish_action,refusal_score,leftover_g,feed_id")
       .eq("trial_id", trialId).lte("obs_date", date),
@@ -124,6 +133,8 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
       .eq("trial_id", trialId).eq("obs_date", date),
     supabase.from("moisture_controls").select("remaining_g")
       .eq("trial_id", trialId).eq("obs_date", date).maybeSingle(),
+    supabase.from("moisture_controls").select("obs_date,offered_g,remaining_g,feed_id")
+      .eq("trial_id", trialId).lte("obs_date", date),
   ]);
   return {
     obs: obs.data ?? [],
@@ -133,6 +144,7 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
     biomass: biomass.data ?? [],
     checklists: checklists.data ?? [],
     control: control.data ?? null,
+    controlReadings: (controlReadings.data ?? []).map((c) => ({ ...c, offered_g: Number(c.offered_g), remaining_g: c.remaining_g == null ? null : Number(c.remaining_g) })),
   };
 }
 
@@ -165,6 +177,8 @@ export function computeDayReview(args: {
   siteName: string;
   /** The water-loss test is running: the control dish counts in the AM check. */
   controlActive?: boolean;
+  /** The trial's control feed — the only feed corrected for water loss. */
+  controlFeedId?: string | null;
 }) {
   const { pens: allPens, assignments, trialInterval, data: d, calendar, date, siteName } = args;
   const controlActive = !!args.controlActive;
@@ -344,32 +358,52 @@ export function computeDayReview(args: {
     if (!done) exceptions.push({ key: `amstep-${i}`, group: "AM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/am" });
   });
 
-  // Consecutive refusal runs ending on the selected date.
-  const runLength = (penId: string, score: string) => {
-    const byDate = new Map(d.obs.filter((o) => o.pen_id === penId).map((o) => [o.obs_date, o.refusal_score]));
-    // Consecutive OPERATING days: a closure neither breaks a run nor counts
-    // towards one.
+  // Portioning runs from the weighed leftover (share left), over consecutive
+  // OPERATING days ending on the selected date. Visual scores never count.
+  const retentionFor = makeRetention(
+    retentionContext(
+      args.controlFeedId,
+      d.controlReadings.filter((c) => c.feed_id === args.controlFeedId),
+      calendar,
+    ),
+  );
+  const shareRun = (penId: string, test: (share: number) => boolean) => {
+    const byDate = new Map<string, number | null>();
+    for (const o of d.obs.filter((r) => r.pen_id === penId)) {
+      const e = feedEaten(o.offered_g, o.leftover_g, retentionFor(o.feed_id, o.obs_date).retention);
+      byDate.set(o.obs_date, e ? e.shareLeft : null);
+    }
     let n = 0;
     let cursor = date;
     while (calendar.isNonOperating(cursor)) cursor = addDays(cursor, -1);
-    while (byDate.get(cursor) === score) {
+    for (;;) {
+      const v = byDate.get(cursor);
+      if (v == null || !test(v)) break;
       n += 1;
       cursor = calendar.previousOperatingDay(cursor);
     }
     return n;
   };
   for (const p of trialPens) {
-    for (const score of ["most_left", "none_left"] as const) {
-      const n = runLength(p.id, score);
-      if (n >= 3) {
-        exceptions.push({
-          key: `run-${score}-${p.id}`,
-          group: "Refusal",
-          text: `${p.label} — ${n} consecutive days at "${REFUSAL_LABEL[score]}"`,
-          to: "/am",
-          penId: p.id,
-        });
-      }
+    const over = shareRun(p.id, (v) => v > OVER_PORTION_SHARE);
+    if (over >= 3) {
+      exceptions.push({
+        key: `run-over-${p.id}`,
+        group: "Refusal",
+        text: `${p.label} — more than 15% left on ${over} feedings in a row: consider cutting the portion`,
+        to: "/am",
+        penId: p.id,
+      });
+    }
+    const under = shareRun(p.id, (v) => v < UNDER_PORTION_SHARE);
+    if (under >= 2) {
+      exceptions.push({
+        key: `run-under-${p.id}`,
+        group: "Refusal",
+        text: `${p.label} — less than 2% left on ${under} feedings in a row: may be feed-limited`,
+        to: "/am",
+        penId: p.id,
+      });
     }
   }
 
@@ -469,7 +503,7 @@ export function summarizeExceptions(exceptions: DayException[]): string {
     }
     else if (e.key.startsWith("ledger-")) bump("count disagreement");
     else if (e.group === "Health") bump("health flag");
-    else if (e.group === "Refusal") bump("refusal run");
+    else if (e.group === "Refusal") bump("portioning run");
     else if (e.group === "Dish") bump("spoiled dish");
     else if (e.key.startsWith("overdue-")) bump("pen overdue for weighing");
     else if (e.key.startsWith("jump-")) bump("weight jump");

@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { computeMetrics, daysBetween, intervalExtras, roundOut } from "@/lib/metrics";
+import { computeMetrics, daysBetween, intervalExtras, roundOut, makeRetention, feedEaten, incompleteLabel } from "@/lib/metrics";
+import { retentionContext } from "@/lib/retention";
 import { makeCalendar } from "@/lib/operatingDays";
 
 const out = (v: number | null | undefined, dp: number): number | "" => roundOut(v, dp) ?? "";
@@ -111,6 +112,26 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
     return t ? treatmentLabel.get(t) ?? "" : "";
   };
 
+  // Water-loss retention per trial, from its control feed and readings.
+  let controlRows: Row[] | null = null;
+  let closureRows: Row[] | null = null;
+  const retentionCtxFor = async (trialId: string) => {
+    controlRows ??= await all("moisture_controls");
+    closureRows ??= await all("site_closures");
+    const t = trials.find((x) => x['id'] === trialId);
+    const sId = t?.['site_id'] as string | undefined;
+    const site = sites.find((x) => x['id'] === sId);
+    const cal = makeCalendar(
+      (site?.['non_operating_weekdays'] as number[] | undefined) ?? [],
+      closureRows.filter((c) => c['site_id'] === sId).map((c) => ({ closure_date: c['closure_date'] as string, reason: (c['reason'] as string) ?? null })),
+    );
+    const controlFeedId = (t?.['control_feed_id'] as string | null) ?? null;
+    const readings = controlRows
+      .filter((c) => c['trial_id'] === trialId && c['feed_id'] === controlFeedId)
+      .map((c) => ({ obs_date: c['obs_date'] as string, offered_g: Number(c['offered_g']), remaining_g: c['remaining_g'] == null ? null : Number(c['remaining_g']) }));
+    return retentionContext(controlFeedId, readings, cal);
+  };
+
   switch (name) {
     case "feeds":
       return feeds;
@@ -169,10 +190,23 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
           pm: signed.get(p['photo_pm_url'] as string) ?? "",
         });
       }
+      const retentionByTrial = new Map<string, ReturnType<typeof makeRetention>>();
+      for (const tid of new Set(obs.map((o) => o['trial_id'] as string))) {
+        retentionByTrial.set(tid, makeRetention(await retentionCtxFor(tid)));
+      }
       return obs.map((o) => {
         const ph = idx.get(`${o['trial_id']}|${o['pen_id']}|${o['obs_date']}`);
+        const r = retentionByTrial.get(o['trial_id'] as string)!(o['feed_id'] as string | null, o['obs_date'] as string);
+        const leftover = o['leftover_g'] == null ? null : Number(o['leftover_g']);
+        const offered = o['offered_g'] == null ? null : Number(o['offered_g']);
+        const e = feedEaten(offered, leftover, r.retention);
         return {
           ...o,
+          retention: leftover == null ? "" : out(r.retention, 4),
+          retention_status: leftover == null ? "" : r.status,
+          leftover_as_offered_g: out(e?.leftoverAsOffered_g, 1),
+          eaten_g: out(e?.eaten_g, 1),
+          share_left_percent: out(e ? e.shareLeft * 100 : null, 1),
           pen_photo_am_url: ph?.am ?? "",
           pen_photo_pm_url: ph?.pm ?? "",
           pen_label: penLabel.get(o['pen_id'] as string) ?? "",
@@ -222,6 +256,7 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
           obs_date: o['obs_date'] as string,
           offered_g: (o['offered_g'] as number) ?? null,
           dish_action: (o['dish_action'] as string) ?? null,
+          leftover_g: o['leftover_g'] == null ? null : Number(o['leftover_g']),
         }));
       const trialBiomass = biomass
         .filter((b) => b['trial_id'] === trialId)
@@ -264,6 +299,7 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
         biomass: trialBiomass,
         includeAcclimation,
         dryMatter: false,
+        retention: await retentionCtxFor(trialId),
       });
 
       const rows: Row[] = [];
@@ -283,23 +319,24 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
             interval_start: iv.from,
             interval_end: iv.to,
             days: daysBetween(iv.from, iv.to),
+            fcr_feed_eaten: iv.eatenPerKgGain != null ? out(iv.eatenPerKgGain, 2) : usable ? incompleteLabel(iv.leftoverDays, iv.feedingDays) : "",
+            cum_eaten_g: out(iv.eaten_g, 1),
+            leftover_coverage_percent: out(iv.leftoverCoverage != null ? iv.leftoverCoverage * 100 : null, 1),
+            mean_share_left_percent: out(iv.meanShareLeft != null ? iv.meanShareLeft * 100 : null, 1),
+            feed_offered_per_kg_gain_fresh: usable ? out(iv.offered_g / iv.gain_g!, 2) : "",
+            feed_offered_per_kg_gain_dm: usable && iv.offeredDm_g != null ? out(iv.offeredDm_g / iv.gain_g!, 2) : "",
+            note: iv.eatenPerKgGain == null && usable ? "eaten not yet measured for this period" : "",
             cum_offered_g: out(iv.offered_g, 1),
             cum_offered_dm_g: out(iv.offeredDm_g, 1),
             mean_weight_start_g: out(iv.meanWeight1, 2),
             mean_weight_end_g: out(iv.meanWeight2, 2),
             live_count_start:
               trialBiomass.find((b) => b.pen_id === pen.penId && b.event_date === iv.from)?.live_count ?? "",
-
             live_count_end: iv.survivingCount,
             gain_g: out(iv.gain_g, 1),
-            offered_per_kg_gain_fresh: usable ? out(iv.offered_g / iv.gain_g!, 2) : "",
-            offered_per_kg_gain_dm: usable && iv.offeredDm_g != null ? out(iv.offeredDm_g / iv.gain_g!, 2) : "",
             sgr_percent_per_day: out(iv.sgr, 2),
             survival_percent: out(iv.survival, 1),
             feeding_rate_percent_bw_day: out(iv.feedingRate, 1),
-            mean_carry_over_days: out(extras.meanCarryOverDays, 1),
-            max_carry_over_days: out(extras.maxCarryOverDays, 0),
-            spoilage_rate_percent: out(extras.spoilageRate, 1),
             missing_feeding_days: extras.missingFeedingDays,
           });
         }

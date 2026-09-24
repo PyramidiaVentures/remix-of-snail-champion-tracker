@@ -3,9 +3,146 @@
  * Nothing here is persisted, so correcting an input or adding a dry-matter %
  * retroactively updates every figure.
  *
- * The conversion metric is offer-based and is always called
- * "Feed offered per kg gain".
+ * Headline conversion: "FCR (feed eaten)" — feed offered minus the weighed
+ * leftover (corrected for water loss on the control feed), per kg gain.
+ * Secondary: "Feed offered per kg gain" — never labelled FCR.
+ *
+ * Interval feed window: the team weighs BEFORE the evening feed, so an
+ * interval from weighing A to weighing B counts feedings A <= obs_date < B.
  */
+
+export interface ControlReading {
+  obs_date: string;
+  offered_g: number;
+  remaining_g: number | null;
+}
+
+export type RetentionStatus = "dry feed, not corrected" | "measured" | "from test" | "not tested";
+
+export interface RetentionContext {
+  /** The trial's control feed — the only feed ever corrected. */
+  controlFeedId: string | null;
+  readings: ControlReading[];
+  /** Nights from feeding date D to the morning it was weighed (normally 1). */
+  nightsFor: (date: string) => number;
+  /** Next feeding day after D — used to find consecutive test readings. */
+  nextFeedingDay: (date: string) => string;
+}
+
+export interface Retention {
+  retention: number;
+  retentionNight: number;
+  nights: number;
+  status: RetentionStatus;
+}
+
+/** Build a lookup for the water-loss retention applied to a feeding. */
+export function makeRetention(ctx: RetentionContext | null | undefined) {
+  const nightsFor = ctx?.nightsFor ?? (() => 1);
+  const perNight = new Map<string, number>();
+  for (const r of ctx?.readings ?? []) {
+    if (r.remaining_g == null || !(r.offered_g > 0)) continue;
+    const n = Math.max(1, nightsFor(r.obs_date));
+    perNight.set(r.obs_date, Math.pow(r.remaining_g / r.offered_g, 1 / n));
+  }
+  // Runs of consecutive readings (consecutive feeding days).
+  const dates = Array.from(perNight.keys()).sort();
+  const runs: { end: string; mean: number }[] = [];
+  let cur: string[] = [];
+  const flush = () => {
+    if (!cur.length) return;
+    const m = cur.reduce((s, d) => s + perNight.get(d)!, 0) / cur.length;
+    runs.push({ end: cur[cur.length - 1]!, mean: m });
+    cur = [];
+  };
+  for (const d of dates) {
+    const prev = cur[cur.length - 1];
+    if (prev && ctx && ctx.nextFeedingDay(prev) !== d) flush();
+    cur.push(d);
+  }
+  flush();
+
+  return (feedId: string | null | undefined, date: string): Retention => {
+    const nights = Math.max(1, nightsFor(date));
+    if (!ctx?.controlFeedId || feedId !== ctx.controlFeedId) {
+      return { retention: 1, retentionNight: 1, nights, status: "dry feed, not corrected" };
+    }
+    const measured = perNight.get(date);
+    if (measured != null) {
+      return { retention: Math.pow(measured, nights), retentionNight: measured, nights, status: "measured" };
+    }
+    if (runs.length) {
+      // Most recent test ending on or before D; a feeding before any test
+      // uses the earliest test.
+      const before = runs.filter((r) => r.end <= date);
+      const run = before.length ? before[before.length - 1]! : runs[0]!;
+      return { retention: Math.pow(run.mean, nights), retentionNight: run.mean, nights, status: "from test" };
+    }
+    return { retention: 1, retentionNight: 1, nights, status: "not tested" };
+  };
+}
+
+export interface FeedEaten {
+  leftoverAsOffered_g: number;
+  eaten_g: number;
+  shareLeft: number; // 0..1+
+}
+
+/** Feed eaten for one feeding. Null when offered or leftover is missing. */
+export function feedEaten(
+  offered_g: number | null | undefined,
+  leftover_g: number | null | undefined,
+  retention: number,
+): FeedEaten | null {
+  if (offered_g == null || leftover_g == null || !(offered_g > 0) || !(retention > 0)) return null;
+  const leftoverAsOffered_g = leftover_g / retention;
+  const eaten_g = Math.min(offered_g, Math.max(0, offered_g - leftoverAsOffered_g));
+  return { leftoverAsOffered_g, eaten_g, shareLeft: leftoverAsOffered_g / offered_g };
+}
+
+/** Share-left bands used by charts and advisories. */
+export const SHARE_BANDS = [
+  { key: "b0_2", label: "0–2%", meaning: "Rising means feed-limited — portions may be too small." },
+  { key: "b2_5", label: "2–5%", meaning: "Close to eaten out." },
+  { key: "b5_10", label: "5–10% (target)", meaning: "Target band." },
+  { key: "b10_25", label: "10–25%", meaning: "A little over-portioned." },
+  { key: "b25_50", label: "25–50%", meaning: "Over-portioned — consider cutting." },
+  { key: "b50", label: "Over 50%", meaning: "Rising means cut portions." },
+] as const;
+export type ShareBand = (typeof SHARE_BANDS)[number]["key"];
+
+export function shareBand(share: number): ShareBand {
+  const pct = share * 100;
+  if (pct < 2) return "b0_2";
+  if (pct < 5) return "b2_5";
+  if (pct < 10) return "b5_10";
+  if (pct < 25) return "b10_25";
+  if (pct <= 50) return "b25_50";
+  return "b50";
+}
+
+/** Historical visual score → band ("visual estimate"). Never used in eaten_g. */
+export const SCORE_BAND: Record<string, ShareBand> = {
+  none_left: "b0_2",
+  trace: "b2_5",
+  about_25: "b10_25",
+  about_50: "b25_50",
+  most_left: "b50",
+};
+
+/** Band for one observation: weighed leftover first, else the visual score. */
+export function observationBand(
+  o: { feed_id?: string | null; obs_date: string; offered_g: number | null; leftover_g?: number | null; refusal_score?: string | null },
+  retentionFor: ReturnType<typeof makeRetention>,
+): { band: ShareBand; visual: boolean; shareLeft: number | null } | null {
+  const e = feedEaten(o.offered_g, o.leftover_g, retentionFor(o.feed_id, o.obs_date).retention);
+  if (e) return { band: shareBand(e.shareLeft), visual: false, shareLeft: e.shareLeft };
+  if (o.refusal_score && SCORE_BAND[o.refusal_score]) return { band: SCORE_BAND[o.refusal_score]!, visual: true, shareLeft: null };
+  return null;
+}
+
+/** Minimum coverage of weighed leftovers before FCR (feed eaten) is shown. */
+export const EATEN_COVERAGE_MIN = 0.9;
 
 export interface MetricsInput {
   trial: { id: string; start_date: string; acclimation_days: number };
@@ -19,6 +156,7 @@ export interface MetricsInput {
     obs_date: string;
     offered_g: number | null;
     dish_action: string | null;
+    leftover_g?: number | null;
   }[];
   biomass: {
     pen_id: string;
@@ -28,6 +166,7 @@ export interface MetricsInput {
   }[];
   includeAcclimation: boolean;
   dryMatter: boolean;
+  retention?: RetentionContext | null;
 }
 
 export interface IntervalMetrics {
@@ -42,6 +181,15 @@ export interface IntervalMetrics {
   offeredDm_g: number | null;
   /** kg feed offered per kg gain — null when gain is not positive. */
   offeredPerKgGain: number | null;
+  /** Sum of eaten_g over feedings with a weighed leftover. */
+  eaten_g: number;
+  eatenDm_g: number | null;
+  feedingDays: number;
+  leftoverDays: number;
+  leftoverCoverage: number | null;
+  /** FCR (feed eaten) — null when gain <= 0 or coverage < 90%. */
+  eatenPerKgGain: number | null;
+  meanShareLeft: number | null;
   sgr: number | null;
   survival: number | null;
   feedingRate: number | null;
@@ -54,14 +202,17 @@ export interface PenMetrics {
   intervals: IntervalMetrics[];
   cumOffered_g: number;
   cumOfferedDm_g: number | null;
+  cumEaten_g: number;
+  feedingDays: number;
+  leftoverDays: number;
+  leftoverCoverage: number | null;
+  eatenPerKgGain: number | null;
+  meanShareLeft: number | null;
   totalGain_g: number | null;
   offeredPerKgGain: number | null;
   meanSgr: number | null;
   survival: number | null;
   meanFeedingRate: number | null;
-  meanCarryOverDays: number | null;
-  maxCarryOverDays: number | null;
-  spoilageRate: number | null;
   weightSeries: { date: string; meanWeight: number; liveCount: number }[];
   offeredSeries: { date: string; cumulative: number }[];
 }
@@ -71,14 +222,16 @@ export interface TreatmentMetrics {
   label: string;
   pens: PenMetrics[];
   cumOffered_g: number | null;
+  cumEaten_g: number | null;
   totalGain_g: number | null;
   offeredPerKgGain: number | null;
+  eatenPerKgGain: number | null;
+  /** Pens with a complete FCR (feed eaten) / pens in the treatment. */
+  eatenCompletePens: number;
+  meanShareLeft: number | null;
   meanSgr: number | null;
   survival: number | null;
   meanFeedingRate: number | null;
-  meanCarryOverDays: number | null;
-  maxCarryOverDays: number | null;
-  spoilageRate: number | null;
 }
 
 export interface TrialMetrics {
@@ -106,22 +259,11 @@ export function meanOf(values: (number | null | undefined)[]): number | null {
   return xs.reduce((a, b) => a + b, 0) / xs.length;
 }
 
-function maxOf(values: (number | null | undefined)[]): number | null {
-  const xs = values.filter((v): v is number => v != null && Number.isFinite(v));
-  if (!xs.length) return null;
-  return Math.max(...xs);
-}
-
 const EMPTYING_ACTIONS = new Set(["emptied_refilled", "emptied_spoiled"]);
 
 /**
- * Carry-over age per recorded date: the number of CALENDAR DAYS since the dish
- * was last emptied. Counting days, not entries, is what keeps a closed day
- * honest — feed put in on Saturday is still sitting there on Monday even
- * though nobody recorded anything on Sunday.
- *
- * A date is omitted when the dish has never been emptied before it, since its
- * age is unknown.
+ * Carry-over age per recorded date (breeder pens only — trial pens no longer
+ * carry feed over): calendar days since the dish was last emptied.
  */
 export function carryOverDaysSeries(
   actionsByDate: { date: string; action: string | null }[],
@@ -140,59 +282,38 @@ export function carryOverDaysSeries(
   return out;
 }
 
+/** True when feeding date d falls in the interval's feed window [from, to). */
+export function inFeedWindow(d: string, iv: { from: string; to: string }): boolean {
+  return d >= iv.from && d < iv.to;
+}
+
 export interface IntervalExtras {
   missingFeedingDays: number;
-  meanCarryOverDays: number | null;
-  maxCarryOverDays: number | null;
-  spoilageRate: number | null;
 }
 
 /**
- * Dish and feeding-day figures for one weighing interval.
- * Shared by the Results pen detail table and the interval_summary export so
- * the two can never drift apart.
- *
- * `isOperating` excludes the site's closed days from the expected feeding
- * days — a planned closure is not a missed feeding.
+ * Feeding-day figures for one weighing interval, shared by Results and the
+ * interval_summary export. Window is [from, to). Closed days are not expected.
  */
 export function intervalExtras(
   interval: { from: string; to: string },
-  penObservations: { obs_date: string; offered_g: number | null; dish_action: string | null }[],
+  penObservations: { obs_date: string; offered_g: number | null }[],
   dateIncluded: (d: string) => boolean,
   isOperating: (d: string) => boolean = () => true,
 ): IntervalExtras {
-  const inRange = penObservations.filter(
-    (o) => o.obs_date > interval.from && o.obs_date <= interval.to && dateIncluded(o.obs_date),
+  const fedDates = new Set(
+    penObservations
+      .filter((o) => o.offered_g != null && inFeedWindow(o.obs_date, interval) && dateIncluded(o.obs_date))
+      .map((o) => o.obs_date),
   );
-
-  // Carry-over reads the pen's whole history so a dish emptied before the
-  // interval still dates the feed sitting inside it.
-  const allByDate = new Map<string, string | null>();
-  for (const o of penObservations) if (o.dish_action != null) allByDate.set(o.obs_date, o.dish_action);
-  const ages = carryOverDaysSeries(Array.from(allByDate, ([date, action]) => ({ date, action })))
-    .filter((r) => r.date > interval.from && r.date <= interval.to && dateIncluded(r.date))
-    .map((r) => r.days);
-
-  const byDate = new Map<string, string | null>();
-  for (const o of inRange) if (o.dish_action != null) byDate.set(o.obs_date, o.dish_action);
-  const spoiled = Array.from(byDate.values()).filter((a) => a === "emptied_spoiled").length;
-
-  const fedDates = new Set(inRange.filter((o) => o.offered_g != null).map((o) => o.obs_date));
   let missing = 0;
-  for (let d = addDays(interval.from, 1); d <= interval.to; d = addDays(d, 1)) {
+  for (let d = interval.from; d < interval.to; d = addDays(d, 1)) {
     if (!dateIncluded(d)) continue;
     if (!isOperating(d)) continue;
     if (!fedDates.has(d)) missing += 1;
   }
-
-  return {
-    missingFeedingDays: missing,
-    meanCarryOverDays: ages.length ? ages.reduce((a, b) => a + b, 0) / ages.length : null,
-    maxCarryOverDays: ages.length ? Math.max(...ages) : null,
-    spoilageRate: byDate.size ? (spoiled / byDate.size) * 100 : null,
-  };
+  return { missingFeedingDays: missing };
 }
-
 
 /**
  * Specific growth rate, % per day. Single definition — used by the Results
@@ -208,6 +329,8 @@ export function specificGrowthRate(
   return ((Math.log(meanWeight2) - Math.log(meanWeight1)) / days) * 100;
 }
 
+const perKg = (feed: number | null, gain: number | null) =>
+  feed != null && gain != null && gain > 0 ? feed / 1000 / (gain / 1000) : null;
 
 export function computeMetrics(input: MetricsInput): TrialMetrics {
   const {
@@ -217,9 +340,8 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
 
   const dmByFeed = new Map(feeds.map((f) => [f.id, f.dm_percent]));
   const treatmentByPen = new Map(assignments.map((a) => [a.pen_id, a.treatment_id]));
+  const retentionFor = makeRetention(input.retention);
 
-  // Every feed used by a treatment in this trial must have a dm_percent
-  // before the dry-matter basis can be offered.
   const trialFeedIds = new Set(treatments.map((t) => t.feed_id));
   const dmAvailable =
     trialFeedIds.size > 0 &&
@@ -234,15 +356,34 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
       .filter((o) => o.pen_id === pen.id && dateIncluded(o.obs_date))
       .sort((a, b) => a.obs_date.localeCompare(b.obs_date));
 
-    const offeredOn = (date: string) => {
+    const dayFigures = (date: string) => {
       const rows = penObs.filter((o) => o.obs_date === date);
-      const fresh = rows.reduce((s, o) => s + (o.offered_g ?? 0), 0);
-      const dm = rows.reduce<number | null>((s, o) => {
+      let fresh = 0;
+      let dm: number | null = 0;
+      let fed = false;
+      let eaten = 0;
+      let eatenDm: number | null = 0;
+      let weighed = false;
+      let offeredWeighed = 0;
+      let leftWeighed = 0;
+      for (const o of rows) {
         const pct = dmByFeed.get(o.feed_id);
-        if (s == null || pct == null) return null;
-        return s + (o.offered_g ?? 0) * (pct / 100);
-      }, 0);
-      return { fresh, dm };
+        if (o.offered_g != null) fed = true;
+        fresh += o.offered_g ?? 0;
+        dm = dm == null || pct == null ? null : dm + (o.offered_g ?? 0) * (pct / 100);
+        const e = feedEaten(o.offered_g, o.leftover_g, retentionFor(o.feed_id, o.obs_date).retention);
+        if (e) {
+          weighed = true;
+          eaten += e.eaten_g;
+          eatenDm = eatenDm == null || pct == null ? null : eatenDm + e.eaten_g * (pct / 100);
+          offeredWeighed += o.offered_g!;
+          leftWeighed += e.leftoverAsOffered_g;
+        }
+      }
+      return {
+        fresh, dm, fed, eaten, eatenDm, weighed,
+        shareLeft: weighed && offeredWeighed > 0 ? leftWeighed / offeredWeighed : null,
+      };
     };
 
     const weighings = biomass
@@ -262,35 +403,40 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
       const a = weighings[i - 1];
       const b = weighings[i];
       // An interval must measure gain and feed over exactly the same days.
-      // If its start falls inside the acclimation window while the feed in it
-      // is filtered by dateIncluded, the interval measures nothing — drop it.
       if (!dateIncluded(a.event_date)) continue;
       const days = daysBetween(a.event_date, b.event_date);
       const valid = a.live_count > 0 && b.live_count > 0 && days > 0;
 
-
       const meanWeight1 = valid ? a.net_biomass_g / a.live_count : NaN;
       const meanWeight2 = valid ? b.net_biomass_g / b.live_count : NaN;
-
-      // Gain is the change in MEAN weight × the surviving count — never the
-      // raw difference in net biomass, which would read mortality as loss.
+      // Gain = change in MEAN weight × surviving count.
       const gain_g = valid ? (meanWeight2 - meanWeight1) * b.live_count : null;
 
       let offered = 0;
       let offeredDm: number | null = 0;
-      for (
-        let d = addDays(a.event_date, 1);
-        d <= b.event_date;
-        d = addDays(d, 1)
-      ) {
+      let eaten = 0;
+      let eatenDm: number | null = 0;
+      let feedingDays = 0;
+      let leftoverDays = 0;
+      const shares: number[] = [];
+      // Weighing happens before the evening feed: window is [A, B).
+      for (let d = a.event_date; d < b.event_date; d = addDays(d, 1)) {
         if (!dateIncluded(d)) continue;
-        const { fresh, dm } = offeredOn(d);
-        offered += fresh;
-        offeredDm = offeredDm == null || dm == null ? null : offeredDm + dm;
+        const f = dayFigures(d);
+        offered += f.fresh;
+        offeredDm = offeredDm == null || f.dm == null ? null : offeredDm + f.dm;
+        if (f.fed) feedingDays += 1;
+        if (f.weighed) {
+          leftoverDays += 1;
+          eaten += f.eaten;
+          eatenDm = eatenDm == null || f.eatenDm == null ? null : eatenDm + f.eatenDm;
+          if (f.shareLeft != null) shares.push(f.shareLeft);
+        }
       }
 
-      const usable = gain_g != null && gain_g > 0;
+      const coverage = feedingDays > 0 ? leftoverDays / feedingDays : null;
       const basisOffered = dmBasis ? offeredDm : offered;
+      const basisEaten = dmBasis ? eatenDm : eaten;
       intervals.push({
         from: a.event_date,
         to: b.event_date,
@@ -301,18 +447,18 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
         gain_g,
         offered_g: offered,
         offeredDm_g: offeredDm,
-        offeredPerKgGain:
-          usable && basisOffered != null && gain_g! > 0
-            ? basisOffered / 1000 / (gain_g! / 1000)
-            : null,
-        sgr:
-          valid ? specificGrowthRate(meanWeight1, meanWeight2, days) : null,
-
+        offeredPerKgGain: perKg(basisOffered, gain_g),
+        eaten_g: eaten,
+        eatenDm_g: eatenDm,
+        feedingDays,
+        leftoverDays,
+        leftoverCoverage: coverage,
+        eatenPerKgGain: coverage != null && coverage >= EATEN_COVERAGE_MIN ? perKg(basisEaten, gain_g) : null,
+        meanShareLeft: meanOf(shares),
+        sgr: valid ? specificGrowthRate(meanWeight1, meanWeight2, days) : null,
         survival: valid ? (b.live_count / a.live_count) * 100 : null,
         feedingRate:
-          valid && a.net_biomass_g > 0
-            ? (offered / days / a.net_biomass_g) * 100
-            : null,
+          valid && a.net_biomass_g > 0 ? (offered / days / a.net_biomass_g) * 100 : null,
       });
     }
 
@@ -321,16 +467,18 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
       (s, i) => (s == null || i.offeredDm_g == null ? null : s + i.offeredDm_g),
       0,
     );
+    const cumEaten = intervals.reduce((s, i) => s + i.eaten_g, 0);
+    const cumEatenDm = intervals.reduce<number | null>(
+      (s, i) => (s == null || i.eatenDm_g == null ? null : s + i.eatenDm_g),
+      0,
+    );
+    const feedingDays = intervals.reduce((s, i) => s + i.feedingDays, 0);
+    const leftoverDays = intervals.reduce((s, i) => s + i.leftoverDays, 0);
+    const coverage = feedingDays > 0 ? leftoverDays / feedingDays : null;
     const gains = intervals.map((i) => i.gain_g).filter((g): g is number => g != null);
     const totalGain = intervals.length && gains.length === intervals.length
       ? gains.reduce((a, b) => a + b, 0)
       : null;
-
-    const basisCum = dmBasis ? cumOfferedDm : cumOffered;
-    const offeredPerKgGain =
-      totalGain != null && totalGain > 0 && basisCum != null
-        ? basisCum / 1000 / (totalGain / 1000)
-        : null;
 
     const first = weightSeries[0];
     const last = weightSeries[weightSeries.length - 1];
@@ -339,25 +487,11 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
         ? (last.liveCount / first.liveCount) * 100
         : null;
 
-    // Carry-over and spoilage, from the recorded dish actions.
-    // Carry-over is days since the dish was last emptied, not entries counted.
-    // Spoilage counts DATES, matching the denominator (intervalExtras does the same).
-    const byDate = new Map<string, string | null>();
-    for (const o of penObs) if (o.dish_action != null) byDate.set(o.obs_date, o.dish_action);
-    const ages = carryOverDaysSeries(
-      Array.from(byDate, ([date, action]) => ({ date, action })),
-    ).map((r) => r.days);
-    const spoiled = Array.from(byDate.values()).filter((a) => a === "emptied_spoiled").length;
-
-
-
     let running = 0;
-    const offeredSeries = Array.from(
-      new Set(penObs.map((o) => o.obs_date)),
-    )
+    const offeredSeries = Array.from(new Set(penObs.map((o) => o.obs_date)))
       .sort()
       .map((date) => {
-        running += offeredOn(date).fresh;
+        running += dayFigures(date).fresh;
         return { date, cumulative: running };
       });
 
@@ -368,15 +502,18 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
       intervals,
       cumOffered_g: cumOffered,
       cumOfferedDm_g: cumOfferedDm,
+      cumEaten_g: cumEaten,
+      feedingDays,
+      leftoverDays,
+      leftoverCoverage: coverage,
+      eatenPerKgGain:
+        coverage != null && coverage >= EATEN_COVERAGE_MIN ? perKg(dmBasis ? cumEatenDm : cumEaten, totalGain) : null,
+      meanShareLeft: meanOf(intervals.map((i) => i.meanShareLeft)),
       totalGain_g: totalGain,
-      offeredPerKgGain,
+      offeredPerKgGain: perKg(dmBasis ? cumOfferedDm : cumOffered, totalGain),
       meanSgr: meanOf(intervals.map((i) => i.sgr)),
       survival,
       meanFeedingRate: meanOf(intervals.map((i) => i.feedingRate)),
-      meanCarryOverDays: ages.length ? ages.reduce((a, b) => a + b, 0) / ages.length : null,
-      maxCarryOverDays: ages.length ? Math.max(...ages) : null,
-
-      spoilageRate: byDate.size ? (spoiled / byDate.size) * 100 : null,
       weightSeries,
       offeredSeries,
     };
@@ -385,19 +522,22 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
   // Treatment figures are the MEAN of the pen figures, never a pooled total.
   const treatmentMetrics: TreatmentMetrics[] = treatments.map((t) => {
     const group = penMetrics.filter((p) => p.treatmentId === t.id);
+    const complete = group.filter((p) => p.eatenPerKgGain != null);
     return {
       treatmentId: t.id,
       label: t.label,
       pens: group,
       cumOffered_g: meanOf(group.map((p) => (dmBasis ? p.cumOfferedDm_g : p.cumOffered_g))),
+      cumEaten_g: meanOf(group.map((p) => p.cumEaten_g)),
       totalGain_g: meanOf(group.map((p) => p.totalGain_g)),
       offeredPerKgGain: meanOf(group.map((p) => p.offeredPerKgGain)),
+      // Only shown once every pen in the treatment has a complete figure.
+      eatenPerKgGain: group.length && complete.length === group.length ? meanOf(complete.map((p) => p.eatenPerKgGain)) : null,
+      eatenCompletePens: complete.length,
+      meanShareLeft: meanOf(group.map((p) => p.meanShareLeft)),
       meanSgr: meanOf(group.map((p) => p.meanSgr)),
       survival: meanOf(group.map((p) => p.survival)),
       meanFeedingRate: meanOf(group.map((p) => p.meanFeedingRate)),
-      meanCarryOverDays: meanOf(group.map((p) => p.meanCarryOverDays)),
-      maxCarryOverDays: maxOf(group.map((p) => p.maxCarryOverDays)),
-      spoilageRate: meanOf(group.map((p) => p.spoilageRate)),
     };
   });
 
@@ -408,4 +548,9 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
 export function roundOut(v: number | null | undefined, dp: number): number | null {
   if (v == null || typeof v !== "number" || !Number.isFinite(v)) return null;
   return Number(v.toFixed(dp));
+}
+
+/** Label for an incomplete FCR (feed eaten). */
+export function incompleteLabel(leftoverDays: number, feedingDays: number): string {
+  return `incomplete (${leftoverDays} of ${feedingDays} days weighed)`;
 }

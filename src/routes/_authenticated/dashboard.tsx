@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardList, Thermometer } from "lucide-react";
 
+import { makeRetention, observationBand, SHARE_BANDS } from "@/lib/metrics";
+import { retentionContext } from "@/lib/retention";
 import { supabase } from "@/integrations/supabase/client";
 import { today } from "@/lib/date";
 import { addDays, roundOut } from "@/lib/metrics";
@@ -10,8 +12,6 @@ import { cumulativeMortality } from "@/lib/liveCount";
 import { NoActiveTrial, useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
 import { operatingDaysSentence, useSiteCalendar } from "@/lib/operatingDays";
 import {
-  REFUSAL_LABEL,
-  REFUSAL_ORDER,
   computeDayReview,
   fetchDayInputs,
   type DayReviewPen,
@@ -118,6 +118,7 @@ function DashboardPage() {
             date,
             siteName: siteName || "",
             controlActive: !!trial.data?.control_active && !!trial.data?.control_feed_id,
+            controlFeedId: trial.data?.control_feed_id ?? null,
           })
         : null,
     [data.data, allPens, assignments.data, trial.data?.weighing_interval_days, trial.data?.control_active, trial.data?.control_feed_id, calendar, date, siteName],
@@ -171,9 +172,22 @@ function DashboardPage() {
   }));
   const offeredTotal = offeredByTreatment.reduce((s, r) => s + r.grams, 0);
 
-  const refusalCounts = REFUSAL_ORDER.map((score) => ({
-    score,
-    count: obsToday.filter((o) => o.refusal_score === score && !isBreeder(o.pen_id)).length,
+  const retentionFor = makeRetention(
+    retentionContext(
+      trial.data?.control_feed_id,
+      (d?.controlReadings ?? []).filter((c) => c.feed_id === trial.data?.control_feed_id),
+      calendar,
+    ),
+  );
+  const bandedToday = obsToday
+    .filter((o) => !isBreeder(o.pen_id))
+    .map((o) => observationBand(o, retentionFor))
+    .filter((b): b is NonNullable<typeof b> => b != null);
+  const refusalCounts = SHARE_BANDS.map((b) => ({
+    score: b.key,
+    label: b.label,
+    count: bandedToday.filter((x) => x.band === b.key).length,
+    visual: bandedToday.filter((x) => x.band === b.key && x.visual).length,
   }));
 
   const temps = (d?.welfare ?? []).map((w) => w.temp_c).filter((v): v is number => v != null);
@@ -437,12 +451,12 @@ function DashboardPage() {
             </div>
 
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Refusal, trial pens</h3>
-              <div className="mt-1 grid grid-cols-5 gap-1 text-center">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Share left, trial pens</h3>
+              <div className="mt-1 grid grid-cols-3 sm:grid-cols-6 gap-1 text-center">
                 {refusalCounts.map((r) => (
                   <div key={r.score} className="rounded-lg border border-border px-1 py-2">
                     <div className="text-base font-semibold tabular-nums">{r.count}</div>
-                    <div className="text-[10px] leading-tight text-muted-foreground">{REFUSAL_LABEL[r.score]}</div>
+                    <div className="text-[10px] leading-tight text-muted-foreground">{r.label}{r.visual ? ` · ${r.visual} visual estimate` : ""}</div>
                   </div>
                 ))}
               </div>
@@ -471,6 +485,7 @@ function DashboardPage() {
 
           {/* 4 — TRENDS */}
           <DashboardTrends
+            controlFeedId={trial.data?.control_feed_id ?? null}
             trialId={trialId}
             treatmentByPen={treatmentByPen}
             treatments={(treatments.data ?? []).map((t) => ({ id: t.id, label: t.label }))}
