@@ -38,8 +38,9 @@ async function compressImage(file: File, maxDim = 1600, quality = 0.8): Promise<
 
 /** Returns the stored reference for an object (kept as a public-style URL for
  *  backward compatibility with rows written before the bucket became private). */
-export function publicPhotoUrl(path: string): string {
-  return supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+export function publicPhotoUrl(path: string, version?: number): string {
+  const base = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+  return version ? `${base}?v=${version}` : base;
 }
 
 /** Extracts the in-bucket object path from a stored URL (public or signed) or path. */
@@ -56,7 +57,10 @@ export async function signedPhotoUrl(value: string, expiresIn = 3600): Promise<s
   if (!path) return null;
   const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(path, expiresIn);
   if (error) return null;
-  return data?.signedUrl ?? null;
+  if (!data?.signedUrl) return null;
+  // Carry the version through so a replaced photo is never served from cache.
+  const v = value.match(/[?&]v=(\d+)/)?.[1];
+  return v ? `${data.signedUrl}&v=${v}` : data.signedUrl;
 }
 
 export interface TrialPhotoArgs {
@@ -74,9 +78,9 @@ export async function uploadTrialPenPhoto(args: TrialPhotoArgs): Promise<string>
   const blob = await compressImage(args.file);
   const { error: upErr } = await supabase.storage
     .from(PHOTO_BUCKET)
-    .upload(path, blob, { contentType: "image/jpeg", upsert: true, cacheControl: "3600" });
+    .upload(path, blob, { contentType: "image/jpeg", upsert: true, cacheControl: "60" });
   if (upErr) throw upErr;
-  const url = publicPhotoUrl(path);
+  const url = publicPhotoUrl(path, Date.now());
   const column = args.kind === "am" ? "photo_am_url" : "photo_pm_url";
 
   const { data: existing } = await supabase
@@ -119,9 +123,9 @@ export async function uploadPopulationPhoto(args: PopulationPhotoArgs): Promise<
   const blob = await compressImage(args.file);
   const { error } = await supabase.storage
     .from(PHOTO_BUCKET)
-    .upload(path, blob, { contentType: "image/jpeg", upsert: true, cacheControl: "3600" });
+    .upload(path, blob, { contentType: "image/jpeg", upsert: true, cacheControl: "60" });
   if (error) throw error;
-  return publicPhotoUrl(path);
+  return publicPhotoUrl(path, Date.now());
 }
 
 export interface WeighPhotoArgs {
@@ -139,7 +143,7 @@ export async function uploadWeighPhoto(args: WeighPhotoArgs): Promise<string> {
   const blob = await compressImage(args.file);
   const { error } = await supabase.storage
     .from(PHOTO_BUCKET)
-    .upload(path, blob, { contentType: "image/jpeg", upsert: true, cacheControl: "3600" });
+    .upload(path, blob, { contentType: "image/jpeg", upsert: true, cacheControl: "60" });
   if (error) throw error;
-  return publicPhotoUrl(path);
+  return publicPhotoUrl(path, Date.now());
 }
