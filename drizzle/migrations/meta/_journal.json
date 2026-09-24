@@ -36,6 +36,13 @@
       "when": 1789987546917,
       "tag": "0004_allow_weigh_sop_session",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790252544067,
+      "tag": "0005_weighed_leftover_and_moisture_controls",
+      "breakpoints": true
     }
   ]
 }

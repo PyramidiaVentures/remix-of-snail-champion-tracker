@@ -1,3 +1,4 @@
+import { AM_STEPS, PM_STEPS } from "@/lib/dayExceptions";
 import { createFileRoute } from "@tanstack/react-router";
 import { today } from "@/lib/date";
 import { useSiteScope } from "@/lib/siteScope";
@@ -34,15 +35,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     body: (
       <List
         ordered
-        items={[
-          "Cut/collect every feed fresh today — no overnight leaves (bran/dry goods exempt).",
-          "Check each dish against the discard criteria. If the remaining feed is sound, top up. If it fails any criterion, empty and clean the dish first.",
-          "Weigh the portion for each pen and enter grams offered.",
-          "Record the dish action: topped up, emptied and refilled, or emptied because spoiled.",
-          "Place feed in each pen, rotating the dish position from yesterday.",
-          "Top up calcium and water dishes (never weighed, always present).",
-          "Upload one PM photo per pen, dish and paper tag in frame.",
-        ]}
+        items={PM_STEPS}
       />
     ),
   },
@@ -51,14 +44,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     body: (
       <List
         ordered
-        items={[
-          "Upload the AM photos (one per pen) — dish untouched, tag in frame.",
-          "Record the refusal score for each pen by eye. Do not weigh.",
-          "Record snail activity and any signs of sickness.",
-          "Record temperature and humidity.",
-          "Log any deaths, escapes or removals.",
-          "Empty and clean any dish whose remaining feed fails the discard criteria.",
-        ]}
+        items={AM_STEPS}
       />
     ),
   },
@@ -79,12 +65,13 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     ),
   },
   {
-    title: "Dish discard criteria",
+    title: "Breeder pens: dish discard criteria",
     body: (
       <div className="space-y-2">
         <p>
-          Empty and clean the dish if ANY of these is true, otherwise the feed may be carried over and topped up.
-          There is NO time limit; judge the feed, not the clock:
+          Breeder pens only — trial-pen dishes are emptied, weighed and cleaned every morning. Empty and clean a
+          breeder dish if ANY of these is true, otherwise the feed may be carried over and topped up. There is NO
+          time limit; judge the feed, not the clock:
         </p>
         <List
           ordered

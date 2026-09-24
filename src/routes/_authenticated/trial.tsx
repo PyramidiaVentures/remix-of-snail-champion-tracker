@@ -95,6 +95,7 @@ function TrialPage() {
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["trials"] });
+    qc.invalidateQueries({ queryKey: ["active-trial"] });
     qc.invalidateQueries({ queryKey: ["treatments"] });
     qc.invalidateQueries({ queryKey: ["pen_assignments"] });
   };
@@ -189,6 +190,8 @@ function TrialPage() {
       )}
 
       <OperatingDaysEditor />
+
+      {current && <WaterLossTest trial={current} feeds={feeds.data ?? []} onSaved={invalidate} />}
 
       <DesignIntegrityPanel
         pens={penList}
@@ -1188,5 +1191,101 @@ function Field({ label, children, className }: { label: string; children: React.
       <span className="block mb-1 text-muted-foreground">{label}</span>
       {children}
     </label>
+  );
+}
+
+/** Water-loss test (leaves): one covered control dish with no snails. */
+function WaterLossTest({
+  trial, feeds, onSaved,
+}: {
+  trial: Trial;
+  feeds: { id: string; name: string }[];
+  onSaved: () => void;
+}) {
+  const t = trial as Trial & { control_feed_id: string | null; control_active: boolean; control_portion_g: number };
+  const [error, setError] = useState<string | null>(null);
+  const readings = useQuery({
+    queryKey: ["moisture-controls", t.id],
+    queryFn: async () =>
+      (await supabase
+        .from("moisture_controls")
+        .select("obs_date,offered_g,remaining_g")
+        .eq("trial_id", t.id)
+        .not("remaining_g", "is", null)
+        .order("obs_date")).data ?? [],
+  });
+
+  const save = async (patch: Record<string, unknown>) => {
+    setError(null);
+    const { error: e } = await supabase.from("trials").update(patch as never).eq("id", t.id);
+    if (e) setError("Could not save. Try again.");
+    onSaved();
+  };
+
+  const rows = (readings.data ?? []).filter((r) => Number(r.offered_g) > 0);
+  const pct = rows.map((r) => (Number(r.remaining_g) / Number(r.offered_g)) * 100);
+  const short = (d: string) => {
+    const v = new Date(`${d}T00:00:00Z`);
+    const m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
+    return `${v.getUTCDate()} ${m[v.getUTCMonth()]}`;
+  };
+  const summary =
+    pct.length === 0
+      ? "Not tested yet, leftovers are not corrected"
+      : `Keeps ${Math.round(pct.reduce((a, b) => a + b, 0) / pct.length)}% of its weight per night (${pct.length} reading${
+          pct.length === 1 ? "" : "s"
+        }, ${short(rows[0]!.obs_date)} to ${short(rows[rows.length - 1]!.obs_date)}, range ${Math.round(Math.min(...pct))}–${Math.round(
+          Math.max(...pct),
+        )}%)`;
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
+      <h2 className="font-semibold">Water-loss test (leaves)</h2>
+      <p className="text-xs text-muted-foreground">
+        One covered control dish with no snails shows how much weight the leaves lose overnight. The team puts the
+        portion in every evening and only weighs what is left in the morning.
+      </p>
+      <label className="block">
+        <span className="text-sm font-medium">Control feed</span>
+        <select
+          value={t.control_feed_id ?? ""}
+          onChange={(e) => void save({ control_feed_id: e.target.value || null })}
+          className="mt-1 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm"
+        >
+          <option value="">— pick the fresh-leaf feed —</option>
+          {feeds.map((f) => (
+            <option key={f.id} value={f.id}>{f.name}</option>
+          ))}
+        </select>
+      </label>
+      <label className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium">Test running</span>
+        <input
+          type="checkbox"
+          className="h-5 w-5"
+          checked={t.control_active}
+          disabled={!t.control_feed_id}
+          onChange={(e) => void save({ control_active: e.target.checked })}
+        />
+      </label>
+      <label className="block">
+        <span className="text-sm font-medium">Control portion (g)</span>
+        <input
+          key={`portion-${t.control_portion_g}`}
+          type="number"
+          inputMode="decimal"
+          step="0.1"
+          min="0.1"
+          defaultValue={t.control_portion_g}
+          onBlur={(e) => {
+            const v = Number(e.currentTarget.value);
+            if (Number.isFinite(v) && v > 0 && v !== Number(t.control_portion_g)) void save({ control_portion_g: v });
+          }}
+          className="num-input mt-1"
+        />
+      </label>
+      <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm">{summary}</p>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </section>
   );
 }

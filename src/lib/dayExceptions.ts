@@ -41,24 +41,24 @@ export const REFUSAL_ORDER = ["none_left", "trace", "about_25", "about_50", "mos
 // The same wording the two field screens use for their SOP steps, so an
 // unticked step is named exactly as the operator sees it.
 export const PM_STEPS = [
-  "Cut/collect every feed fresh today — no overnight leaves (bran/dry goods exempt).",
-  "Check each dish against the discard criteria. If the remaining feed is sound, top up. If it fails any criterion, empty and clean the dish first.",
-  "Weigh the portion for each pen and enter grams offered.",
-  "Record the dish action: topped up, emptied and refilled, or emptied because spoiled.",
-  "Place feed in each pen, rotating the dish position from yesterday.",
-  "Top up calcium and water dishes (never weighed, always present).",
-  "Upload one PM photo per pen, dish and paper tag in frame.",
+  "Cut/collect fresh feed.",
+  "Weigh each pen's portion and enter grams.",
+  "Put the feed in the clean dish, rotating the dish position.",
+  "Only during a water-loss test: put the standard amount of leaves in the control dish (nothing to enter).",
+  "Calcium and water.",
+  "PM photo.",
 ];
-export const PM_PHOTO_STEP_INDEX = 6;
+export const PM_CONTROL_STEP_INDEX = 3;
+export const PM_PHOTO_STEP_INDEX = 5;
 export const AM_STEPS = [
-  "Upload the AM photos (one per pen) — dish untouched, tag in frame.",
-  "Record the refusal score for each pen by eye. Do not weigh.",
-  "Record snail activity and any signs of sickness.",
-  "Record temperature and humidity.",
+  "Photo each dish untouched, tag in frame.",
+  "Take out all leftover feed, weigh it on the zeroed scale, enter grams, throw it away, clean the dish.",
+  "Only during a water-loss test: weigh what is left in the control dish, enter grams, throw it away.",
+  "Activity, health flags, temperature and humidity.",
   "Log any deaths, escapes or removals.",
-  "Empty and clean any dish whose remaining feed fails the discard criteria.",
 ];
 export const AM_PHOTO_STEP_INDEX = 0;
+export const AM_CONTROL_STEP_INDEX = 2;
 
 // SOP ticks live in the database (table sop_checklists), so a step ticked on a
 // field phone is visible to everyone. They arrive through DayInputs.checklists.
@@ -78,6 +78,7 @@ export type DayInputs = {
     offered_g: number | null;
     dish_action: string | null;
     refusal_score: string | null;
+    leftover_g: number | null;
     feed_id: string | null;
   }[];
   welfare: {
@@ -100,13 +101,15 @@ export type DayInputs = {
   }[];
   biomass: { pen_id: string; event_date: string; net_biomass_g: number; live_count: number }[];
   checklists: { session: string; steps: boolean[] | null }[];
+  /** The control dish reading for the date (null when none saved). */
+  control: { remaining_g: number | null } | null;
 };
 
 /** Fetch every dataset the day review reads, for one trial and date. */
 export async function fetchDayInputs(trialId: string, date: string): Promise<DayInputs> {
-  const [obs, welfare, photos, pop, biomass, checklists] = await Promise.all([
+  const [obs, welfare, photos, pop, biomass, checklists, control] = await Promise.all([
     supabase.from("observations")
-      .select("pen_id,obs_date,offered_g,dish_action,refusal_score,feed_id")
+      .select("pen_id,obs_date,offered_g,dish_action,refusal_score,leftover_g,feed_id")
       .eq("trial_id", trialId).lte("obs_date", date),
     supabase.from("welfare_checks")
       .select("id,pen_id,health_flags,substrate_condition,activity,temp_c,humidity_pct")
@@ -119,6 +122,8 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
       .eq("trial_id", trialId),
     supabase.from("sop_checklists").select("session,steps")
       .eq("trial_id", trialId).eq("obs_date", date),
+    supabase.from("moisture_controls").select("remaining_g")
+      .eq("trial_id", trialId).eq("obs_date", date).maybeSingle(),
   ]);
   return {
     obs: obs.data ?? [],
@@ -127,6 +132,7 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
     pop: (pop.data ?? []) as DayInputs["pop"],
     biomass: biomass.data ?? [],
     checklists: checklists.data ?? [],
+    control: control.data ?? null,
   };
 }
 
@@ -157,8 +163,11 @@ export function computeDayReview(args: {
   calendar: OperatingCalendar;
   date: string;
   siteName: string;
+  /** The water-loss test is running: the control dish counts in the AM check. */
+  controlActive?: boolean;
 }) {
   const { pens: allPens, assignments, trialInterval, data: d, calendar, date, siteName } = args;
+  const controlActive = !!args.controlActive;
 
   const pmExpected = calendar.pmExpected(date);
   const amExpected = calendar.amExpected(date);
@@ -189,11 +198,12 @@ export function computeDayReview(args: {
     const row = obsFor(id);
     const miss: string[] = [];
     if (!isBreeder(id) && row?.offered_g == null) miss.push("grams offered");
-    if (!row?.dish_action) miss.push("dish action");
+    // Trial-pen dishes are emptied every morning; only breeders record a dish action.
+    if (isBreeder(id) && !row?.dish_action) miss.push("dish action");
     if (!photoFor(id)?.photo_pm_url) miss.push("PM photo");
     return miss;
   };
-  const pmTotal = (id: string) => (isBreeder(id) ? 2 : 3);
+  const pmTotal = (_id: string) => 2;
 
   const amMissing = (id: string) => {
     const w = welfareFor(id);
@@ -201,7 +211,9 @@ export function computeDayReview(args: {
     if (isBreeder(id)) {
       if (!w?.substrate_condition) miss.push("substrate condition");
     } else {
-      if (!obsFor(id)?.refusal_score) miss.push("refusal score");
+      // A weighed leftover — or, on older days, the visual score it replaced.
+      const o = obsFor(id);
+      if (o?.leftover_g == null && !o?.refusal_score) miss.push("leftover (g)");
       if (!w?.activity) miss.push("activity");
     }
     if (!photoFor(id)?.photo_am_url) miss.push("AM photo");
@@ -211,6 +223,8 @@ export function computeDayReview(args: {
 
   const pmComplete = (list: DayReviewPen[]) => list.filter((p) => pmMissing(p.id).length === 0).length;
   const amComplete = (list: DayReviewPen[]) => list.filter((p) => amMissing(p.id).length === 0).length;
+
+  const controlMissing = controlActive && (d.control?.remaining_g ?? null) == null;
 
   const pmPhotosAll = watched.length > 0 && watched.every((p) => !!photoFor(p.id)?.photo_pm_url);
   const amPhotosAll = watched.length > 0 && watched.every((p) => !!photoFor(p.id)?.photo_am_url);
@@ -305,6 +319,15 @@ export function computeDayReview(args: {
     });
   }
 
+  // The control dish: a missing reading is an exception, never a hard stop.
+  if (amExpected && controlMissing) {
+    const item = {
+      key: "am-control", group: "AM session", to: "/am" as const,
+      text: amInProgress ? "Control dish — reading not yet recorded" : "Control dish — no leftover reading",
+    };
+    (amInProgress ? inProgress : exceptions).push(item);
+  }
+
   // SOP steps still unticked.
   const ticksFor = (session: string, length: number) => {
     const steps = d.checklists.find((c) => c.session === session)?.steps ?? null;
@@ -312,12 +335,12 @@ export function computeDayReview(args: {
   };
   const pmTicks = ticksFor("pm", PM_STEPS.length);
   (pmExpected && !pmInProgress ? PM_STEPS : []).forEach((step, i) => {
-    const done = i === PM_PHOTO_STEP_INDEX ? pmPhotosAll : pmTicks[i];
+    const done = i === PM_PHOTO_STEP_INDEX ? pmPhotosAll : i === PM_CONTROL_STEP_INDEX && !controlActive ? true : pmTicks[i];
     if (!done) exceptions.push({ key: `pmstep-${i}`, group: "PM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/pm" });
   });
   const amTicks = ticksFor("am", AM_STEPS.length);
   (amExpected && !amInProgress ? AM_STEPS : []).forEach((step, i) => {
-    const done = i === AM_PHOTO_STEP_INDEX ? amPhotosAll : amTicks[i];
+    const done = i === AM_PHOTO_STEP_INDEX ? amPhotosAll : i === AM_CONTROL_STEP_INDEX && !controlActive ? true : amTicks[i];
     if (!done) exceptions.push({ key: `amstep-${i}`, group: "AM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/am" });
   });
 
@@ -424,6 +447,8 @@ export function computeDayReview(args: {
     amMissing,
     pmComplete,
     amComplete,
+    controlActive,
+    controlMissing,
   };
 }
 

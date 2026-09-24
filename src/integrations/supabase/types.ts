@@ -118,6 +118,70 @@ export type Database = {
           },
         ]
       }
+      moisture_controls: {
+        Row: {
+          created_at: string
+          feed_id: string
+          id: string
+          notes: string | null
+          obs_date: string
+          offered_g: number
+          recorded_by: string | null
+          remaining_g: number | null
+          site_id: string
+          trial_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          feed_id: string
+          id?: string
+          notes?: string | null
+          obs_date: string
+          offered_g: number
+          recorded_by?: string | null
+          remaining_g?: number | null
+          site_id: string
+          trial_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          feed_id?: string
+          id?: string
+          notes?: string | null
+          obs_date?: string
+          offered_g?: number
+          recorded_by?: string | null
+          remaining_g?: number | null
+          site_id?: string
+          trial_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moisture_controls_feed_id_fkey"
+            columns: ["feed_id"]
+            isOneToOne: false
+            referencedRelation: "feeds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moisture_controls_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moisture_controls_trial_id_fkey"
+            columns: ["trial_id"]
+            isOneToOne: false
+            referencedRelation: "trials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       observations: {
         Row: {
           created_at: string
@@ -125,6 +189,7 @@ export type Database = {
           feed_id: string | null
           id: string
           is_acclimation: boolean
+          leftover_g: number | null
           notes: string | null
           obs_date: string
           offered_g: number | null
@@ -140,6 +205,7 @@ export type Database = {
           feed_id?: string | null
           id?: string
           is_acclimation?: boolean
+          leftover_g?: number | null
           notes?: string | null
           obs_date: string
           offered_g?: number | null
@@ -155,6 +221,7 @@ export type Database = {
           feed_id?: string | null
           id?: string
           is_acclimation?: boolean
+          leftover_g?: number | null
           notes?: string | null
           obs_date?: string
           offered_g?: number | null
@@ -534,6 +601,9 @@ export type Database = {
       trials: {
         Row: {
           acclimation_days: number
+          control_active: boolean
+          control_feed_id: string | null
+          control_portion_g: number
           created_at: string
           end_date: string | null
           id: string
@@ -547,6 +617,9 @@ export type Database = {
         }
         Insert: {
           acclimation_days?: number
+          control_active?: boolean
+          control_feed_id?: string | null
+          control_portion_g?: number
           created_at?: string
           end_date?: string | null
           id?: string
@@ -560,6 +633,9 @@ export type Database = {
         }
         Update: {
           acclimation_days?: number
+          control_active?: boolean
+          control_feed_id?: string | null
+          control_portion_g?: number
           created_at?: string
           end_date?: string | null
           id?: string
@@ -572,6 +648,13 @@ export type Database = {
           weighing_interval_days?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "trials_control_feed_id_fkey"
+            columns: ["control_feed_id"]
+            isOneToOne: false
+            referencedRelation: "feeds"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "trials_site_id_fkey"
             columns: ["site_id"]
