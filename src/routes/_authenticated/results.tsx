@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { retentionContext } from "@/lib/retention";
 import {
-  computeMetrics, daysBetween, intervalExtras, meanOf, addDays,
+  computeMetrics, daysBetween, intervalExtras, meanOf, addDays, incompleteLabel,
   type PenMetrics, type TrialMetrics,
 } from "@/lib/metrics";
 import { readIncludeAcclimation } from "@/lib/acclimation";
