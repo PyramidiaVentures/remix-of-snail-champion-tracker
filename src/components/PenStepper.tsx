@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, CheckCircle2, CircleDashed, Loader2, Circle,
 
 export type PenCompletion = "complete" | "partial" | "empty" | "uploading";
 
-export type PenRole = "trial" | "breeder";
+export type PenRole = "trial" | "breeder" | "control";
 
 export interface StepperPen {
   id: string;
@@ -42,6 +42,9 @@ const CHIP_STYLES: Record<PenCompletion, string> = {
   empty: "border-border bg-card text-muted-foreground",
 };
 
+// Trial pens, then breeder pens, then the control dish (never a pen) last.
+const rank = (role: PenRole | undefined) => (role === "control" ? 2 : role === "breeder" ? 1 : 0);
+
 function ChipIcon({ state }: { state: PenCompletion }) {
   if (state === "complete") return <CheckCircle2 className="h-3.5 w-3.5" />;
   if (state === "partial") return <CircleDashed className="h-3.5 w-3.5" />;
@@ -56,7 +59,7 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
     () =>
       [...pens].sort(
         (a, b) =>
-          (a.role === "breeder" ? 1 : 0) - (b.role === "breeder" ? 1 : 0) ||
+          rank(a.role) - rank(b.role) ||
           a.label.localeCompare(b.label, undefined, { numeric: true }),
       ),
     [pens],
@@ -121,7 +124,7 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
 
   // Trial pens and breeder pens are always counted apart, so a completion
   // figure never mixes the two kinds of pen.
-  const trialPens = ordered.filter((p) => p.role !== "breeder");
+  const trialPens = ordered.filter((p) => p.role !== "breeder" && p.role !== "control");
   const breederPens = ordered.filter((p) => p.role === "breeder");
   const doneIn = (list: StepperPen[]) => list.filter((p) => stateFor(p.id) === "complete").length;
   const trialDone = doneIn(trialPens);
@@ -135,7 +138,9 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
       <div className="flex items-baseline justify-between gap-2 text-sm">
         <span className="font-semibold">
           {current
-            ? `Pen ${current.label}${current.role === "breeder" ? " (breeder)" : ""} · ${index + 1} of ${n}`
+            ? current.role === "control"
+              ? `${current.label} · ${index + 1} of ${n}`
+              : `Pen ${current.label}${current.role === "breeder" ? " (breeder)" : ""} · ${index + 1} of ${n}`
             : "Session summary"}
         </span>
         <span className="text-right text-xs text-muted-foreground">
