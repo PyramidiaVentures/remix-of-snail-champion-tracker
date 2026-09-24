@@ -14,6 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      benchmarks: {
+        Row: {
+          citation: string
+          created_at: string
+          diet: string
+          high: number
+          id: string
+          low: number
+          metric: string
+          notes: string | null
+          site_id: string | null
+          snail_weight_range: string
+          species: string
+          url: string | null
+        }
+        Insert: {
+          citation?: string
+          created_at?: string
+          diet?: string
+          high: number
+          id?: string
+          low: number
+          metric: string
+          notes?: string | null
+          site_id?: string | null
+          snail_weight_range?: string
+          species?: string
+          url?: string | null
+        }
+        Update: {
+          citation?: string
+          created_at?: string
+          diet?: string
+          high?: number
+          id?: string
+          low?: number
+          metric?: string
+          notes?: string | null
+          site_id?: string | null
+          snail_weight_range?: string
+          species?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "benchmarks_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       biomass_events: {
         Row: {
           created_at: string
