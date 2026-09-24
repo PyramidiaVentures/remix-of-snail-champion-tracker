@@ -64,11 +64,8 @@ function ResultsPage() {
   const hiddenSeries = useMemo(() => listToSet(search.hs), [search.hs]);
 
   const { calendarFor } = useAllSiteCalendars();
-  const trial = useQuery({
-    queryKey: ["active-trial"],
-    queryFn: async () =>
-      (await supabase.from("trials").select("*").eq("status", "active").limit(1)).data?.[0] ?? null,
-  });
+  // The active trial of the site selected in the header — never "first active trial found".
+  const trial = useSiteTrial();
   const trialId = trial.data?.id;
   // Closed days never count as missing feeding days.
   const isOperating = calendarFor(trial.data?.site_id).isOperating;
