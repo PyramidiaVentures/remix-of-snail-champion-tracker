@@ -55,7 +55,7 @@ const SUBSTRATE: { value: SubstrateCondition; label: string }[] = [
   { value: "mouldy", label: "Mouldy" },
 ];
 
-import { AM_CONTROL_STEP_KEY, AM_PHOTO_STEP_KEY, AM_STEPS } from "@/lib/sopSteps";
+import { AM_CONTROL_STEP_KEY, AM_PHOTO_STEP_KEY, checklistSteps } from "@/lib/sopSteps";
 
 const EVENT_LABEL: Record<string, string> = {
   mortality: "Death",
@@ -264,7 +264,8 @@ function AmPage() {
     setChecklistAll(all);
   }, []);
 
-  const overrides = AM_STEPS.map((step) =>
+  const checklistItems = checklistSteps("am", date);
+  const overrides = checklistItems.map((step) =>
     step.key === AM_PHOTO_STEP_KEY
       ? {
           forced: allPhotos,
@@ -366,7 +367,7 @@ function AmPage() {
         date={date}
         session="am"
         title="AM steps"
-        items={AM_STEPS}
+        items={checklistItems}
         overrides={overrides}
         onProgress={onChecklistProgress}
       />

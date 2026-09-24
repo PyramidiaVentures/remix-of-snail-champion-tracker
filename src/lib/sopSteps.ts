@@ -38,28 +38,33 @@ export const AM_PHOTO_STEP_KEY = "am.photo";
 export const AM_CONTROL_STEP_KEY = "am.control_leftover";
 export const WEIGH_PHOTO_STEP_KEY = "weigh.photo_scale";
 
-const OLD_PM_KEYS = [
-  "pm.collect_fresh",
-  "pm.check_discard",
-  "pm.weigh_portion",
-  "pm.record_dish_action",
-  "pm.place_feed",
-  "pm.calcium_water",
-  "pm.photo",
+const OLD_PM_STEPS: SopStep[] = [
+  { key: "pm.collect_fresh", label: "Cut/collect every feed fresh today — no overnight leaves (bran/dry goods exempt)." },
+  { key: "pm.check_discard", label: "Check each dish against the discard criteria. If the remaining feed is sound, top up. If it fails any criterion, empty and clean the dish first." },
+  { key: "pm.weigh_portion", label: "Weigh the portion for each pen and enter grams offered." },
+  { key: "pm.record_dish_action", label: "Record the dish action: topped up, emptied and refilled, or emptied because spoiled." },
+  { key: "pm.place_feed", label: "Place feed in each pen, rotating the dish position from yesterday." },
+  { key: "pm.calcium_water", label: "Top up calcium and water dishes (never weighed, always present)." },
+  { key: "pm.photo", label: "Upload one PM photo per pen, dish and paper tag in frame." },
 ];
-const OLD_AM_KEYS = [
-  "am.photo",
-  "am.visual_refusal",
-  "am.activity_health",
-  "am.environment",
-  "am.population",
-  "am.discard_spoiled",
+const OLD_AM_STEPS: SopStep[] = [
+  { key: "am.photo", label: "Upload the AM photos (one per pen) — dish untouched, tag in frame." },
+  { key: "am.visual_refusal", label: "Record the refusal score for each pen by eye. Do not weigh." },
+  { key: "am.activity_health", label: "Record snail activity and any signs of sickness." },
+  { key: "am.environment", label: "Record temperature and humidity." },
+  { key: "am.population", label: "Log any deaths, escapes or removals." },
+  { key: "am.discard_spoiled", label: "Empty and clean any dish whose remaining feed fails the discard criteria." },
 ];
 const CURRENT_FROM = "2026-09-24";
 
+/** Checklist version that was live on the selected operating date. */
+export function checklistSteps(session: SopSession, date: string): SopStep[] {
+  if (session === "weigh") return WEIGH_STEPS;
+  if (date < CURRENT_FROM) return session === "pm" ? OLD_PM_STEPS : OLD_AM_STEPS;
+  return session === "pm" ? PM_STEPS : AM_STEPS;
+}
+
 /** Exact key order used to convert a legacy positional array for its date. */
 export function legacyStepKeys(session: SopSession, date: string): string[] {
-  if (session === "weigh") return WEIGH_STEPS.map((step) => step.key);
-  if (date < CURRENT_FROM) return session === "pm" ? OLD_PM_KEYS : OLD_AM_KEYS;
-  return (session === "pm" ? PM_STEPS : AM_STEPS).map((step) => step.key);
+  return checklistSteps(session, date).map((step) => step.key);
 }

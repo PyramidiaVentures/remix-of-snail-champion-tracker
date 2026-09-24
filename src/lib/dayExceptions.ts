@@ -7,8 +7,8 @@ import { liveCount } from "@/lib/liveCount";
 import { buildSchedule, type SchedulePen } from "@/lib/weighSchedule";
 import type { OperatingCalendar } from "@/lib/operatingDays";
 import {
-  AM_CONTROL_STEP_KEY, AM_PHOTO_STEP_KEY, AM_STEPS,
-  PM_CONTROL_STEP_KEY, PM_PHOTO_STEP_KEY, PM_STEPS,
+  AM_CONTROL_STEP_KEY, AM_PHOTO_STEP_KEY, checklistSteps,
+  PM_CONTROL_STEP_KEY, PM_PHOTO_STEP_KEY,
 } from "@/lib/sopSteps";
 
 /* ------------------------------------------------------------------ labels */
@@ -333,12 +333,14 @@ export function computeDayReview(args: {
   // SOP steps still unticked.
   const ticksFor = (session: string) => new Set(d.checklists.find((c) => c.session === session)?.checked_step_keys ?? []);
   const pmTicks = ticksFor("pm");
-  (pmExpected && !pmInProgress ? PM_STEPS : []).forEach((step, i) => {
+  const pmSteps = checklistSteps("pm", date);
+  (pmExpected && !pmInProgress ? pmSteps : []).forEach((step, i) => {
     const done = step.key === PM_PHOTO_STEP_KEY ? pmPhotosAll : step.key === PM_CONTROL_STEP_KEY && !controlActive ? true : pmTicks.has(step.key);
     if (!done) exceptions.push({ key: `pmstep-${step.key}`, group: "PM checklist", text: `Step ${i + 1} not ticked — ${step.label}`, to: "/pm" });
   });
   const amTicks = ticksFor("am");
-  (amExpected && !amInProgress ? AM_STEPS : []).forEach((step, i) => {
+  const amSteps = checklistSteps("am", date);
+  (amExpected && !amInProgress ? amSteps : []).forEach((step, i) => {
     const done = step.key === AM_PHOTO_STEP_KEY ? amPhotosAll : step.key === AM_CONTROL_STEP_KEY && !controlActive ? true : amTicks.has(step.key);
     if (!done) exceptions.push({ key: `amstep-${step.key}`, group: "AM checklist", text: `Step ${i + 1} not ticked — ${step.label}`, to: "/am" });
   });
