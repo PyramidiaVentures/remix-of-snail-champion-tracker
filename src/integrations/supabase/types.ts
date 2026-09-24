@@ -752,6 +752,8 @@ export type Database = {
           activity: Database["public"]["Enums"]["snail_activity"] | null
           created_at: string
           health_flags: Database["public"]["Enums"]["health_flag"][] | null
+          humidity_max_pct: number | null
+          humidity_min_pct: number | null
           humidity_pct: number | null
           id: string
           notes: string | null
@@ -762,6 +764,8 @@ export type Database = {
             | Database["public"]["Enums"]["substrate_condition"]
             | null
           temp_c: number | null
+          temp_max_c: number | null
+          temp_min_c: number | null
           trial_id: string
           updated_at: string
         }
@@ -769,6 +773,8 @@ export type Database = {
           activity?: Database["public"]["Enums"]["snail_activity"] | null
           created_at?: string
           health_flags?: Database["public"]["Enums"]["health_flag"][] | null
+          humidity_max_pct?: number | null
+          humidity_min_pct?: number | null
           humidity_pct?: number | null
           id?: string
           notes?: string | null
@@ -779,6 +785,8 @@ export type Database = {
             | Database["public"]["Enums"]["substrate_condition"]
             | null
           temp_c?: number | null
+          temp_max_c?: number | null
+          temp_min_c?: number | null
           trial_id: string
           updated_at?: string
         }
@@ -786,6 +794,8 @@ export type Database = {
           activity?: Database["public"]["Enums"]["snail_activity"] | null
           created_at?: string
           health_flags?: Database["public"]["Enums"]["health_flag"][] | null
+          humidity_max_pct?: number | null
+          humidity_min_pct?: number | null
           humidity_pct?: number | null
           id?: string
           notes?: string | null
@@ -796,6 +806,8 @@ export type Database = {
             | Database["public"]["Enums"]["substrate_condition"]
             | null
           temp_c?: number | null
+          temp_max_c?: number | null
+          temp_min_c?: number | null
           trial_id?: string
           updated_at?: string
         }
