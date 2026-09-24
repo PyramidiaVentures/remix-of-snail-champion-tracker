@@ -680,3 +680,107 @@ export function portionChanges(feedings: FeedingShare[]): PortionChange[] {
   }
   return out;
 }
+
+/* ---------- Pooled treatment FCR ("all feed ÷ all gain") ---------- */
+
+export interface PooledFcr {
+  pens: number;
+  offered_g: number;
+  eaten_g: number;
+  eatenDm_g: number | null;
+  /** Sum of every pen's gain, including pens that lost weight. */
+  gain_g: number | null;
+  economicFcr: number | null;
+  biologicalFcr: number | null;
+  biologicalFcrDm: number | null;
+  /** Why Biological FCR is missing, in per-pen terms (never summed across pens). */
+  biologicalWhy: string | null;
+  biologicalDmWhy: string | null;
+}
+
+/**
+ * Headline FCR for a group of pen intervals: all feed of the pens ÷ all gain
+ * of the pens, including pens that lost weight. Averaging only pens with a
+ * positive gain would drop the bad pens and flatter the treatment.
+ * Biological FCR needs weighed leftovers on ≥90% of feeding days in EVERY pen.
+ */
+export function pooledFcr(ivs: IntervalMetrics[]): PooledFcr {
+  const offered = ivs.reduce((s, i) => s + i.offered_g, 0);
+  const eaten = ivs.reduce((s, i) => s + i.eaten_g, 0);
+  const eatenDm = ivs.reduce<number | null>((s, i) => (s == null || i.eatenDm_g == null ? null : s + i.eatenDm_g), 0);
+  const gains = ivs.map((i) => i.gain_g);
+  const gain = ivs.length && gains.every((g) => g != null) ? gains.reduce<number>((s, g) => s + (g as number), 0) : null;
+  const uncovered = ivs.filter((i) => !(i.leftoverCoverage != null && i.leftoverCoverage >= EATEN_COVERAGE_MIN));
+  let why: string | null = null;
+  if (ivs.length === 0) why = "no pens";
+  else if (uncovered.length) {
+    const same = uncovered.every((i) => i.leftoverDays === uncovered[0]!.leftoverDays && i.feedingDays === uncovered[0]!.feedingDays);
+    why = same
+      ? `${uncovered[0]!.leftoverDays} of ${uncovered[0]!.feedingDays} feeding days weighed${uncovered.length < ivs.length ? ` in ${uncovered.length} of ${ivs.length} pens` : ""}`
+      : `too few feeding days weighed in ${uncovered.length} of ${ivs.length} pens`;
+  } else if (gain == null || gain <= 0) why = "no weight gain";
+  const dmMissing = ivs.some((i) => i.dmMissing);
+  return {
+    pens: ivs.length,
+    offered_g: offered,
+    eaten_g: eaten,
+    eatenDm_g: dmMissing ? null : eatenDm,
+    gain_g: gain,
+    economicFcr: perKg(offered, gain),
+    biologicalFcr: why ? null : perKg(eaten, gain),
+    biologicalFcrDm: why || dmMissing ? null : perKg(eatenDm, gain),
+    biologicalWhy: why,
+    biologicalDmWhy: why ?? (dmMissing ? "add dry-matter % in Setup" : null),
+  };
+}
+
+/* ---------- Literature benchmarks ---------- */
+
+export type BenchmarkMetric = "sgr" | "bfcr_dm";
+
+export interface Benchmark {
+  id: string;
+  site_id: string | null;
+  metric: string;
+  low: number;
+  high: number;
+  species: string;
+  diet: string;
+  snail_weight_range: string;
+  citation: string;
+  url: string | null;
+  notes: string | null;
+}
+
+/** A site's own benchmark wins over an all-sites one. */
+export function pickBenchmark(rows: Benchmark[], metric: BenchmarkMetric, siteId: string | null | undefined): Benchmark | null {
+  const m = rows.filter((r) => r.metric === metric);
+  return m.find((r) => siteId && r.site_id === siteId) ?? m.find((r) => r.site_id == null) ?? null;
+}
+
+export type BenchmarkVerdict = "better" | "worse" | "within" | "below" | "above" | "none";
+
+/** Compare a value with a literature range. For FCRs lower is better. */
+export function compareBenchmark(
+  value: number | null,
+  b: { low: number; high: number } | null,
+  lowerIsBetter: boolean,
+): BenchmarkVerdict {
+  if (!b) return "none";
+  if (value == null) return "none";
+  if (value >= b.low && value <= b.high) return "within";
+  if (value < b.low) return lowerIsBetter ? "better" : "below";
+  return lowerIsBetter ? "worse" : "above";
+}
+
+/** Expected mean weight from literature SGR: w0 × e^(SGR/100 × days). */
+export function literatureWeight(w0: number, sgrPct: number, days: number): number {
+  return w0 * Math.exp((sgrPct / 100) * days);
+}
+
+/** Eaten grams for a feeding: weighed when available, else from the visual score (display only). */
+export function displayEaten(f: FeedingShare): number | null {
+  if (f.eaten_g != null) return f.eaten_g;
+  if (f.shareLeft != null) return f.offered_g * (1 - f.shareLeft);
+  return null;
+}

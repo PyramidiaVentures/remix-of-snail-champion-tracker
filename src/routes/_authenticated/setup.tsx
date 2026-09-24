@@ -1,3 +1,4 @@
+import { BenchmarksSection } from "@/components/BenchmarksSection";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { liveCount } from "@/lib/liveCount";
 import { today } from "@/lib/date";
@@ -23,10 +24,11 @@ function SetupPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold">Setup</h1>
-        <p className="text-sm text-muted-foreground">Pens and feed library.</p>
+        <p className="text-sm text-muted-foreground">Pens, feed library and literature benchmarks.</p>
       </header>
       <PensSection />
       <FeedsSection />
+      <BenchmarksSection />
     </div>
   );
 }

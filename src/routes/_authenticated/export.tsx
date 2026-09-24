@@ -1,3 +1,4 @@
+import { pooledFcr } from "@/lib/metrics";
 import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { toCsv, downloadCsv } from "@/lib/csv";
@@ -410,6 +411,29 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
             survival_percent: out(iv.survival, 1),
             feeding_rate_percent_bw_day: out(iv.feedingRate, 1),
             missing_feeding_days: extras.missingFeedingDays,
+          });
+        }
+      }
+      // Pooled treatment rows: all feed of the pens ÷ all gain of the pens (same numbers as Results).
+      for (const t of metrics.treatments) {
+        const ends = Array.from(new Set(t.pens.flatMap((pp) => pp.intervals.map((i) => i.to)))).sort();
+        for (const end of ends) {
+          const ivs = t.pens.map((pp) => pp.intervals.find((i) => i.to === end)).filter((i): i is NonNullable<typeof i> => !!i);
+          const pooled = pooledFcr(ivs);
+          rows.push({
+            site_name: trialSiteName,
+            trial_name: trialName,
+            pen_label: `All ${ivs.length} pens (all feed ÷ all gain)`,
+            treatment_label: t.label,
+            feed_name: feedName.get(treatmentFeed.get(t.treatmentId) ?? "") ?? "",
+            interval_start: ivs.map((i) => i.from).sort()[0] ?? "",
+            interval_end: end,
+            "Economic FCR": out(pooled.economicFcr, 2) ?? "",
+            "Biological FCR": pooled.biologicalFcr != null ? out(pooled.biologicalFcr, 2) : pooled.biologicalWhy ?? "",
+            "Biological FCR (dry matter)": pooled.biologicalFcrDm != null ? out(pooled.biologicalFcrDm, 2) : pooled.biologicalDmWhy ?? "",
+            cum_offered_g: out(pooled.offered_g, 1),
+            cum_eaten_g: out(pooled.eaten_g, 1),
+            gain_g: out(pooled.gain_g, 1),
           });
         }
       }

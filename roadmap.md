@@ -56,3 +56,13 @@
 - [x] Show keyed AM control step only while the test runs and complete it from the saved reading
 - [x] Replace the PM summary reminder with linked tick status
 - [x] Correct the control setup wording and remove “covered box”
+
+## Results redesign (2026-09-24)
+- [x] Top bar with weighing selector only; date filter moved to More detail
+- [x] At a glance tiles with pooled FCR (in metrics.ts) and literature comparison
+- [x] Growth and Feed tables, flags, average/pooled rows
+- [x] Four charts vs literature, fixed treatment colours, one axis
+- [x] Literature benchmarks table + Setup section
+- [x] More detail collapsible holding the existing page
+- [x] Export uses pooled FCR
+- [x] Verify Nairobi 23 Sept figures
