@@ -255,6 +255,10 @@ function ResultsPage() {
           Every figure is calculated from the records as they stand — correct an entry and the numbers update.
           Treatment figures are the average of the pens in that treatment.
         </p>
+        <p className="text-xs text-muted-foreground">
+          {METRIC_LABELS.economicFcr}: {METRIC_EXPLANATIONS.economicFcr}. {METRIC_LABELS.biologicalFcr}: {METRIC_EXPLANATIONS.biologicalFcr}.{" "}
+          {METRIC_LABELS.biologicalFcrDm}: {METRIC_EXPLANATIONS.biologicalFcrDm}. {METRIC_LABELS.sgr}: {METRIC_EXPLANATIONS.sgr}.
+        </p>
       </header>
 
       {search.weighing && (
