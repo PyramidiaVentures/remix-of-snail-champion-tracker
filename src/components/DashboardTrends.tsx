@@ -243,7 +243,7 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
           <div className="space-y-3">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold">Refusal distribution — how many pens at each level</h3>
+                <h3 className="text-sm font-semibold">Share left — how many pens in each band</h3>
                 <p className="text-xs text-muted-foreground">
                   Portion tuning: <strong>Most left</strong> rising means cut portions.{" "}
                   <strong>None left</strong> rising means the snails may be feed-limited. Breeder pens are
