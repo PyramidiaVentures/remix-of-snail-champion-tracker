@@ -245,9 +245,11 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
               <div>
                 <h3 className="text-sm font-semibold">Share left — how many pens in each band</h3>
                 <p className="text-xs text-muted-foreground">
-                  Portion tuning: <strong>Most left</strong> rising means cut portions.{" "}
-                  <strong>None left</strong> rising means the snails may be feed-limited. Breeder pens are
-                  not included — they have no refusal score. All five charts share the same scale.
+                  Leftover as a share of feed offered, from the weighed leftover (leaves corrected for
+                  water loss). <strong>Over 50%</strong> rising means cut portions;{" "}
+                  <strong>0–2%</strong> rising means the snails may be feed-limited. Days before leftovers were
+                  weighed use the old visual score, shown as "visual estimate". Breeder pens are not included.
+                  All six charts share the same scale.
                 </p>
               </div>
               <label className="block">
