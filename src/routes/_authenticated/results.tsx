@@ -12,6 +12,11 @@ import {
 import { readIncludeAcclimation } from "@/lib/acclimation";
 import { useAllSiteCalendars } from "@/lib/operatingDays";
 import { WeighingReport } from "@/components/WeighingReport";
+import { ResultsOverview } from "@/components/ResultsOverview";
+import { useSiteScope } from "@/lib/siteScope";
+import { nextWeighing as nextWeighingFor, type SchedulePen } from "@/lib/weighSchedule";
+import type { Benchmark } from "@/lib/metrics";
+import type { PopulationEventLike } from "@/lib/liveCount";
 
 import {
   XAxis, YAxis, ResponsiveContainer, Tooltip, Legend,
@@ -99,7 +104,7 @@ function ResultsPage() {
   });
   const assignments = useQuery({
     queryKey: ["assignments", trialId], enabled: !!trialId,
-    queryFn: async () => (await supabase.from("pen_assignments").select("pen_id,treatment_id").eq("trial_id", trialId!)).data ?? [],
+    queryFn: async () => (await supabase.from("pen_assignments").select("pen_id,treatment_id,start_date").eq("trial_id", trialId!)).data ?? [],
   });
   const observations = useQuery({
     queryKey: ["trial-observations", trialId], enabled: !!trialId,
@@ -205,7 +210,7 @@ function ResultsPage() {
       (await supabase.from("weighing_sessions").select("session_date,closed_at").eq("site_id", trial.data!.site_id).not("closed_at", "is", null).order("session_date", { ascending: false })).data ?? [],
   });
   const weighingInput = useMemo(() => {
-    if (!search.weighing || !trial.data || !feeds.data || !treatments.data || !assignments.data || !observations.data || !biomass.data) return null;
+    if (!trial.data || !feeds.data || !treatments.data || !assignments.data || !observations.data || !biomass.data) return null;
     return {
       trial: { id: trial.data.id, start_date: trial.data.start_date, acclimation_days: trial.data.acclimation_days },
       pens: assignedPens,
@@ -218,7 +223,53 @@ function ResultsPage() {
       dryMatter,
       retention,
     };
-  }, [search.weighing, trial.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, assignedPens, includeAcclimation, dryMatter, retention]);
+  }, [trial.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, assignedPens, includeAcclimation, dryMatter, retention]);
+
+  const { siteId, siteName } = useSiteScope();
+  const sitePens = useQuery({
+    queryKey: ["results-site-pens", trial.data?.site_id], enabled: !!trial.data?.site_id,
+    queryFn: async () => (await supabase.from("pens").select("id,label,role,initial_snail_count,weighing_interval_days").eq("site_id", trial.data!.site_id)).data ?? [],
+  });
+  const population = useQuery({
+    queryKey: ["trial-population", trialId], enabled: !!trialId,
+    queryFn: async () => ((await supabase.from("population_events").select("pen_id,event_date,event_type,count").eq("trial_id", trialId!)).data ?? []) as PopulationEventLike[],
+  });
+  const benchmarks = useQuery({
+    queryKey: ["benchmarks"],
+    queryFn: async () => ((await supabase.from("benchmarks").select("*")).data ?? []).map((b) => ({ ...b, low: Number(b.low), high: Number(b.high) })) as Benchmark[],
+  });
+  // Newest closed weighing unless one is chosen.
+  const selectedWeighing = search.weighing || closedSessions.data?.[0]?.session_date || "";
+  const overviewInput = useMemo(() => {
+    if (!trial.data || !sitePens.data || !feeds.data || !treatments.data || !assignments.data || !observations.data || !biomass.data) return null;
+    const assigned = new Set(assignments.data.map((a) => a.pen_id));
+    return {
+      trial: { id: trial.data.id, start_date: trial.data.start_date, acclimation_days: trial.data.acclimation_days },
+      pens: sitePens.data.filter((p) => p.role !== "breeder" && assigned.has(p.id)).map((p) => ({ id: p.id, label: p.label })),
+      feeds: feeds.data,
+      treatments: treatments.data,
+      assignments: assignments.data,
+      observations: observations.data.filter((o) => o.feed_id != null).map((o) => ({ ...o, feed_id: o.feed_id as string })),
+      biomass: biomass.data,
+      includeAcclimation,
+      dryMatter: false,
+      retention,
+    };
+  }, [trial.data, sitePens.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, includeAcclimation, retention]);
+  const nextScheduled = useMemo(() => {
+    if (!selectedWeighing || !sitePens.data || !assignments.data || !biomass.data) return null;
+    const assigned = new Set(assignments.data.map((a) => a.pen_id));
+    const startDateByPen = new Map<string, string>();
+    for (const a of assignments.data) if (!startDateByPen.has(a.pen_id)) startDateByPen.set(a.pen_id, a.start_date);
+    return nextWeighingFor({
+      pens: (sitePens.data as SchedulePen[]).filter((p) => p.role !== "breeder" && assigned.has(p.id)),
+      trialInterval: trial.data?.weighing_interval_days,
+      startDateByPen,
+      events: biomass.data,
+      isOperating: siteCalendar.isOperating,
+      nextOperatingDay: siteCalendar.nextOperatingDay,
+    }, selectedWeighing)?.date ?? null;
+  }, [selectedWeighing, sitePens.data, assignments.data, biomass.data, trial.data?.weighing_interval_days, siteCalendar]);
 
   if (!trial.isLoading && !trial.data) {
     return (
@@ -251,21 +302,46 @@ function ResultsPage() {
     <div className="space-y-4">
       <header>
         <h1 className="text-2xl font-bold">Results</h1>
+        <p className="text-sm text-muted-foreground">{siteName || "—"}{trial.data?.name ? ` · ${trial.data.name}` : ""}</p>
+      </header>
+
+      <ResultsOverview
+        siteId={siteId}
+        input={overviewInput}
+        sessions={closedSessions.data ?? []}
+        date={selectedWeighing}
+        onPick={(d) => void navigate({ search: (prev) => ({ ...prev, weighing: d }), replace: true })}
+        benchmarks={benchmarks.data ?? []}
+        population={population.data ?? []}
+        pens={(sitePens.data ?? []).map((p) => ({ id: p.id, initial_snail_count: p.initial_snail_count }))}
+        observations={observations.data ?? []}
+        retentionFor={makeRetention(retention)}
+        isOperating={isOperating}
+        nextWeighing={nextScheduled}
+      />
+
+      <details className="group rounded-2xl border border-border bg-card shadow-sm">
+        <summary className="cursor-pointer list-none px-4 py-3 text-sm">
+          <span className="font-semibold text-primary">More detail <span className="inline-block transition-transform group-open:rotate-90">▸</span></span>
+          <span className="ml-2 text-xs text-muted-foreground">per-pen lines · survival · all intervals · date range</span>
+        </summary>
+        <div className="space-y-4 border-t border-border p-3">
+      <div>
         <p className="text-sm text-muted-foreground">
           Every figure is calculated from the records as they stand — correct an entry and the numbers update.
-          Treatment figures are the average of the pens in that treatment.
+          In this section treatment figures are the average of the pens in that treatment.
         </p>
         <p className="text-xs text-muted-foreground">
           {METRIC_LABELS.economicFcr}: {METRIC_EXPLANATIONS.economicFcr}. {METRIC_LABELS.biologicalFcr}: {METRIC_EXPLANATIONS.biologicalFcr}.{" "}
           {METRIC_LABELS.biologicalFcrDm}: {METRIC_EXPLANATIONS.biologicalFcrDm}. {METRIC_LABELS.sgr}: {METRIC_EXPLANATIONS.sgr}.
         </p>
-      </header>
+      </div>
 
-      {search.weighing && (
+      {selectedWeighing && (
         <WeighingReport
           input={weighingInput}
           sessions={closedSessions.data ?? []}
-          date={search.weighing}
+          date={selectedWeighing}
           onPick={(d) => void navigate({ search: (prev) => ({ ...prev, weighing: d }) })}
         />
       )}
@@ -453,6 +529,8 @@ function ResultsPage() {
           })()}
         </p>
       )}
+        </div>
+      </details>
     </div>
   );
 }
