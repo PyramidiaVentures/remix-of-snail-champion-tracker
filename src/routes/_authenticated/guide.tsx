@@ -1,4 +1,4 @@
-import { AM_STEPS, PM_STEPS } from "@/lib/dayExceptions";
+import { AM_STEPS, PM_STEPS, WEIGH_STEPS } from "@/lib/sopSteps";
 import { createFileRoute } from "@tanstack/react-router";
 import { today } from "@/lib/date";
 import { useSiteScope } from "@/lib/siteScope";
@@ -35,7 +35,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     body: (
       <List
         ordered
-        items={PM_STEPS}
+         items={PM_STEPS.map((step) => step.label)}
       />
     ),
   },
@@ -44,7 +44,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     body: (
       <List
         ordered
-        items={AM_STEPS}
+         items={AM_STEPS.map((step) => step.label)}
       />
     ),
   },
@@ -53,14 +53,7 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     body: (
       <List
         ordered
-        items={[
-          "Place the empty container on the scale and zero it, so the scale reads only the snails.",
-          "Count every live snail in the pen and enter the count.",
-          "Weigh all the snails together and enter the weight the scale shows.",
-          "Photograph the scale display with the pen tag in frame.",
-          "Return the snails to the pen and confirm the count matches.",
-          "Log any snail found dead during handling as a mortality event.",
-        ]}
+         items={WEIGH_STEPS.map((step) => step.label)}
       />
     ),
   },

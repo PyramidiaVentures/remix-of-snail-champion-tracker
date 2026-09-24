@@ -6,6 +6,10 @@ import { addDays, roundOut } from "@/lib/metrics";
 import { liveCount } from "@/lib/liveCount";
 import { buildSchedule, type SchedulePen } from "@/lib/weighSchedule";
 import type { OperatingCalendar } from "@/lib/operatingDays";
+import {
+  AM_CONTROL_STEP_KEY, AM_PHOTO_STEP_KEY, checklistSteps,
+  PM_CONTROL_STEP_KEY, PM_PHOTO_STEP_KEY,
+} from "@/lib/sopSteps";
 
 /* ------------------------------------------------------------------ labels */
 
@@ -47,26 +51,6 @@ export const REFUSAL_ORDER = ["none_left", "trace", "about_25", "about_50", "mos
 
 // The same wording the two field screens use for their SOP steps, so an
 // unticked step is named exactly as the operator sees it.
-export const PM_STEPS = [
-  "Cut/collect fresh feed.",
-  "Weigh each pen's portion and enter grams.",
-  "Put the feed in the clean dish, rotating the dish position.",
-  "Only during a water-loss test: put the standard amount of leaves in the control dish (nothing to enter).",
-  "Calcium and water.",
-  "PM photo.",
-];
-export const PM_CONTROL_STEP_INDEX = 3;
-export const PM_PHOTO_STEP_INDEX = 5;
-export const AM_STEPS = [
-  "Photo each dish untouched, tag in frame.",
-  "Take out all leftover feed, weigh it on the zeroed scale, enter grams, throw it away, clean the dish.",
-  "Only during a water-loss test: weigh what is left in the control dish, enter grams, throw it away.",
-  "Activity, health flags, minimum and maximum temperature and humidity.",
-  "Log any deaths, escapes or removals.",
-];
-export const AM_PHOTO_STEP_INDEX = 0;
-export const AM_CONTROL_STEP_INDEX = 2;
-
 // SOP ticks live in the database (table sop_checklists), so a step ticked on a
 // field phone is visible to everyone. They arrive through DayInputs.checklists.
 
@@ -111,7 +95,7 @@ export type DayInputs = {
     cause: string | null;
   }[];
   biomass: { pen_id: string; event_date: string; net_biomass_g: number; live_count: number }[];
-  checklists: { session: string; steps: boolean[] | null }[];
+  checklists: { session: string; checked_step_keys: string[] }[];
   /** The control dish reading for the date (null when none saved). */
   control: { remaining_g: number | null } | null;
   /** Every control-dish reading for the trial up to the date. */
@@ -133,7 +117,7 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
       .eq("trial_id", trialId),
     supabase.from("biomass_events").select("pen_id,event_date,net_biomass_g,live_count")
       .eq("trial_id", trialId),
-    supabase.from("sop_checklists").select("session,steps")
+    supabase.from("sop_checklists").select("session,checked_step_keys")
       .eq("trial_id", trialId).eq("obs_date", date),
     supabase.from("moisture_controls").select("remaining_g")
       .eq("trial_id", trialId).eq("obs_date", date).maybeSingle(),
@@ -347,19 +331,18 @@ export function computeDayReview(args: {
   }
 
   // SOP steps still unticked.
-  const ticksFor = (session: string, length: number) => {
-    const steps = d.checklists.find((c) => c.session === session)?.steps ?? null;
-    return Array.from({ length }, (_, i) => Boolean(steps?.[i]));
-  };
-  const pmTicks = ticksFor("pm", PM_STEPS.length);
-  (pmExpected && !pmInProgress ? PM_STEPS : []).forEach((step, i) => {
-    const done = i === PM_PHOTO_STEP_INDEX ? pmPhotosAll : i === PM_CONTROL_STEP_INDEX && !controlActive ? true : pmTicks[i];
-    if (!done) exceptions.push({ key: `pmstep-${i}`, group: "PM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/pm" });
+  const ticksFor = (session: string) => new Set(d.checklists.find((c) => c.session === session)?.checked_step_keys ?? []);
+  const pmTicks = ticksFor("pm");
+  const pmSteps = checklistSteps("pm", date);
+  (pmExpected && !pmInProgress ? pmSteps : []).forEach((step, i) => {
+    const done = step.key === PM_PHOTO_STEP_KEY ? pmPhotosAll : step.key === PM_CONTROL_STEP_KEY && !controlActive ? true : pmTicks.has(step.key);
+    if (!done) exceptions.push({ key: `pmstep-${step.key}`, group: "PM checklist", text: `Step ${i + 1} not ticked — ${step.label}`, to: "/pm" });
   });
-  const amTicks = ticksFor("am", AM_STEPS.length);
-  (amExpected && !amInProgress ? AM_STEPS : []).forEach((step, i) => {
-    const done = i === AM_PHOTO_STEP_INDEX ? amPhotosAll : i === AM_CONTROL_STEP_INDEX && !controlActive ? true : amTicks[i];
-    if (!done) exceptions.push({ key: `amstep-${i}`, group: "AM checklist", text: `Step ${i + 1} not ticked — ${step}`, to: "/am" });
+  const amTicks = ticksFor("am");
+  const amSteps = checklistSteps("am", date);
+  (amExpected && !amInProgress ? amSteps : []).forEach((step, i) => {
+    const done = step.key === AM_PHOTO_STEP_KEY ? amPhotosAll : step.key === AM_CONTROL_STEP_KEY && !controlActive ? true : amTicks.has(step.key);
+    if (!done) exceptions.push({ key: `amstep-${step.key}`, group: "AM checklist", text: `Step ${i + 1} not ticked — ${step.label}`, to: "/am" });
   });
 
   // Portioning runs from the weighed leftover (share left), over consecutive

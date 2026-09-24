@@ -44,3 +44,9 @@
 - [x] Show the recorded ranges on the daily dashboard
 - [x] Use recorded ranges in environment trends and weekly summaries
 - [x] Preserve historical single readings as both ends of the range
+
+## Permanent checklist keys (2026-09-24)
+- [x] Give every PM, AM, and weighing step a permanent key
+- [x] Map stored positional ticks using the checklist version live on each date
+- [x] Save and read shared and offline ticks by key
+- [x] Preserve retired keys without showing them in current checklists

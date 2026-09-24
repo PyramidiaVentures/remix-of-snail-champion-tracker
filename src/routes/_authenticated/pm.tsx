@@ -37,7 +37,7 @@ const DISH_ACTIONS: { value: DishAction; label: string }[] = [
   { value: "emptied_spoiled", label: "Emptied — spoiled" },
 ];
 
-import { PM_STEPS, PM_PHOTO_STEP_INDEX, PM_CONTROL_STEP_INDEX } from "@/lib/dayExceptions";
+import { checklistSteps, PM_CONTROL_STEP_KEY, PM_PHOTO_STEP_KEY } from "@/lib/sopSteps";
 
 type SaveState = "idle" | "saving" | "saved" | "failed";
 
@@ -240,8 +240,9 @@ function PmPage() {
     setChecklistAll(all);
   }, []);
 
-  const overrides = PM_STEPS.map((_, i) =>
-    i === PM_PHOTO_STEP_INDEX
+  const checklistItems = checklistSteps("pm", date);
+  const overrides = checklistItems.map((step) =>
+    step.key === PM_PHOTO_STEP_KEY
       ? {
           forced: allPhotos,
           locked: true,
@@ -252,7 +253,7 @@ function PmPage() {
                 ? ` · ${breederPhotosDone} of ${breederPhotosNeeded} breeder pen photos uploaded.`
                 : "."),
         }
-      : i === PM_CONTROL_STEP_INDEX && !controlOn
+      : step.key === PM_CONTROL_STEP_KEY && !controlOn
         ? { forced: true, locked: true, subtitle: "No water-loss test running — nothing to do." }
         : undefined,
   );
@@ -286,7 +287,7 @@ function PmPage() {
         date={date}
         session="pm"
         title="PM steps"
-        items={PM_STEPS}
+        items={checklistItems}
         overrides={overrides}
         onProgress={onChecklistProgress}
       />
