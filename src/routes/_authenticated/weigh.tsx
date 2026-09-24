@@ -15,6 +15,7 @@ import { specificGrowthRate } from "@/lib/metrics";
 
 import { liveCount, hasAddition } from "@/lib/liveCount";
 import { Checklist } from "@/components/Checklist";
+import { WEIGH_PHOTO_STEP_KEY, WEIGH_STEPS } from "@/lib/sopSteps";
 import { NumberField } from "@/components/NumberField";
 import { PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import type { Database } from "@/integrations/supabase/types";
@@ -32,16 +33,6 @@ export const Route = createFileRoute("/_authenticated/weigh")({
 
 type BiomassRow = Database["public"]["Tables"]["biomass_events"]["Row"];
 type BiomassMethod = Database["public"]["Enums"]["biomass_method"];
-
-const WEIGH_STEPS = [
-  "Place the empty container on the scale and zero it, so the scale reads only the snails.",
-  "Count every live snail in the pen and enter the count.",
-  "Weigh all the snails together and enter the weight the scale shows.",
-  "Photograph the scale display with the pen tag in frame.",
-  "Return the snails to the pen and confirm the count matches.",
-  "Log any snail found dead during handling as a mortality event.",
-];
-const WEIGH_PHOTO_STEP_INDEX = 3;
 
 type SaveState = "idle" | "saving" | "saved" | "failed";
 
@@ -217,8 +208,8 @@ function WeighPage() {
   const photosNeeded = dueInfo.due.length;
   const allPhotos = photosNeeded > 0 && photosDone === photosNeeded;
 
-  const overrides = WEIGH_STEPS.map((_, i) =>
-    i === WEIGH_PHOTO_STEP_INDEX
+  const overrides = WEIGH_STEPS.map((step) =>
+    step.key === WEIGH_PHOTO_STEP_KEY
       ? {
           forced: allPhotos,
           locked: true,

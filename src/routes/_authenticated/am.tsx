@@ -55,7 +55,7 @@ const SUBSTRATE: { value: SubstrateCondition; label: string }[] = [
   { value: "mouldy", label: "Mouldy" },
 ];
 
-import { AM_STEPS, AM_PHOTO_STEP_INDEX, AM_CONTROL_STEP_INDEX } from "@/lib/dayExceptions";
+import { AM_CONTROL_STEP_KEY, AM_PHOTO_STEP_KEY, AM_STEPS } from "@/lib/sopSteps";
 
 const EVENT_LABEL: Record<string, string> = {
   mortality: "Death",
@@ -264,8 +264,8 @@ function AmPage() {
     setChecklistAll(all);
   }, []);
 
-  const overrides = AM_STEPS.map((_, i) =>
-    i === AM_PHOTO_STEP_INDEX
+  const overrides = AM_STEPS.map((step) =>
+    step.key === AM_PHOTO_STEP_KEY
       ? {
           forced: allPhotos,
           locked: true,
@@ -277,7 +277,7 @@ function AmPage() {
                 : ".") +
               (allPhotos ? "" : " Take them before disturbing the dish."),
         }
-      : i === AM_CONTROL_STEP_INDEX && !controlOn
+      : step.key === AM_CONTROL_STEP_KEY && !controlOn
         ? { forced: true, locked: true, subtitle: "No water-loss test running — nothing to do." }
         : undefined,
   );
