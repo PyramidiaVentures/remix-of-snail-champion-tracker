@@ -40,6 +40,7 @@ type ObservationRow = {
   offered_g: number | null;
   dish_action: string | null;
   refusal_score: string | null;
+  leftover_g: number | null;
 };
 
 const PAGE = 8;
@@ -101,9 +102,13 @@ function CycleDetails({ observation }: { observation: ObservationRow | undefined
         </dd>
       </div>
       <div>
-        <dt className="text-xs text-muted-foreground">Morning refusal score</dt>
+        <dt className="text-xs text-muted-foreground">Leftover</dt>
         <dd className="font-semibold">
-          {observation?.refusal_score ? REFUSAL_LABELS[observation.refusal_score] ?? observation.refusal_score : "—"}
+          {observation?.leftover_g != null
+            ? `Leftover: ${Number(observation.leftover_g).toFixed(1)} g${observation.offered_g ? ` (${Math.round((Number(observation.leftover_g) / Number(observation.offered_g)) * 100)}%)` : ""}`
+            : observation?.refusal_score
+              ? `${REFUSAL_LABELS[observation.refusal_score] ?? observation.refusal_score} (visual estimate)`
+              : "—"}
         </dd>
       </div>
     </dl>
@@ -148,7 +153,7 @@ function PhotosPage() {
           .in("pen_id", penIds).eq("obs_date", date),
         supabase.from("biomass_events").select("pen_id,event_date,photo_url")
           .in("pen_id", penIds).eq("event_date", date),
-        supabase.from("observations").select("pen_id,obs_date,offered_g,dish_action,refusal_score")
+        supabase.from("observations").select("pen_id,obs_date,offered_g,dish_action,refusal_score,leftover_g")
           .in("pen_id", penIds).eq("obs_date", date),
       ]);
       return {
@@ -205,7 +210,7 @@ function PhotosPage() {
         supabase.from("session_photos").select("pen_id,obs_date,photo_am_url,photo_pm_url")
           .eq("pen_id", selectedPenId).order("obs_date", { ascending: false }),
         supabase.from("biomass_events").select("pen_id,event_date,photo_url").eq("pen_id", selectedPenId),
-        supabase.from("observations").select("pen_id,obs_date,offered_g,dish_action,refusal_score")
+        supabase.from("observations").select("pen_id,obs_date,offered_g,dish_action,refusal_score,leftover_g")
           .eq("pen_id", selectedPenId),
       ]);
       return {
