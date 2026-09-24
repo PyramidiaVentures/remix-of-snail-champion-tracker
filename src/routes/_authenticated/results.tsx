@@ -10,6 +10,7 @@ import {
 } from "@/lib/metrics";
 import { readIncludeAcclimation } from "@/lib/acclimation";
 import { useAllSiteCalendars } from "@/lib/operatingDays";
+import { WeighingReport } from "@/components/WeighingReport";
 
 import {
   XAxis, YAxis, ResponsiveContainer, Tooltip, Legend,
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/_authenticated/results")({
     to: typeof search['to'] === "string" ? search['to'] : "",
     hide: typeof search['hide'] === "string" ? search['hide'] : "",
     hs: typeof search['hs'] === "string" ? search['hs'] : "",
+    weighing: typeof search['weighing'] === "string" ? search['weighing'] : "",
   }),
   head: () => ({
     meta: [
@@ -193,6 +195,30 @@ function ResultsPage() {
   }, [retention, trial.data, pens.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, assignedPens, selectedPenIds, scopedObservations, scopedBiomass, selectedIntervals.length, includeAcclimation, dryMatter]);
 
 
+  // "Weighing of <date>": the same metrics, over every recorded day, for the
+  // pens whose interval ends on that weighing.
+  const closedSessions = useQuery({
+    queryKey: ["weighing-sessions", trial.data?.site_id],
+    enabled: !!trial.data?.site_id,
+    queryFn: async () =>
+      (await supabase.from("weighing_sessions").select("session_date,closed_at").eq("site_id", trial.data!.site_id).not("closed_at", "is", null).order("session_date", { ascending: false })).data ?? [],
+  });
+  const weighingInput = useMemo(() => {
+    if (!search.weighing || !trial.data || !feeds.data || !treatments.data || !assignments.data || !observations.data || !biomass.data) return null;
+    return {
+      trial: { id: trial.data.id, start_date: trial.data.start_date, acclimation_days: trial.data.acclimation_days },
+      pens: assignedPens,
+      feeds: feeds.data,
+      treatments: treatments.data,
+      assignments: assignments.data,
+      observations: observations.data.filter((o) => o.feed_id != null).map((o) => ({ ...o, feed_id: o.feed_id as string })),
+      biomass: biomass.data,
+      includeAcclimation,
+      dryMatter,
+      retention,
+    };
+  }, [search.weighing, trial.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, assignedPens, includeAcclimation, dryMatter, retention]);
+
   if (!trial.isLoading && !trial.data) {
     return (
       <div className="space-y-4">
@@ -229,6 +255,15 @@ function ResultsPage() {
           Treatment figures are the average of the pens in that treatment.
         </p>
       </header>
+
+      {search.weighing && (
+        <WeighingReport
+          input={weighingInput}
+          sessions={closedSessions.data ?? []}
+          date={search.weighing}
+          onPick={(d) => void navigate({ search: (prev) => ({ ...prev, weighing: d }) })}
+        />
+      )}
 
       <section className="rounded-2xl border border-border bg-card p-3 shadow-sm space-y-3">
         <div className="flex items-end gap-2">
@@ -272,7 +307,7 @@ function ResultsPage() {
 
         <button
           type="button"
-          onClick={() => navigate({ search: { pen: "", from: "", to: "", hide: "", hs: "" }, replace: true })}
+          onClick={() => navigate({ search: { pen: "", from: "", to: "", hide: "", hs: "", weighing: search.weighing }, replace: true })}
           className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium"
         >
           Reset view

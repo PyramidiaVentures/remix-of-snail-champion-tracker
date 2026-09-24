@@ -1,11 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { upsertRow, BIOMASS_EVENTS_KEY } from "@/lib/upsertRow";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
 import { useSiteCalendar } from "@/lib/operatingDays";
-import { buildSchedule, overdueSummary, type PenSchedule, type SchedulePen } from "@/lib/weighSchedule";
+import { dueOnDate, nextWeighing, penListLabel, type PenSchedule, type SchedulePen } from "@/lib/weighSchedule";
 
 import { uploadWeighPhoto } from "@/lib/photoUpload";
 import { useSignedPhotoUrl } from "@/lib/useSignedPhotoUrl";
@@ -127,34 +127,53 @@ function WeighPage() {
     return m;
   }, [assignments.data]);
 
-  const scheduleRows = useMemo(
-    () =>
-      buildSchedule({
-        pens: (pens.data ?? []) as SchedulePen[],
-        trialInterval: trial.data?.weighing_interval_days,
-        startDateByPen,
-        events: events.data ?? [],
-        today: today(),
-        isOperating: calendar.isOperating,
-        nextOperatingDay: calendar.nextOperatingDay,
-      }),
-    [pens.data, trial.data?.weighing_interval_days, startDateByPen, events.data, calendar],
+  const scheduleArgs = useMemo(
+    () => ({
+      pens: ((pens.data ?? []) as SchedulePen[]).filter((p) => p.role === "breeder" || assignedPenIds.has(p.id)),
+      trialInterval: trial.data?.weighing_interval_days,
+      startDateByPen,
+      events: events.data ?? [],
+      isOperating: calendar.isOperating,
+      nextOperatingDay: calendar.nextOperatingDay,
+    }),
+    [pens.data, assignedPenIds, trial.data?.weighing_interval_days, startDateByPen, events.data, calendar],
   );
-  const scheduleFor = (penId: string) => scheduleRows.find((r) => r.penId === penId) ?? null;
-  const dueCount = scheduleRows.filter((r) => r.dueToday).length;
-  const overdue = overdueSummary(scheduleRows);
+  // One rule everywhere: due on the selected date = next weighing on or before it.
+  const dueInfo = useMemo(() => dueOnDate(scheduleArgs, date), [scheduleArgs, date]);
+  const next = useMemo(() => nextWeighing(scheduleArgs, date), [scheduleArgs, date]);
+  const scheduleFor = (penId: string) => dueInfo.rows.find((r) => r.penId === penId) ?? null;
+  const dueIds = useMemo(() => new Set(dueInfo.due.map((r) => r.penId)), [dueInfo]);
+
+  // Pens weighed "anyway": picked from the list, or already weighed on this date.
+  const [extraIds, setExtraIds] = useState<Set<string>>(new Set());
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const allPens = useMemo(() => [...trialPens, ...breederPens], [trialPens, breederPens]);
+  const shownIds = useMemo(
+    () => new Set([...dueIds, ...extraIds, ...dueInfo.weighedIds]),
+    [dueIds, extraIds, dueInfo.weighedIds],
+  );
 
   const stepperPens = useMemo(
     () =>
-      [...trialPens, ...breederPens].map((p) => {
-        const s = scheduleRows.find((r) => r.penId === p.id);
+      allPens.filter((p) => shownIds.has(p.id)).map((p) => {
+        const s = dueInfo.rows.find((r) => r.penId === p.id);
         return {
           ...p,
-          dueState: s?.overdueDays ? ("overdue" as const) : s?.dueToday ? ("due" as const) : undefined,
+          dueState: !dueIds.has(p.id) ? undefined : s?.overdueDays ? ("overdue" as const) : ("due" as const),
         };
       }),
-    [trialPens, breederPens, scheduleRows],
+    [allPens, shownIds, dueInfo.rows, dueIds],
   );
+  const otherPens = allPens.filter((p) => !shownIds.has(p.id));
+
+  const session = useQuery({
+    queryKey: ["weighing-session", trialId, date],
+    enabled: !!trialId,
+    queryFn: async () =>
+      (await supabase.from("weighing_sessions").select("*").eq("trial_id", trialId!).eq("session_date", date).maybeSingle()).data,
+  });
+  const closed = !!session.data?.closed_at;
+  const navigate = useNavigate();
 
   const rowFor = (penId: string) => (events.data ?? []).find((e) => e.pen_id === penId && e.event_date === date);
   const previousFor = (penId: string) =>
@@ -179,7 +198,7 @@ function WeighPage() {
   const missingFor = (penId: string) => {
     const row = rowFor(penId);
     // Weighing a breeder pen is optional, so an empty one is never "missing".
-    if (isBreeder(penId) && !row) return [];
+    if ((isBreeder(penId) || !dueIds.has(penId)) && !row) return [];
     const missing: string[] = [];
     if (row?.live_count == null) missing.push("live count");
     if (row?.net_biomass_g == null) missing.push("snail weight");
@@ -194,8 +213,8 @@ function WeighPage() {
     return missing.length === 3 ? "empty" : "partial";
   };
 
-  const photosDone = trialPens.filter((p) => photoDone(p.id)).length;
-  const photosNeeded = trialPens.length;
+  const photosDone = dueInfo.due.filter((p) => photoDone(p.penId)).length;
+  const photosNeeded = dueInfo.due.length;
   const allPhotos = photosNeeded > 0 && photosDone === photosNeeded;
 
   const overrides = WEIGH_STEPS.map((_, i) =>
@@ -204,7 +223,7 @@ function WeighPage() {
           forced: allPhotos,
           locked: true,
           subtitle: photosNeeded === 0
-            ? "Assign pens to the trial first."
+            ? "No pens are due on this date."
             : allPhotos
               ? `All ${photosNeeded} scale photos uploaded.`
               : `${photosNeeded - photosDone} of ${photosNeeded} scale photos still needed.`,
@@ -215,6 +234,45 @@ function WeighPage() {
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["biomass-events", trialId] });
     void qc.invalidateQueries({ queryKey: ["population-events", trialId] });
+  };
+
+  const dueN = dueInfo.due.length;
+  const weighedN = dueInfo.weighed.length;
+  const complete = dueN > 0 && weighedN === dueN;
+  const dayWord = date === today() ? "today" : `on ${date}`;
+  const nextLine = next ? `Next weighing: ${next.date}, ${penListLabel(next.labels)}` : "No further weighing scheduled";
+
+  // Counts that disagree with the population log, for pens weighed on this date.
+  const mismatches = allPens.flatMap((p) => {
+    const row = rowFor(p.id);
+    if (!row || row.live_count == null) return [];
+    const ledger = ledgerFor(p.id).count;
+    return row.live_count === ledger ? [] : [{ pen: p, weighed: row.live_count, ledger }];
+  });
+
+  const [closing, setClosing] = useState(false);
+  const closeWeighing = async () => {
+    if (!trial.data || !siteId) return;
+    if (!complete && !window.confirm(`Close weighing with ${weighedN} of ${dueN} pens? The unweighed pens stay due.`)) return;
+    setClosing(true);
+    const { data: u } = await supabase.auth.getUser();
+    const { error } = await supabase.from("weighing_sessions").upsert(
+      {
+        site_id: siteId, trial_id: trial.data.id, session_date: date,
+        pens_due: dueN, pens_weighed: weighedN,
+        closed_at: new Date().toISOString(), closed_by: u.user?.email ?? null,
+      },
+      { onConflict: "trial_id,session_date" },
+    );
+    setClosing(false);
+    if (error) { window.alert(`Could not close the weighing: ${error.message}`); return; }
+    void qc.invalidateQueries({ queryKey: ["weighing-session"] });
+    void navigate({ to: "/results", search: { pen: "", from: "", to: "", hide: "", hs: "", weighing: date } });
+  };
+  const reopen = async () => {
+    if (!session.data) return;
+    await supabase.from("weighing_sessions").update({ closed_at: null, closed_by: null }).eq("id", session.data.id);
+    void qc.invalidateQueries({ queryKey: ["weighing-session"] });
   };
 
   return (
@@ -234,13 +292,14 @@ function WeighPage() {
       </label>
 
       {trial.data && (
-        <div className={`rounded-lg border p-3 text-sm ${overdue.count > 0 ? "border-destructive/40 bg-destructive/5" : "border-border bg-card"}`}>
+        <div className="rounded-lg border border-border bg-card p-3 text-sm">
           <span className="font-semibold">
-            {dueCount} pen{dueCount === 1 ? "" : "s"} due today, {overdue.count} overdue
+            {dueN === 0
+              ? `No pens due ${dayWord}. ${nextLine}.`
+              : `${dueN} pen${dueN === 1 ? "" : "s"} due ${dayWord}: ${penListLabel(dueInfo.due.map((r) => r.label))}`}
           </span>
           <div className="mt-0.5 text-xs text-muted-foreground">
-            Every pen runs on its own interval. Weighing a pen off-schedule is always welcome — record whichever pens
-            you weighed today.
+            Only due pens are listed. Weighing another pen off-schedule is always welcome — its schedule then counts from that date.
           </div>
         </div>
       )}
@@ -250,7 +309,7 @@ function WeighPage() {
       {!!siteId && !trial.isLoading && !trial.data && <NoActiveTrial siteName={siteName} />}
 
 
-      {trial.data && (
+      {trial.data && stepperPens.length > 0 && (
         <PenStepper
           pens={stepperPens}
           stateFor={stateFor}
@@ -270,6 +329,84 @@ function WeighPage() {
             />
           )}
         />
+      )}
+
+      {trial.data && (
+        <div className="space-y-2">
+          {!pickerOpen ? (
+            <button type="button" onClick={() => setPickerOpen(true)} className="text-sm text-primary underline">
+              Weigh another pen anyway
+            </button>
+          ) : (
+            <select
+              autoFocus
+              value=""
+              onChange={(e) => {
+                const id = e.target.value;
+                if (!id) return;
+                setExtraIds((prev) => new Set(prev).add(id));
+                setPickerOpen(false);
+                void navigate({ to: "/weigh", search: { pen: id } });
+              }}
+              className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm"
+            >
+              <option value="">Choose a pen…</option>
+              {otherPens.map((p) => <option key={p.id} value={p.id}>{p.label}{p.role === "breeder" ? " (breeder)" : ""}</option>)}
+            </select>
+          )}
+        </div>
+      )}
+
+      {trial.data && dueN > 0 && (
+        <section className={`rounded-2xl border p-4 space-y-3 ${closed ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
+          <div className="font-semibold">
+            {weighedN} of {dueN} due pens weighed. {nextLine}.
+          </div>
+          {mismatches.length > 0 && (
+            <ul className="space-y-2">
+              {mismatches.map((m) => (
+                <li key={m.pen.id} className="flex items-center justify-between gap-2 rounded-lg bg-earth/10 px-3 py-2 text-sm">
+                  <span>{m.pen.label}: weighed {m.weighed} snails, death log says {m.ledger}</span>
+                  <Link
+                    to="/population"
+                    search={{
+                      logPen: m.pen.id, logDate: date,
+                      logType: m.weighed < m.ledger ? "mortality" : "addition",
+                      logCount: String(Math.abs(m.ledger - m.weighed)),
+                      logNote: `found at weighing ${date}`,
+                    }}
+                    className="shrink-0 rounded-md border border-border bg-card px-2 py-1 text-xs font-medium"
+                  >
+                    Log the difference
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          {closed ? (
+            <div className="space-y-2">
+              <div className="text-sm text-primary">Weighing closed.</div>
+              <div className="flex gap-2">
+                <Link to="/results" search={(prev) => ({ ...prev, weighing: date }) as never}
+                  className="flex-1 rounded-lg bg-primary px-3 py-3 text-center text-sm font-semibold text-primary-foreground">
+                  Show results
+                </Link>
+                <button type="button" onClick={() => void reopen()} className="rounded-lg border border-border px-3 py-3 text-sm">
+                  Reopen weighing
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={closing}
+              onClick={() => void closeWeighing()}
+              className="w-full rounded-lg bg-primary px-3 py-4 text-base font-semibold text-primary-foreground disabled:opacity-60"
+            >
+              {complete ? "Close weighing and show results" : `Close weighing with ${weighedN} of ${dueN} pens`}
+            </button>
+          )}
+        </section>
       )}
 
       <p className="text-xs text-muted-foreground flex items-center gap-1">

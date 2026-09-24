@@ -10,7 +10,7 @@ import { today } from "@/lib/date";
 import { daysBetween } from "@/lib/metrics";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
 import { useAllSiteCalendars, useSiteCalendar } from "@/lib/operatingDays";
-import { buildSchedule, type SchedulePen } from "@/lib/weighSchedule";
+import { buildSchedule, dueOnDate, type SchedulePen } from "@/lib/weighSchedule";
 import {
   computeDayReview,
   fetchDayInputs,
@@ -164,9 +164,27 @@ function HomePage() {
       }),
     [pens.data, trial.data?.weighing_interval_days, startDateByPen, daily.data?.biomass, t, calendar],
   );
-  const dueTodayCount = scheduleRows.filter((r) => r.dueToday).length;
-  const overdueCount = scheduleRows.filter((r) => r.overdueDays > 0).length;
-  const isWeighDay = dueTodayCount > 0 || overdueCount > 0;
+  // Same "due" rule as Weigh Day: next weighing on or before today, overdue included.
+  const dueToday = useMemo(
+    () =>
+      dueOnDate({
+        pens: (pens.data ?? []) as SchedulePen[],
+        trialInterval: trial.data?.weighing_interval_days,
+        startDateByPen,
+        events: daily.data?.biomass ?? [],
+        isOperating: calendar.isOperating,
+        nextOperatingDay: calendar.nextOperatingDay,
+      }, t),
+    [pens.data, trial.data?.weighing_interval_days, startDateByPen, daily.data?.biomass, t, calendar],
+  );
+  const weighSession = useQuery({
+    queryKey: ["weighing-session", trialId, t],
+    enabled: !!trialId,
+    queryFn: async () =>
+      (await supabase.from("weighing_sessions").select("closed_at").eq("trial_id", trialId!).eq("session_date", t).maybeSingle()).data,
+  });
+  const dueTodayCount = dueToday.due.length;
+  const isWeighDay = dueTodayCount > 0 && !weighSession.data?.closed_at;
   const nextDueDate = scheduleRows
     .map((r) => r.nextDue)
     .filter((d): d is string => !!d && d > t)
@@ -214,8 +232,7 @@ function HomePage() {
 
           {isWeighDay ? (
             <Link to="/weigh" className="block rounded-lg bg-primary px-3 py-3 text-center text-sm font-semibold text-primary-foreground">
-              {dueTodayCount} pen{dueTodayCount === 1 ? "" : "s"} due today
-              {overdueCount > 0 ? `, ${overdueCount} overdue` : ""} — open Weigh Day
+              Weigh day: {dueTodayCount} pen{dueTodayCount === 1 ? "" : "s"} due
             </Link>
           ) : (
             <p className="text-sm text-muted-foreground">

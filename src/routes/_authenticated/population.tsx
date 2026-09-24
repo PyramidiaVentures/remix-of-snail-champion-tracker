@@ -12,10 +12,19 @@ import { liveCount, cumulativeMortality } from "@/lib/liveCount";
 import type { Database } from "@/integrations/supabase/types";
 import { Plus, Trash2, Pencil, X, Check, Upload, Loader2, AlertTriangle } from "lucide-react";
 
+type Prefill = { pen?: string; logPen?: string; logDate?: string; logType?: string; logCount?: string; logNote?: string };
+
 export const Route = createFileRoute("/_authenticated/population")({
   component: PopulationPage,
-  validateSearch: (search: Record<string, unknown>): { pen?: string } =>
-    typeof search['pen'] === "string" ? { pen: search['pen'] } : {},
+  // `log*` prefill the event form, e.g. from a Weigh Day count mismatch.
+  validateSearch: (search: Record<string, unknown>): Prefill => {
+    const out: Prefill = {};
+    for (const k of ["pen", "logPen", "logDate", "logType", "logCount", "logNote"] as const) {
+      const v = search[k];
+      if (typeof v === "string" || typeof v === "number") out[k] = String(v);
+    }
+    return out;
+  },
   head: () => ({
     meta: [
       { title: "Population — SNOVA Growth Tracker" },
@@ -124,6 +133,7 @@ function PopulationPage() {
           trialId={trialId}
           pens={trialPens}
           defaultDate={t}
+          prefill={Route.useSearch()}
           onSaved={refresh}
         />
       )}
@@ -347,11 +357,12 @@ interface FormValues {
 }
 
 function AddEventForm({
-  trialId, pens, defaultDate, onSaved,
+  trialId, pens, defaultDate, prefill, onSaved,
 }: {
   trialId: string;
   pens: { id: string; label: string }[];
   defaultDate: string;
+  prefill?: Prefill;
   onSaved: () => void;
 }) {
   const empty = (): FormValues => ({
@@ -362,7 +373,18 @@ function AddEventForm({
     cause: "",
     notes: "",
   });
-  const [v, setV] = useState<FormValues>(empty);
+  const [v, setV] = useState<FormValues>(() =>
+    prefill?.logPen
+      ? {
+          pen_id: prefill.logPen,
+          event_date: prefill.logDate ?? defaultDate,
+          event_type: (prefill.logType as EventType) ?? "mortality",
+          count: prefill.logCount ?? "1",
+          cause: "unknown",
+          notes: prefill.logNote ?? "",
+        }
+      : empty(),
+  );
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const photoViewUrl = useSignedPhotoUrl(photoUrl);
   const [uploading, setUploading] = useState(false);

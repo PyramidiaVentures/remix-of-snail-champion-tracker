@@ -24,3 +24,11 @@
 - [x] 4. cum_eaten, coverage, FCR (feed eaten) headline, mean share left
 - [x] 5. Replace refusal_score rules with share-left rules/bands
 - [x] 6. Remove carry-over/spoilage for trial pens in Results + interval_summary
+
+## Weigh Day due-only (2026-09-24)
+- [x] 1. Shared "due on date" rule (weighSchedule)
+- [x] 2. Stepper shows due pens only + "Weigh another pen anyway"
+- [x] 3. Completion panel, ledger mismatches, close/reopen (weighing_sessions)
+- [x] 3b. Results "Weighing of <date>" section
+- [x] 4. Home/dashboard/exceptions use due rule
+- [x] 5. No pens due message

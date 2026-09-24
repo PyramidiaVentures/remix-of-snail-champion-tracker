@@ -696,6 +696,57 @@ export type Database = {
           },
         ]
       }
+      weighing_sessions: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          id: string
+          pens_due: number
+          pens_weighed: number
+          session_date: string
+          site_id: string
+          trial_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          id?: string
+          pens_due?: number
+          pens_weighed?: number
+          session_date: string
+          site_id: string
+          trial_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          id?: string
+          pens_due?: number
+          pens_weighed?: number
+          session_date?: string
+          site_id?: string
+          trial_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weighing_sessions_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weighing_sessions_trial_id_fkey"
+            columns: ["trial_id"]
+            isOneToOne: false
+            referencedRelation: "trials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       welfare_checks: {
         Row: {
           activity: Database["public"]["Enums"]["snail_activity"] | null

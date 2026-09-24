@@ -50,6 +50,13 @@
       "when": 1790254580091,
       "tag": "0006_trial_target_left_band",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790259123000,
+      "tag": "0007_weighing_sessions",
+      "breakpoints": true
     }
   ]
 }
