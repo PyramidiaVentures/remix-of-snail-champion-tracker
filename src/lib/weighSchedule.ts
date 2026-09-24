@@ -113,3 +113,50 @@ export function overdueAdvisory(rows: PenSchedule[]): string | null {
   if (count === 0) return null;
   return `${count} pen${count === 1 ? " is" : "s are"} overdue for weighing, the oldest by ${oldest} day${oldest === 1 ? "" : "s"}.`;
 }
+
+type ScheduleArgs = Omit<Parameters<typeof buildSchedule>[0], "today">;
+
+/**
+ * Which pens are DUE on a date: the schedule built from weighings BEFORE that
+ * date puts their next weighing on or before it. Overdue pens count as due; a
+ * weighing saved on the date itself does not move the pen out of "due" — it
+ * makes it "weighed". Breeder pens without an interval are never due.
+ */
+export function dueOnDate(args: ScheduleArgs, date: string) {
+  const before = args.events.filter((e) => e.event_date < date);
+  const rows = buildSchedule({ ...args, events: before, today: date });
+  const weighedIds = new Set(args.events.filter((e) => e.event_date === date).map((e) => e.pen_id));
+  const due = rows.filter((r) => !!r.nextDue && r.nextDue <= date);
+  const weighed = due.filter((r) => weighedIds.has(r.penId));
+  const unweighed = due.filter((r) => !weighedIds.has(r.penId));
+  return { rows, due, weighed, unweighed, weighedIds };
+}
+
+/** The next weighing strictly after a date, counting weighings up to and including it. */
+export function nextWeighing(args: ScheduleArgs, date: string): { date: string; labels: string[] } | null {
+  const upTo = args.events.filter((e) => e.event_date <= date);
+  const rows = buildSchedule({ ...args, events: upTo, today: date });
+  const next = rows.map((r) => r.nextDue).filter((d): d is string => !!d && d > date).sort()[0];
+  if (!next) return null;
+  return { date: next, labels: rows.filter((r) => r.nextDue === next).map((r) => r.label) };
+}
+
+/** "Pens 1–5" / "Pens 1, 3, 7" / "Pen 4". */
+export function penListLabel(labels: string[]): string {
+  if (labels.length === 0) return "";
+  const sorted = [...labels].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const nums = sorted.map((l) => l.match(/^Pen (\d+)$/)?.[1]);
+  if (sorted.length === 1) return sorted[0]!;
+  if (nums.every(Boolean)) {
+    const n = nums.map(Number);
+    const runs: string[] = [];
+    let s = n[0]!, p = n[0]!;
+    for (const x of [...n.slice(1), NaN]) {
+      if (x === p + 1) { p = x; continue; }
+      runs.push(s === p ? `${s}` : p === s + 1 ? `${s}, ${p}` : `${s}–${p}`);
+      s = p = x;
+    }
+    return `Pens ${runs.join(", ")}`;
+  }
+  return sorted.join(", ");
+}
