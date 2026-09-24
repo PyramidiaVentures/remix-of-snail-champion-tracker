@@ -71,6 +71,13 @@
       "when": 1790260540405,
       "tag": "0009_key_sop_checklist_ticks",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790260863239,
+      "tag": "0010_rename_control_checklist_keys",
+      "breakpoints": true
     }
   ]
 }
