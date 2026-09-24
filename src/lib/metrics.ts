@@ -150,7 +150,7 @@ export function observationBand(
   return null;
 }
 
-/** Minimum coverage of weighed leftovers before FCR (feed eaten) is shown. */
+/** Minimum coverage of weighed leftovers before Biological FCR is shown. */
 export const EATEN_COVERAGE_MIN = 0.9;
 
 /** Canonical user-facing metric names and their first-use explanations. */
@@ -263,7 +263,7 @@ export interface TreatmentMetrics {
   eatenPerKgGain: number | null;
   eatenDmPerKgGain: number | null;
   dmMissing: boolean;
-  /** Pens with a complete FCR (feed eaten) / pens in the treatment. */
+  /** Pens with a complete Biological FCR / pens in the treatment. */
   eatenCompletePens: number;
   meanShareLeft: number | null;
   meanSgr: number | null;
