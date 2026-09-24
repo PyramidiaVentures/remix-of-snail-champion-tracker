@@ -267,7 +267,7 @@ function WeighPage() {
     setClosing(false);
     if (error) { window.alert(`Could not close the weighing: ${error.message}`); return; }
     void qc.invalidateQueries({ queryKey: ["weighing-session"] });
-    void navigate({ to: "/results", search: (prev) => ({ ...prev, weighing: date }) });
+    void navigate({ to: "/results", search: { pen: "", from: "", to: "", hide: "", hs: "", weighing: date } });
   };
   const reopen = async () => {
     if (!session.data) return;
