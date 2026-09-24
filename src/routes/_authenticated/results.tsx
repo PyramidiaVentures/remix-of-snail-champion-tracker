@@ -1108,8 +1108,8 @@ function PortionsChart({
                       />
                     ))}
                   </Bar>
-                  <Line yAxisId="g" type="monotone" dataKey="offered" name="Offered (g)" stroke="var(--color-primary)" dot={false} connectNulls />
-                  <Line yAxisId="g" type="monotone" dataKey="eaten" name="Eaten (g)" stroke="#0369a1" dot={false} connectNulls />
+                  <Line yAxisId="g" type="linear" dataKey="offered" name="Offered (g)" stroke="var(--color-primary)" dot={false} connectNulls />
+                  <Line yAxisId="g" type="linear" dataKey="eaten" name="Eaten (g)" stroke="#0369a1" dot={false} connectNulls />
                   <Scatter yAxisId="g" dataKey="changeMark" name="Portion changed" fill="var(--color-foreground)" shape="diamond" />
                   <Tooltip content={<PortionTooltip />} />
                 </ComposedChart>
