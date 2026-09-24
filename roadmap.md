@@ -38,3 +38,9 @@
 - [x] Add treatment headline cards to each closed weighing report using mean-of-pens figures
 - [x] Add shared per-day interval metrics to the weighing table and interval_summary
 - [x] Verify Nairobi Pen 2 for 9–23 September against the supplied values
+
+## AM environment ranges (2026-09-24)
+- [x] Add minimum and maximum temperature and humidity to morning records
+- [x] Show the recorded ranges on the daily dashboard
+- [x] Use recorded ranges in environment trends and weekly summaries
+- [x] Preserve historical single readings as both ends of the range

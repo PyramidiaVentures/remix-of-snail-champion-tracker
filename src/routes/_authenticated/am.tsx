@@ -288,14 +288,14 @@ function AmPage() {
   const existingTempMax = (welfare.data ?? []).find((w) => w.temp_max_c != null || w.temp_c != null);
   const existingHumidityMin = (welfare.data ?? []).find((w) => w.humidity_min_pct != null || w.humidity_pct != null);
   const existingHumidityMax = (welfare.data ?? []).find((w) => w.humidity_max_pct != null || w.humidity_pct != null);
-  const [sessionTempMin, setSessionTempMin] = useState<number | null>(null);
-  const [sessionTempMax, setSessionTempMax] = useState<number | null>(null);
-  const [sessionHumidityMin, setSessionHumidityMin] = useState<number | null>(null);
-  const [sessionHumidityMax, setSessionHumidityMax] = useState<number | null>(null);
-  const tempMin = sessionTempMin ?? existingTempMin?.temp_min_c ?? existingTempMin?.temp_c ?? null;
-  const tempMax = sessionTempMax ?? existingTempMax?.temp_max_c ?? existingTempMax?.temp_c ?? null;
-  const humidityMin = sessionHumidityMin ?? existingHumidityMin?.humidity_min_pct ?? existingHumidityMin?.humidity_pct ?? null;
-  const humidityMax = sessionHumidityMax ?? existingHumidityMax?.humidity_max_pct ?? existingHumidityMax?.humidity_pct ?? null;
+  const [sessionTempMin, setSessionTempMin] = useState<{ date: string; value: number | null } | null>(null);
+  const [sessionTempMax, setSessionTempMax] = useState<{ date: string; value: number | null } | null>(null);
+  const [sessionHumidityMin, setSessionHumidityMin] = useState<{ date: string; value: number | null } | null>(null);
+  const [sessionHumidityMax, setSessionHumidityMax] = useState<{ date: string; value: number | null } | null>(null);
+  const tempMin = sessionTempMin?.date === date ? sessionTempMin.value : existingTempMin?.temp_min_c ?? existingTempMin?.temp_c ?? null;
+  const tempMax = sessionTempMax?.date === date ? sessionTempMax.value : existingTempMax?.temp_max_c ?? existingTempMax?.temp_c ?? null;
+  const humidityMin = sessionHumidityMin?.date === date ? sessionHumidityMin.value : existingHumidityMin?.humidity_min_pct ?? existingHumidityMin?.humidity_pct ?? null;
+  const humidityMax = sessionHumidityMax?.date === date ? sessionHumidityMax.value : existingHumidityMax?.humidity_max_pct ?? existingHumidityMax?.humidity_pct ?? null;
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["trial-obs", trialId, date] });
@@ -387,7 +387,7 @@ function AmPage() {
                 defaultValue={tempMin ?? ""}
                 onBlur={(e) => {
                   const v = e.currentTarget.value === "" ? null : Number(e.currentTarget.value);
-                  setSessionTempMin(v);
+                  setSessionTempMin({ date, value: v });
                   void applySessionValue({ temp_min_c: v });
                 }}
               />
@@ -397,7 +397,7 @@ function AmPage() {
                 defaultValue={tempMax ?? ""}
                 onBlur={(e) => {
                   const v = e.currentTarget.value === "" ? null : Number(e.currentTarget.value);
-                  setSessionTempMax(v);
+                  setSessionTempMax({ date, value: v });
                   void applySessionValue({ temp_max_c: v });
                 }}
               />
@@ -407,7 +407,7 @@ function AmPage() {
                 defaultValue={humidityMin ?? ""}
                 onBlur={(e) => {
                   const v = e.currentTarget.value === "" ? null : Number(e.currentTarget.value);
-                  setSessionHumidityMin(v);
+                  setSessionHumidityMin({ date, value: v });
                   void applySessionValue({ humidity_min_pct: v });
                 }}
               />
@@ -417,7 +417,7 @@ function AmPage() {
                 defaultValue={humidityMax ?? ""}
                 onBlur={(e) => {
                   const v = e.currentTarget.value === "" ? null : Number(e.currentTarget.value);
-                  setSessionHumidityMax(v);
+                  setSessionHumidityMax({ date, value: v });
                   void applySessionValue({ humidity_max_pct: v });
                 }}
               />
