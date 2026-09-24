@@ -26,9 +26,9 @@
 - [x] 6. Remove carry-over/spoilage for trial pens in Results + interval_summary
 
 ## Weigh Day due-only (2026-09-24)
-- [ ] 1. Shared "due on date" rule (weighSchedule)
-- [ ] 2. Stepper shows due pens only + "Weigh another pen anyway"
-- [ ] 3. Completion panel, ledger mismatches, close/reopen (weighing_sessions)
-- [ ] 3b. Results "Weighing of <date>" section
-- [ ] 4. Home/dashboard/exceptions use due rule
-- [ ] 5. No pens due message
+- [x] 1. Shared "due on date" rule (weighSchedule)
+- [x] 2. Stepper shows due pens only + "Weigh another pen anyway"
+- [x] 3. Completion panel, ledger mismatches, close/reopen (weighing_sessions)
+- [x] 3b. Results "Weighing of <date>" section
+- [x] 4. Home/dashboard/exceptions use due rule
+- [x] 5. No pens due message
