@@ -264,7 +264,9 @@ function AmPage() {
     setChecklistAll(all);
   }, []);
 
-  const checklistItems = checklistSteps("am", date).filter((step) => step.key !== AM_CONTROL_STEP_KEY || controlOn);
+  // AM checklist versions follow the day the check is performed, while their
+  // readings remain attached to the previous operating evening's feed date.
+  const checklistItems = checklistSteps("am", checkDate).filter((step) => step.key !== AM_CONTROL_STEP_KEY || controlOn);
   const overrides = checklistItems.map((step) =>
     step.key === AM_PHOTO_STEP_KEY
       ? {

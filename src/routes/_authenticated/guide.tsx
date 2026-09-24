@@ -127,7 +127,7 @@ function GuidePage() {
   const pmSteps = PM_STEPS
     .filter((step) => step.key !== "pm.control_dish" || controlOn)
     .map((step) => step.key === "pm.control_dish"
-      ? `Put ${Number(trial.data?.control_portion_g ?? 0)} g of ${controlFeedName} in the control dish, in an empty pen of the same build, same lid and substrate, no snails. Keep humidity and every other condition the same as in the snail pens.`
+      ? `Put ${Number(trial.data?.control_portion_g ?? 0)} g of ${controlFeedName} in the control dish. Place it in an empty pen of the same build, same lid and substrate, no snails. Keep humidity and every other condition the same as in the snail pens.`
       : step.label);
   const amSteps = AM_STEPS
     .filter((step) => step.key !== "am.control_dish" || controlOn)
