@@ -282,13 +282,20 @@ function AmPage() {
         : undefined,
   );
 
-  // One site reading per session, written to every pen's welfare row for the date.
-  const existingTemp = (welfare.data ?? []).find((w) => w.temp_c != null)?.temp_c ?? null;
-  const existingHumidity = (welfare.data ?? []).find((w) => w.humidity_pct != null)?.humidity_pct ?? null;
-  const [sessionTemp, setSessionTemp] = useState<number | null>(null);
-  const [sessionHumidity, setSessionHumidity] = useState<number | null>(null);
-  const temp = sessionTemp ?? existingTemp;
-  const humidity = sessionHumidity ?? existingHumidity;
+  // One site range per session, written to every pen's welfare row for the date.
+  // Historical single readings are treated as both ends of the range.
+  const existingTempMin = (welfare.data ?? []).find((w) => w.temp_min_c != null || w.temp_c != null);
+  const existingTempMax = (welfare.data ?? []).find((w) => w.temp_max_c != null || w.temp_c != null);
+  const existingHumidityMin = (welfare.data ?? []).find((w) => w.humidity_min_pct != null || w.humidity_pct != null);
+  const existingHumidityMax = (welfare.data ?? []).find((w) => w.humidity_max_pct != null || w.humidity_pct != null);
+  const [sessionTempMin, setSessionTempMin] = useState<number | null>(null);
+  const [sessionTempMax, setSessionTempMax] = useState<number | null>(null);
+  const [sessionHumidityMin, setSessionHumidityMin] = useState<number | null>(null);
+  const [sessionHumidityMax, setSessionHumidityMax] = useState<number | null>(null);
+  const tempMin = sessionTempMin ?? existingTempMin?.temp_min_c ?? existingTempMin?.temp_c ?? null;
+  const tempMax = sessionTempMax ?? existingTempMax?.temp_max_c ?? existingTempMax?.temp_c ?? null;
+  const humidityMin = sessionHumidityMin ?? existingHumidityMin?.humidity_min_pct ?? existingHumidityMin?.humidity_pct ?? null;
+  const humidityMax = sessionHumidityMax ?? existingHumidityMax?.humidity_max_pct ?? existingHumidityMax?.humidity_pct ?? null;
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["trial-obs", trialId, date] });
@@ -299,7 +306,12 @@ function AmPage() {
   };
 
   /** Rewrite the session reading on every welfare row already saved for this date. */
-  const applySessionValue = async (patch: { temp_c?: number | null; humidity_pct?: number | null }) => {
+  const applySessionValue = async (patch: {
+    temp_min_c?: number | null;
+    temp_max_c?: number | null;
+    humidity_min_pct?: number | null;
+    humidity_max_pct?: number | null;
+  }) => {
     if (!trialId) return;
     await supabase.from("welfare_checks").update(patch).eq("trial_id", trialId).eq("obs_date", date);
     refresh();
@@ -367,29 +379,55 @@ function AmPage() {
         <>
           <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
             <h2 className="font-semibold">Conditions for this session</h2>
-            <p className="text-xs text-muted-foreground">One reading for the whole site. Applied to every pen recorded on this date, including pens already saved.</p>
+            <p className="text-xs text-muted-foreground">One daily range for the whole site. Applied to every pen recorded on this date, including pens already saved.</p>
             <div className="grid grid-cols-2 gap-3">
               <NumberField
-                label="Temperature" suffix="°C"
-                key={`sess-temp-${date}`}
-                defaultValue={temp ?? ""}
+                label="Temperature minimum" suffix="°C"
+                key={`sess-temp-min-${date}`}
+                defaultValue={tempMin ?? ""}
                 onBlur={(e) => {
                   const v = e.currentTarget.value === "" ? null : Number(e.currentTarget.value);
-                  setSessionTemp(v);
-                  void applySessionValue({ temp_c: v });
+                  setSessionTempMin(v);
+                  void applySessionValue({ temp_min_c: v });
                 }}
               />
               <NumberField
-                label="Humidity" suffix="%"
-                key={`sess-hum-${date}`}
-                defaultValue={humidity ?? ""}
+                label="Temperature maximum" suffix="°C"
+                key={`sess-temp-max-${date}`}
+                defaultValue={tempMax ?? ""}
                 onBlur={(e) => {
                   const v = e.currentTarget.value === "" ? null : Number(e.currentTarget.value);
-                  setSessionHumidity(v);
-                  void applySessionValue({ humidity_pct: v });
+                  setSessionTempMax(v);
+                  void applySessionValue({ temp_max_c: v });
+                }}
+              />
+              <NumberField
+                label="Humidity minimum" suffix="%"
+                key={`sess-hum-min-${date}`}
+                defaultValue={humidityMin ?? ""}
+                onBlur={(e) => {
+                  const v = e.currentTarget.value === "" ? null : Number(e.currentTarget.value);
+                  setSessionHumidityMin(v);
+                  void applySessionValue({ humidity_min_pct: v });
+                }}
+              />
+              <NumberField
+                label="Humidity maximum" suffix="%"
+                key={`sess-hum-max-${date}`}
+                defaultValue={humidityMax ?? ""}
+                onBlur={(e) => {
+                  const v = e.currentTarget.value === "" ? null : Number(e.currentTarget.value);
+                  setSessionHumidityMax(v);
+                  void applySessionValue({ humidity_max_pct: v });
                 }}
               />
             </div>
+            {tempMin != null && tempMax != null && tempMin > tempMax && (
+              <p className="text-xs text-destructive">Temperature minimum cannot be higher than the maximum.</p>
+            )}
+            {humidityMin != null && humidityMax != null && humidityMin > humidityMax && (
+              <p className="text-xs text-destructive">Humidity minimum cannot be higher than the maximum.</p>
+            )}
           </section>
 
           <PenStepper
@@ -434,8 +472,10 @@ function AmPage() {
                   photoUrl={photoUrlFor(pen.id)}
                   pmPhotoUrl={pmPhotoUrlFor(pen.id)}
                   fedLabel={displayDate(date)}
-                  sessionTemp={temp}
-                  sessionHumidity={humidity}
+                  sessionTempMin={tempMin}
+                  sessionTempMax={tempMax}
+                  sessionHumidityMin={humidityMin}
+                  sessionHumidityMax={humidityMax}
                   penEvents={eventsForPenDate(pen.id)}
                   liveCountValue={liveCountFor(pen.id)}
                   onSaved={refresh}
@@ -452,8 +492,10 @@ function AmPage() {
                 photoUrl={photoUrlFor(pen.id)}
                 pmPhotoUrl={pmPhotoUrlFor(pen.id)}
                 fedLabel={displayDate(date)}
-                sessionTemp={temp}
-                sessionHumidity={humidity}
+                sessionTempMin={tempMin}
+                sessionTempMax={tempMax}
+                sessionHumidityMin={humidityMin}
+                sessionHumidityMax={humidityMax}
                 penEvents={eventsForPenDate(pen.id)}
                 liveCountValue={liveCountFor(pen.id)}
                 onSaved={refresh}
@@ -494,7 +536,8 @@ function OptionRow<T extends string>({
 }
 
 function PenCard({
-  trialId, pen, feedId, date, obsRow, welfareRow, photoUrl, pmPhotoUrl, fedLabel, sessionTemp, sessionHumidity,
+  trialId, pen, feedId, date, obsRow, welfareRow, photoUrl, pmPhotoUrl, fedLabel,
+  sessionTempMin, sessionTempMax, sessionHumidityMin, sessionHumidityMax,
   penEvents, liveCountValue, onSaved,
 }: {
   trialId: string;
@@ -507,8 +550,10 @@ function PenCard({
   pmPhotoUrl: string | null;
   fedLabel: string;
 
-  sessionTemp: number | null;
-  sessionHumidity: number | null;
+  sessionTempMin: number | null;
+  sessionTempMax: number | null;
+  sessionHumidityMin: number | null;
+  sessionHumidityMax: number | null;
   penEvents: { id: string; event_type: PopulationEventType; count: number }[];
   liveCountValue: number;
   onSaved: () => void;
@@ -549,8 +594,10 @@ function PenCard({
           trial_id: trialId,
           pen_id: pen.id,
           obs_date: date,
-          temp_c: sessionTemp,
-          humidity_pct: sessionHumidity,
+          temp_min_c: sessionTempMin,
+          temp_max_c: sessionTempMax,
+          humidity_min_pct: sessionHumidityMin,
+          humidity_max_pct: sessionHumidityMax,
           ...patch,
         },
         WELFARE_CHECKS_KEY,
@@ -760,7 +807,8 @@ function PenCard({
  * and no feed, while substrate, health, deaths and notes are all still logged.
  */
 function BreederCard({
-  trialId, pen, date, welfareRow, photoUrl, pmPhotoUrl, fedLabel, sessionTemp, sessionHumidity,
+  trialId, pen, date, welfareRow, photoUrl, pmPhotoUrl, fedLabel,
+  sessionTempMin, sessionTempMax, sessionHumidityMin, sessionHumidityMax,
   penEvents, liveCountValue, onSaved,
 }: {
   trialId: string;
@@ -771,8 +819,10 @@ function BreederCard({
   pmPhotoUrl: string | null;
   fedLabel: string;
 
-  sessionTemp: number | null;
-  sessionHumidity: number | null;
+  sessionTempMin: number | null;
+  sessionTempMax: number | null;
+  sessionHumidityMin: number | null;
+  sessionHumidityMax: number | null;
   penEvents: { id: string; event_type: PopulationEventType; count: number }[];
   liveCountValue: number;
   onSaved: () => void;
@@ -793,8 +843,10 @@ function BreederCard({
           trial_id: trialId,
           pen_id: pen.id,
           obs_date: date,
-          temp_c: sessionTemp,
-          humidity_pct: sessionHumidity,
+          temp_min_c: sessionTempMin,
+          temp_max_c: sessionTempMax,
+          humidity_min_pct: sessionHumidityMin,
+          humidity_max_pct: sessionHumidityMax,
           ...patch,
         },
         WELFARE_CHECKS_KEY,

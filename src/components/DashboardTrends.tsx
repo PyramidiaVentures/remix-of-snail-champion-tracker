@@ -82,7 +82,7 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
           .lte("obs_date", to),
         supabase
           .from("welfare_checks")
-          .select("pen_id,obs_date,temp_c,humidity_pct")
+          .select("pen_id,obs_date,temp_c,humidity_pct,temp_min_c,temp_max_c,humidity_min_pct,humidity_max_pct")
           .eq("trial_id", trialId!)
           .gte("obs_date", from)
           .lte("obs_date", to),
@@ -145,18 +145,24 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
     const rows = trends.data?.welfare ?? []; // breeder pens included — same room
     return days.map((day) => {
       const forDay = rows.filter((w) => w.obs_date === day);
-      const temps = forDay.map((w) => w.temp_c).filter((v): v is number => v != null);
-      const hums = forDay.map((w) => w.humidity_pct).filter((v): v is number => v != null);
+      const tempMins = forDay.map((w) => w.temp_min_c ?? w.temp_c).filter((v): v is number => v != null);
+      const tempMaxs = forDay.map((w) => w.temp_max_c ?? w.temp_c).filter((v): v is number => v != null);
+      const humMins = forDay.map((w) => w.humidity_min_pct ?? w.humidity_pct).filter((v): v is number => v != null);
+      const humMaxs = forDay.map((w) => w.humidity_max_pct ?? w.humidity_pct).filter((v): v is number => v != null);
       const mean = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null);
+      const tMin = tempMins.length ? Math.min(...tempMins) : null;
+      const tMax = tempMaxs.length ? Math.max(...tempMaxs) : null;
+      const hMin = humMins.length ? Math.min(...humMins) : null;
+      const hMax = humMaxs.length ? Math.max(...humMaxs) : null;
       return {
         date: day,
         label: shortDate(day),
-        temp: mean(temps),
-        hum: mean(hums),
-        tempMin: temps.length ? Math.min(...temps) : null,
-        tempMax: temps.length ? Math.max(...temps) : null,
-        humMin: hums.length ? Math.min(...hums) : null,
-        humMax: hums.length ? Math.max(...hums) : null,
+        temp: tMin != null && tMax != null ? mean([tMin, tMax]) : null,
+        hum: hMin != null && hMax != null ? mean([hMin, hMax]) : null,
+        tempMin: tMin,
+        tempMax: tMax,
+        humMin: hMin,
+        humMax: hMax,
       };
     });
   }, [trends.data?.welfare, days]);
@@ -187,8 +193,8 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
           hMin: hMins.length ? Math.min(...hMins) : null,
           hMean: mean(hums),
           hMax: hMaxs.length ? Math.max(...hMaxs) : null,
-          tempOutDays: rows.filter((r) => r.temp != null && (r.temp < TEMP_MIN || r.temp > TEMP_MAX)).length,
-          humOutDays: rows.filter((r) => r.hum != null && (r.hum < HUM_MIN || r.hum > HUM_MAX)).length,
+          tempOutDays: rows.filter((r) => r.tempMin != null && r.tempMax != null && (r.tempMin < TEMP_MIN || r.tempMax > TEMP_MAX)).length,
+          humOutDays: rows.filter((r) => r.humMin != null && r.humMax != null && (r.humMin < HUM_MIN || r.humMax > HUM_MAX)).length,
         };
       });
   }, [envDaily]);
@@ -320,7 +326,7 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
             <div>
               <h3 className="text-sm font-semibold">Temperature and humidity</h3>
               <p className="text-xs text-muted-foreground">
-                Every pen in the room, breeder pens included. Target bands 25–30 °C and 70–95 % are shaded.
+                 Daily range midpoint, with recorded minima and maxima in the weekly table. Every pen in the room, breeder pens included. Target bands 25–30 °C and 70–95 % are shaded.
               </p>
             </div>
 
@@ -348,10 +354,10 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
             </div>
             <div className="flex gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
-                <span className="inline-block h-0.5 w-5 bg-primary" /> Daily mean temperature (left)
+                 <span className="inline-block h-0.5 w-5 bg-primary" /> Daily range midpoint, temperature (left)
               </span>
               <span className="flex items-center gap-1">
-                <span className="inline-block h-0.5 w-5 bg-earth" /> Daily mean humidity (right)
+                 <span className="inline-block h-0.5 w-5 bg-earth" /> Daily range midpoint, humidity (right)
               </span>
             </div>
 

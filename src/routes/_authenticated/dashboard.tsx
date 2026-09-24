@@ -190,10 +190,14 @@ function DashboardPage() {
     visual: bandedToday.filter((x) => x.band === b.key && x.visual).length,
   }));
 
-  const temps = (d?.welfare ?? []).map((w) => w.temp_c).filter((v): v is number => v != null);
-  const hums = (d?.welfare ?? []).map((w) => w.humidity_pct).filter((v): v is number => v != null);
-  const tempVal = temps.length ? temps[0] : null;
-  const humVal = hums.length ? hums[0] : null;
+  const tempMins = (d?.welfare ?? []).map((w) => w.temp_min_c ?? w.temp_c).filter((v): v is number => v != null);
+  const tempMaxs = (d?.welfare ?? []).map((w) => w.temp_max_c ?? w.temp_c).filter((v): v is number => v != null);
+  const humMins = (d?.welfare ?? []).map((w) => w.humidity_min_pct ?? w.humidity_pct).filter((v): v is number => v != null);
+  const humMaxs = (d?.welfare ?? []).map((w) => w.humidity_max_pct ?? w.humidity_pct).filter((v): v is number => v != null);
+  const tempMin = tempMins.length ? Math.min(...tempMins) : null;
+  const tempMax = tempMaxs.length ? Math.max(...tempMaxs) : null;
+  const humMin = humMins.length ? Math.min(...humMins) : null;
+  const humMax = humMaxs.length ? Math.max(...humMaxs) : null;
 
   const loading = trial.isLoading || data.isPending || !review;
 
@@ -469,14 +473,14 @@ function DashboardPage() {
               <div className="mt-1 grid grid-cols-2 gap-2 text-sm">
                 <Reading
                   label="Temperature"
-                  value={tempVal == null ? null : `${roundOut(tempVal, 1)} °C`}
-                  bad={tempVal != null && (tempVal < 25 || tempVal > 30)}
+                  value={tempMin == null || tempMax == null ? null : `${roundOut(tempMin, 1)}–${roundOut(tempMax, 1)} °C`}
+                  bad={tempMin != null && tempMax != null && (tempMin < 25 || tempMax > 30)}
                   range="25–30 °C"
                 />
                 <Reading
                   label="Humidity"
-                  value={humVal == null ? null : `${roundOut(humVal, 0)} %`}
-                  bad={humVal != null && (humVal < 70 || humVal > 95)}
+                  value={humMin == null || humMax == null ? null : `${roundOut(humMin, 0)}–${roundOut(humMax, 0)} %`}
+                  bad={humMin != null && humMax != null && (humMin < 70 || humMax > 95)}
                   range="70–95 %"
                 />
               </div>

@@ -61,7 +61,7 @@ export const AM_STEPS = [
   "Photo each dish untouched, tag in frame.",
   "Take out all leftover feed, weigh it on the zeroed scale, enter grams, throw it away, clean the dish.",
   "Only during a water-loss test: weigh what is left in the control dish, enter grams, throw it away.",
-  "Activity, health flags, temperature and humidity.",
+  "Activity, health flags, minimum and maximum temperature and humidity.",
   "Log any deaths, escapes or removals.",
 ];
 export const AM_PHOTO_STEP_INDEX = 0;
@@ -96,6 +96,10 @@ export type DayInputs = {
     activity: string | null;
     temp_c: number | null;
     humidity_pct: number | null;
+    temp_min_c: number | null;
+    temp_max_c: number | null;
+    humidity_min_pct: number | null;
+    humidity_max_pct: number | null;
   }[];
   photos: { pen_id: string; photo_am_url: string | null; photo_pm_url: string | null }[];
   pop: {
@@ -121,7 +125,7 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
       .select("pen_id,obs_date,offered_g,dish_action,refusal_score,leftover_g,feed_id")
       .eq("trial_id", trialId).lte("obs_date", date),
     supabase.from("welfare_checks")
-      .select("id,pen_id,health_flags,substrate_condition,activity,temp_c,humidity_pct")
+      .select("id,pen_id,health_flags,substrate_condition,activity,temp_c,humidity_pct,temp_min_c,temp_max_c,humidity_min_pct,humidity_max_pct")
       .eq("trial_id", trialId).eq("obs_date", date),
     supabase.from("session_photos").select("pen_id,photo_am_url,photo_pm_url")
       .eq("trial_id", trialId).eq("obs_date", date),
