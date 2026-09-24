@@ -32,3 +32,9 @@
 - [x] 3b. Results "Weighing of <date>" section
 - [x] 4. Home/dashboard/exceptions use due rule
 - [x] 5. No pens due message
+
+## Results weighing metrics (2026-09-24)
+- [x] Rename Economic FCR, Biological FCR, Biological FCR (dry matter), and SGR throughout Results and Export
+- [x] Add treatment headline cards to each closed weighing report using mean-of-pens figures
+- [x] Add shared per-day interval metrics to the weighing table and interval_summary
+- [x] Verify Nairobi Pen 2 for 9–23 September against the supplied values

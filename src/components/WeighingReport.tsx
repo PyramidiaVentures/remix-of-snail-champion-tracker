@@ -151,7 +151,7 @@ export function WeighingReport({
             {headlines.map((h) => (
               <div key={h.key} className="rounded-lg border border-border p-3">
                 <h3 className="mb-2 text-sm font-semibold">{h.label}</h3>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <Headline label={METRIC_LABELS.economicFcr} explanation={METRIC_EXPLANATIONS.economicFcr} value={h.interval.offeredPerKgGain} />
                   <Headline label={METRIC_LABELS.biologicalFcr} explanation={METRIC_EXPLANATIONS.biologicalFcr} value={h.interval.eatenPerKgGain} fallback={eatenWhy(h.interval)} />
                   <Headline label={METRIC_LABELS.sgr} explanation={METRIC_EXPLANATIONS.sgr} value={h.interval.sgr} />
