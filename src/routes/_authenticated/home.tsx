@@ -101,6 +101,7 @@ function HomePage() {
             date: reportDate,
             siteName: siteName || "",
             controlActive: !!trial.data?.control_active && !!trial.data?.control_feed_id,
+            controlFeedId: trial.data?.control_feed_id ?? null,
           })
         : null,
     [dayInputs.data, pens.data, assignments.data, trial.data?.weighing_interval_days, trial.data?.control_active, trial.data?.control_feed_id, calendar, reportDate, siteName],
@@ -335,6 +336,7 @@ function OtherSites({ currentSiteId, date }: { currentSiteId: string | null; dat
                 date: reportDate,
                 siteName: sites.find((s) => s.id === t.site_id)?.name ?? "",
                 controlActive: !!t.control_active && !!t.control_feed_id,
+                controlFeedId: t.control_feed_id ?? null,
               });
           return {
             siteId: t.site_id,

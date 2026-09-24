@@ -118,6 +118,7 @@ function DashboardPage() {
             date,
             siteName: siteName || "",
             controlActive: !!trial.data?.control_active && !!trial.data?.control_feed_id,
+            controlFeedId: trial.data?.control_feed_id ?? null,
           })
         : null,
     [data.data, allPens, assignments.data, trial.data?.weighing_interval_days, trial.data?.control_active, trial.data?.control_feed_id, calendar, date, siteName],
