@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { retentionContext } from "@/lib/retention";
 import {
   computeMetrics, daysBetween, intervalExtras, meanOf, addDays, incompleteLabel, makeRetention, feedingShare, portionChanges, meanOf as meanOfValues,
+  METRIC_EXPLANATIONS, METRIC_LABELS,
   type PenMetrics, type TrialMetrics,
 } from "@/lib/metrics";
 import { readIncludeAcclimation } from "@/lib/acclimation";
@@ -370,9 +371,9 @@ function ResultsPage() {
             onChange={(e) => setDryMatter(e.target.checked)}
           />
           <span>
-            Show FCR on a dry-matter-eaten basis
+            Show {METRIC_LABELS.biologicalFcr} on a dry-matter basis
             <span className="block text-xs text-muted-foreground">
-              {metrics?.dmAvailable ? metrics.dmBasis ? "Headline is FCR (dry matter eaten). Feed offered stays fresh weight." : "Headline is FCR (feed eaten), fresh weight." : "Add dry-matter % to all feeds to enable."}
+              {metrics?.dmAvailable ? metrics.dmBasis ? `${METRIC_LABELS.biologicalFcrDm}: ${METRIC_EXPLANATIONS.biologicalFcrDm}.` : `${METRIC_LABELS.biologicalFcr}: ${METRIC_EXPLANATIONS.biologicalFcr}.` : "Add dry-matter % to all feeds to enable."}
             </span>
           </span>
         </label>
@@ -689,7 +690,7 @@ function Charts({
   return (
     <>
       <IntervalChartCard
-        title={dm ? "FCR (dry matter eaten) — each weighing interval" : "FCR (feed eaten) — each weighing interval"}
+        title={`${dm ? METRIC_LABELS.biologicalFcrDm : METRIC_LABELS.biologicalFcr} — each weighing interval`}
         note={`kg of ${dm ? "dry matter eaten (feed eaten × the feed's dry-matter %" : "feed eaten (fresh weight"}, offered minus the weighed leftover, leaves corrected for water loss) per kg of snail gained. Shown only where at least 90% of feedings had a weighed leftover — otherwise eaten is not yet measured for this period.`}
         series={eatenPerInterval}
         {...toggles}
@@ -702,13 +703,13 @@ function Charts({
         {...toggles}
       />
       <IntervalChartCard
-        title="Feed offered per kg gain — each weighing interval"
+        title={`${METRIC_LABELS.economicFcr} — each weighing interval`}
         note={`kg of feed offered (fresh weight) for every kg of snail gained, held flat across the interval it covers. Lower is better. Tap a name in the key to hide or show it.`}
         series={perInterval}
         {...toggles}
       />
       <LineChartCard
-        title="Feed offered per kg gain — cumulative"
+        title={`${METRIC_LABELS.economicFcr} — cumulative`}
         note="Running total since the first weighing in range (fresh weight)."
         series={cumulativeConversion}
         {...toggles}
@@ -721,8 +722,8 @@ function Charts({
         {...toggles}
       />
       <IntervalChartCard
-        title="Growth rate per day"
-        note="Specific growth rate, % per day, across each weighing interval."
+        title={METRIC_LABELS.sgr}
+        note={`${METRIC_EXPLANATIONS.sgr}, across each weighing interval.`}
         series={sgr}
         unit="%"
         {...toggles}
@@ -775,13 +776,13 @@ function SummaryTable({ metrics }: { metrics: TrialMetrics }) {
           <thead>
             <tr className="text-left text-xs uppercase text-muted-foreground">
               <th className="py-2 pr-3">Treatment</th>
-              <th className="py-2 pr-3">{dm ? "FCR (dry matter eaten)" : "FCR (feed eaten)"}</th>
+              <th className="py-2 pr-3">{dm ? METRIC_LABELS.biologicalFcrDm : METRIC_LABELS.biologicalFcr}</th>
               <th className="py-2 pr-3">{dm ? "Dry matter eaten (g)" : "Feed eaten (g)"}</th>
               <th className="py-2 pr-3">Share left (%)</th>
               <th className="py-2 pr-3">Feed offered (g)</th>
               <th className="py-2 pr-3">Total gain (g)</th>
-              <th className="py-2 pr-3">Feed offered per kg gain</th>
-              <th className="py-2 pr-3">Growth (%/day)</th>
+              <th className="py-2 pr-3">{METRIC_LABELS.economicFcr}</th>
+              <th className="py-2 pr-3">{METRIC_LABELS.sgr}</th>
               <th className="py-2 pr-3">Survival (%)</th>
             </tr>
           </thead>
@@ -844,15 +845,15 @@ const PEN_COLUMNS = [
   { key: "mwStart", label: "Mean wt start (g)" },
   { key: "mwEnd", label: "Mean wt end (g)" },
   { key: "gain", label: "Gain (g)" },
-  { key: "fcrEaten", label: "FCR (feed eaten)" },
+  { key: "fcrEaten", label: METRIC_LABELS.biologicalFcr },
   { key: "eaten", label: "Feed eaten (g)" },
   { key: "coverage", label: "Leftover coverage (%)" },
   { key: "shareLeft", label: "Share left (%)" },
   { key: "offered", label: "Feed offered (g)" },
-  { key: "perKgFresh", label: "Feed offered / kg gain" },
-  { key: "fcrDm", label: "FCR (dry matter eaten)" },
+  { key: "perKgFresh", label: METRIC_LABELS.economicFcr },
+  { key: "fcrDm", label: METRIC_LABELS.biologicalFcrDm },
   { key: "eatenDm", label: "Dry matter eaten (g)" },
-  { key: "sgr", label: "SGR (%/day)" },
+  { key: "sgr", label: METRIC_LABELS.sgr },
   { key: "survival", label: "Survival (%)" },
   { key: "missing", label: "Missing feeding days" },
 ] as const;
