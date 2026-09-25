@@ -267,6 +267,7 @@ function formToFeedInsert(values: FeedFormValues): Database["public"]["Tables"][
     cost_per_kg: values.cost_per_kg.trim() ? Number(values.cost_per_kg) : null,
     dm_percent: dmPercent,
     dm_source: dmPercent ? (values.dm_source as DmSource) : null,
+    protein_percent: values.protein_percent.trim() ? Number(values.protein_percent) : null,
     notes: values.notes.trim() || null,
   };
 }
@@ -391,6 +392,7 @@ function FeedsSection() {
                   <div className="text-xs text-muted-foreground">
                     {f.cost_per_kg != null ? `${f.cost_per_kg}/kg` : "No cost recorded"}
                     {f.dm_percent != null && ` · DM ${f.dm_percent}% (${labelFor(DM_SOURCE_OPTIONS, f.dm_source)})`}
+                    {f.protein_percent != null && ` · Protein ${f.protein_percent}%`}
                   </div>
                   {f.notes && <div className="text-xs text-muted-foreground italic">{f.notes}</div>}
                 </div>
