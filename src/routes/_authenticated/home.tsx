@@ -334,7 +334,7 @@ function OtherSites({ currentSiteId, date }: { currentSiteId: string | null; dat
       const [{ data: pa }, { data: obs }, { data: sitePens }] = await Promise.all([
         supabase.from("pen_assignments").select("trial_id,pen_id,start_date").in("trial_id", ids),
         supabase.from("observations").select("trial_id,pen_id,offered_g").in("trial_id", ids).eq("obs_date", date),
-        supabase.from("pens").select("id,site_id,label,role,initial_snail_count,weighing_interval_days").in("site_id", otherIds),
+        supabase.from("pens").select("id,site_id,label,role,initial_snail_count,weighing_interval_days,created_at").in("site_id", otherIds),
       ]);
       return Promise.all(
         list.map(async (t) => {

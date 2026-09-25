@@ -146,6 +146,8 @@ export type DayReviewPen = {
   role: string | null;
   initial_snail_count: number;
   weighing_interval_days: number | null;
+  /** Used to avoid expecting entries from before the pen existed. */
+  created_at?: string | null;
 };
 
 export type DayReview = ReturnType<typeof computeDayReview>;
@@ -184,9 +186,12 @@ export function computeDayReview(args: {
   const amInProgress = amExpected && (isLastCompleted || isToday);
   const pmInProgress = pmExpected && isToday;
 
-  const assignedIds = new Set(assignments.map((a) => a.pen_id));
+  // A pen is only expected to have entries once it exists: trial pens from
+  // their assignment start, breeder pens from the day they were created.
+  const assignedIds = new Set(assignments.filter((a) => a.start_date <= date).map((a) => a.pen_id));
+  const existedOn = (p: DayReviewPen) => !p.created_at || p.created_at.slice(0, 10) <= date;
   const trialPens = allPens.filter((p) => p.role !== "breeder" && assignedIds.has(p.id));
-  const breederPens = allPens.filter((p) => p.role === "breeder");
+  const breederPens = allPens.filter((p) => p.role === "breeder" && existedOn(p));
   const watched = [...trialPens, ...breederPens];
   const isBreeder = (id: string) => breederPens.some((p) => p.id === id);
   const labelOf = (id: string) => allPens.find((p) => p.id === id)?.label ?? "Pen";
