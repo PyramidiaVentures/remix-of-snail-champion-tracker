@@ -39,6 +39,8 @@ export const FLAG_LABEL: Record<string, string> = {
 export const OVER_PORTION_SHARE = 0.15;
 /** Under-portioning: share left below 2% on 2 consecutive feedings. */
 export const UNDER_PORTION_SHARE = 0.02;
+/** Eaten share below this (leftover, water-loss corrected, within 5% of offered) is flagged. */
+export const NOT_EATEN_SHARE = 0.05;
 
 export const REFUSAL_LABEL: Record<string, string> = {
   none_left: "None left",
@@ -398,6 +400,25 @@ export function computeDayReview(args: {
       });
     }
   }
+
+  // Snails barely ate: the leftover, corrected for water loss, is within 5%
+  // of what was offered. Needs investigating.
+  let cursorDate = date;
+  while (calendar.isNonOperating(cursorDate)) cursorDate = addDays(cursorDate, -1);
+  for (const p of trialPens) {
+    const o = d.obs.find((r) => r.pen_id === p.id && r.obs_date === cursorDate);
+    if (!o) continue;
+    const e = feedEaten(o.offered_g, o.leftover_g, retentionFor(o.feed_id, o.obs_date).retention);
+    if (!e || e.shareLeft < 1 - NOT_EATEN_SHARE) continue;
+    exceptions.push({
+      key: `not-eaten-${p.id}`,
+      group: "Refusal",
+      text: `${p.label} — almost nothing eaten (${Math.round((1 - e.shareLeft) * 100)}% of the ${Math.round(Number(o.offered_g))} g offered, after water loss): investigate`,
+      to: "/am",
+      penId: p.id,
+    });
+  }
+
 
   // Dish emptied because spoiled.
   for (const o of obsToday.filter((r) => r.dish_action === "emptied_spoiled")) {
