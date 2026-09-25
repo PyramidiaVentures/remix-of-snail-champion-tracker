@@ -92,6 +92,13 @@
       "when": 1790331503420,
       "tag": "0012_add_feed_protein_percent",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790340458530,
+      "tag": "0013_add_feed_is_leaf",
+      "breakpoints": true
     }
   ]
 }

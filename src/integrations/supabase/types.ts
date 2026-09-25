@@ -137,6 +137,7 @@ export type Database = {
           dm_percent: number | null
           dm_source: Database["public"]["Enums"]["dm_source"] | null
           id: string
+          is_leaf: boolean
           name: string
           notes: string | null
           protein_percent: number | null
@@ -148,6 +149,7 @@ export type Database = {
           dm_percent?: number | null
           dm_source?: Database["public"]["Enums"]["dm_source"] | null
           id?: string
+          is_leaf?: boolean
           name: string
           notes?: string | null
           protein_percent?: number | null
@@ -159,6 +161,7 @@ export type Database = {
           dm_percent?: number | null
           dm_source?: Database["public"]["Enums"]["dm_source"] | null
           id?: string
+          is_leaf?: boolean
           name?: string
           notes?: string | null
           protein_percent?: number | null
