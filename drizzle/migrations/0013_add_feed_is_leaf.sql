@@ -1,0 +1,2 @@
+alter table public.feeds add column if not exists is_leaf boolean not null default false;
+update public.feeds set is_leaf = true where lower(name) like '%leaf%' or lower(name) like '%managu%' or lower(name) like '%pumpkin%';

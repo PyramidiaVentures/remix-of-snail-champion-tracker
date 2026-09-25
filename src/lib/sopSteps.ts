@@ -17,7 +17,7 @@ export const PM_STEPS: SopStep[] = [
 
 export const AM_STEPS: SopStep[] = [
   { key: "am.photo", label: "Photo each dish untouched, tag in frame." },
-  { key: "am.weigh_leftover", label: "Take out and weigh everything left in the dish and enter the grams. Keep the rest and top up to the required grams. Only throw away the leftovers if moldy." },
+  { key: "am.weigh_leftover", label: "Weigh everything left in the dish and enter the grams. Leaves: throw away and clean the dish. Concentrate and fish feed: keep the rest and top up to the required grams, throw away only if moldy." },
   { key: "am.control_dish", label: "Weigh what is left in the control dish and enter it on the Control dish step." },
   { key: "am.activity_health_environment", label: "Activity, health flags, minimum and maximum temperature and humidity." },
   { key: "am.population", label: "Log any deaths, escapes or removals." },

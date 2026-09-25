@@ -190,6 +190,22 @@ function AmPage() {
     return map;
   }, [assignments.data, treatments.data]);
 
+  // Leaf leftovers are thrown away (they go moldy); concentrate and fish feed
+  // are kept and topped up. The leftover instruction follows the pen's feed.
+  const feedIds = useMemo(() => [...new Set([...feedByPen.values()])], [feedByPen]);
+  const feeds = useQuery({
+    queryKey: ["feeds-leaf", feedIds],
+    enabled: feedIds.length > 0,
+    queryFn: async () =>
+      (await supabase.from("feeds").select("id,is_leaf").in("id", feedIds)).data ?? [],
+  });
+  const leafByPen = useMemo(() => {
+    const leafByFeed = new Map((feeds.data ?? []).map((f) => [f.id, f.is_leaf]));
+    const map = new Map<string, boolean>();
+    for (const [penId, feedId] of feedByPen) map.set(penId, leafByFeed.get(feedId) ?? false);
+    return map;
+  }, [feeds.data, feedByPen]);
+
   // Breeder pens are checked in the same walk, marked apart and counted apart.
   const trialPens: StepperPen[] = useMemo(
     () =>
@@ -495,6 +511,7 @@ function AmPage() {
                 trialId={trial.data!.id}
                 pen={pen}
                 feedId={feedByPen.get(pen.id)!}
+                isLeaf={leafByPen.get(pen.id) ?? false}
                 date={date}
                 obsRow={obsFor(pen.id)}
                 welfareRow={welfareFor(pen.id)}
@@ -545,13 +562,14 @@ function OptionRow<T extends string>({
 }
 
 function PenCard({
-  trialId, pen, feedId, date, obsRow, welfareRow, photoUrl, pmPhotoUrl, fedLabel,
+  trialId, pen, feedId, isLeaf, date, obsRow, welfareRow, photoUrl, pmPhotoUrl, fedLabel,
   sessionTempMin, sessionTempMax, sessionHumidityMin, sessionHumidityMax,
   penEvents, liveCountValue, onSaved,
 }: {
   trialId: string;
   pen: StepperPen;
   feedId: string;
+  isLeaf: boolean;
   date: string;
   obsRow: ObsRow | undefined;
   welfareRow: WelfareRow | undefined;
@@ -698,7 +716,9 @@ function PenCard({
           min={0}
           step="0.1"
           defaultValue={obsRow?.leftover_g ?? ""}
-          hint="Take out and weigh everything left in the dish and enter the grams. Keep the rest and top up to the required grams. Only throw away the leftovers if moldy. Enter 0 if nothing is left."
+          hint={isLeaf
+            ? "Take out all leftover feed, weigh it on the zeroed scale, enter grams, throw it away, clean the dish. Enter 0 if nothing is left."
+            : "Take out and weigh everything left in the dish and enter the grams. Keep the rest and top up to the required grams. Only throw away the leftovers if moldy. Enter 0 if nothing is left."}
           onBlur={(e) => {
             const raw = e.currentTarget.value;
             const v = raw === "" ? null : Number(raw);
