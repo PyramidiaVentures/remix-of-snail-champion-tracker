@@ -502,6 +502,22 @@ function FeedForm({ values, onChange, error }: FeedFormProps) {
             Optional. Can be added at any time, including after the trial ends — all figures recompute automatically.
           </span>
         </label>
+
+        <label className="block text-xs">
+          <span className="block mb-1 text-muted-foreground">Protein %</span>
+          <input
+            type="number"
+            step="0.1"
+            min={0}
+            max={100}
+            value={values.protein_percent}
+            onChange={(e) => update("protein_percent", e.target.value)}
+            className="inp"
+          />
+          <span className="mt-1 block text-[10px] text-muted-foreground">
+            Optional. Crude protein content of the feed, for reference and export.
+          </span>
+        </label>
       </div>
 
       <label className="block text-xs">
