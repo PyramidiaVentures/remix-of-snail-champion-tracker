@@ -139,6 +139,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          protein_percent: number | null
           site_id: string
         }
         Insert: {
@@ -149,6 +150,7 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          protein_percent?: number | null
           site_id?: string
         }
         Update: {
@@ -159,6 +161,7 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          protein_percent?: number | null
           site_id?: string
         }
         Relationships: [

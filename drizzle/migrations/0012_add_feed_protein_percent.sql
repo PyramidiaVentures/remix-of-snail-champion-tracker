@@ -1,0 +1,1 @@
+ALTER TABLE public.feeds ADD COLUMN protein_percent numeric;

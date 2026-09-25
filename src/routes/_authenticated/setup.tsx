@@ -214,6 +214,7 @@ interface FeedFormValues {
   cost_per_kg: string;
   dm_percent: string;
   dm_source: DmSource | "";
+  protein_percent: string;
   notes: string;
 }
 
@@ -223,6 +224,7 @@ function emptyFeedForm(): FeedFormValues {
     cost_per_kg: "",
     dm_percent: "",
     dm_source: "",
+    protein_percent: "",
     notes: "",
   };
 }
@@ -233,12 +235,19 @@ function feedToFormValues(feed: TablesRow<"feeds">): FeedFormValues {
     cost_per_kg: feed.cost_per_kg?.toString() ?? "",
     dm_percent: feed.dm_percent?.toString() ?? "",
     dm_source: feed.dm_source ?? "",
+    protein_percent: feed.protein_percent?.toString() ?? "",
     notes: feed.notes ?? "",
   };
 }
 
 function validateFeedForm(values: FeedFormValues): string | null {
   if (!values.name.trim()) return "Name is required.";
+  if (values.protein_percent.trim()) {
+    const p = Number(values.protein_percent);
+    if (Number.isNaN(p) || p < 0 || p > 100) {
+      return "Protein % must be between 0 and 100.";
+    }
+  }
   if (values.dm_percent.trim()) {
     const dm = Number(values.dm_percent);
     if (Number.isNaN(dm) || dm < 0 || dm > 100) {
@@ -258,6 +267,7 @@ function formToFeedInsert(values: FeedFormValues): Database["public"]["Tables"][
     cost_per_kg: values.cost_per_kg.trim() ? Number(values.cost_per_kg) : null,
     dm_percent: dmPercent,
     dm_source: dmPercent ? (values.dm_source as DmSource) : null,
+    protein_percent: values.protein_percent.trim() ? Number(values.protein_percent) : null,
     notes: values.notes.trim() || null,
   };
 }
@@ -382,6 +392,7 @@ function FeedsSection() {
                   <div className="text-xs text-muted-foreground">
                     {f.cost_per_kg != null ? `${f.cost_per_kg}/kg` : "No cost recorded"}
                     {f.dm_percent != null && ` · DM ${f.dm_percent}% (${labelFor(DM_SOURCE_OPTIONS, f.dm_source)})`}
+                    {f.protein_percent != null && ` · Protein ${f.protein_percent}%`}
                   </div>
                   {f.notes && <div className="text-xs text-muted-foreground italic">{f.notes}</div>}
                 </div>
@@ -489,6 +500,22 @@ function FeedForm({ values, onChange, error }: FeedFormProps) {
           />
           <span className="mt-1 block text-[10px] text-muted-foreground">
             Optional. Can be added at any time, including after the trial ends — all figures recompute automatically.
+          </span>
+        </label>
+
+        <label className="block text-xs">
+          <span className="block mb-1 text-muted-foreground">Protein %</span>
+          <input
+            type="number"
+            step="0.1"
+            min={0}
+            max={100}
+            value={values.protein_percent}
+            onChange={(e) => update("protein_percent", e.target.value)}
+            className="inp"
+          />
+          <span className="mt-1 block text-[10px] text-muted-foreground">
+            Optional. Crude protein content of the feed, for reference and export.
           </span>
         </label>
       </div>
