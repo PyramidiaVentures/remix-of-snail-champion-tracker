@@ -6,8 +6,10 @@ export type PhotoKind = "am" | "pm";
 /** Downscale + JPEG-compress a file client-side before upload. */
 async function compressImage(file: File, maxDim = 1600, quality = 0.8): Promise<Blob> {
   try {
-    // Apply the camera's rotation (EXIF) so the saved JPEG is upright.
-    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    // Decode through an <img>: every modern phone browser applies the camera's
+    // rotation (EXIF orientation) to <img>, so the saved JPEG comes out the way
+    // the phone was held. (createImageBitmap ignores it on some phones.)
+    const bitmap = await loadOriented(file);
     const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
     const w = Math.max(1, Math.round(bitmap.width * scale));
     const h = Math.max(1, Math.round(bitmap.height * scale));
