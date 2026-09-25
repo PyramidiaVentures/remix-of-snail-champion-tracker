@@ -698,7 +698,7 @@ function PenCard({
           min={0}
           step="0.1"
           defaultValue={obsRow?.leftover_g ?? ""}
-          hint="Take out everything left in the dish, weigh it on the zeroed scale, enter the grams, then throw it away and clean the dish. Enter 0 if nothing is left."
+          hint="Take out and weigh everything left in the dish and enter the grams. Keep the rest and top up to the required grams. Only throw away the leftovers if moldy. Enter 0 if nothing is left."
           onBlur={(e) => {
             const raw = e.currentTarget.value;
             const v = raw === "" ? null : Number(raw);
