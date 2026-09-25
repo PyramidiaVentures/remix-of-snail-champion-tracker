@@ -116,7 +116,7 @@ function Frame({
             alt={caption}
             loading="lazy"
             decoding="async"
-            className="aspect-[4/3] w-full rounded-md border border-border object-contain bg-background"
+            className="h-auto w-full rounded-md border border-border bg-background"
           />
         </button>
       ) : (
