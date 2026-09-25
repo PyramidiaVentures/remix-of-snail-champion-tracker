@@ -746,6 +746,8 @@ function PenCard({
         <OptionRow options={SUBSTRATE} value={substrate} onPick={(v) => { setSubstrate(v); void saveWelfare({ substrate_condition: v }, setWelfareState); }} columns={2} />
       </div>
 
+      {/* The death tracker only appears once the team has flagged a visible dead snail. */}
+      {flags.includes("visible_dead") && (
       <div className="rounded-lg border border-border p-3 space-y-2">
         <div className="flex items-baseline justify-between">
           <span className="text-sm font-medium">Log a death, escape or removal</span>
@@ -793,6 +795,7 @@ function PenCard({
 
         <div className="text-sm font-medium">Live count: {liveCountValue}</div>
       </div>
+      )}
 
       <div className="space-y-1">
         <div className="flex items-baseline justify-between">
@@ -973,6 +976,8 @@ function BreederCard({
         </div>
       </div>
 
+      {/* Same rule for breeder pens: hidden until "Visible dead" is flagged. */}
+      {flags.includes("visible_dead") && (
       <div className="rounded-lg border border-border p-3 space-y-2">
         <div className="flex items-baseline justify-between">
           <span className="text-sm font-medium">Log a death, escape or removal</span>
@@ -1021,6 +1026,7 @@ function BreederCard({
 
         <div className="text-sm font-medium">Live count: {liveCountValue}</div>
       </div>
+      )}
 
       <div className="space-y-1">
         <div className="flex items-baseline justify-between">
