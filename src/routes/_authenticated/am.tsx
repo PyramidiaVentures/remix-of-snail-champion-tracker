@@ -580,7 +580,7 @@ function OptionRow<T extends string>({
 }
 
 function PenCard({
-  trialId, pen, feedId, isLeaf, date, obsRow, welfareRow, photoUrl, pmPhotoUrl, fedLabel,
+  trialId, pen, feedId, isLeaf, retentionFor, date, obsRow, welfareRow, photoUrl, pmPhotoUrl, fedLabel,
   sessionTempMin, sessionTempMax, sessionHumidityMin, sessionHumidityMax,
   penEvents, liveCountValue, onSaved,
 }: {
@@ -588,6 +588,8 @@ function PenCard({
   pen: StepperPen;
   feedId: string;
   isLeaf: boolean;
+  /** Water-loss correction for the feeding date, from the shared metrics. */
+  retentionFor: (feedId: string | null | undefined, date: string) => Retention;
   date: string;
   obsRow: ObsRow | undefined;
   welfareRow: WelfareRow | undefined;
@@ -610,6 +612,10 @@ function PenCard({
 
   const [leftover, setLeftover] = useState<number | null>(obsRow?.leftover_g != null ? Number(obsRow.leftover_g) : null);
   const offered = obsRow?.offered_g != null ? Number(obsRow.offered_g) : null;
+  const ret = retentionFor(feedId, date);
+  const expectedLeftover = offered != null ? offered * ret.retention : null;
+  const eatenCheck = offered != null && leftover != null ? feedEaten(offered, leftover, ret.retention) : null;
+  const corrected = ret.status === "measured" || ret.status === "from test";
   const [activity, setActivity] = useState<SnailActivity | null>(welfareRow?.activity ?? null);
   const [flags, setFlags] = useState<HealthFlag[]>((welfareRow?.health_flags as HealthFlag[] | null) ?? []);
   const [substrate, setSubstrate] = useState<SubstrateCondition | null>(welfareRow?.substrate_condition ?? null);
@@ -746,6 +752,21 @@ function PenCard({
             void saveLeftover(v);
           }}
         />
+        {expectedLeftover != null && (
+          <p className="text-xs text-muted-foreground">
+            Expected leftover after water loss: ~{roundOut(expectedLeftover, 1)} g
+            {corrected
+              ? ` (${roundOut((1 - ret.retention) * 100, 1)}% water loss over ${ret.nights} night${ret.nights === 1 ? "" : "s"})`
+              : ret.status === "not tested"
+                ? " — no water-loss figure yet, compared as weighed"
+                : " — dry feed, no water-loss correction"}
+          </p>
+        )}
+        {eatenCheck && eatenCheck.shareLeft >= 1 - NOT_EATEN_SHARE && (
+          <p className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+            Almost nothing eaten ({Math.round((1 - eatenCheck.shareLeft) * 100)}% of the {Math.round(offered!)} g offered, after water loss): investigate.
+          </p>
+        )}
         {leftover != null && offered != null && leftover > offered && (
           <p className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
             More left than was offered. Check the scale zero and the entry.
