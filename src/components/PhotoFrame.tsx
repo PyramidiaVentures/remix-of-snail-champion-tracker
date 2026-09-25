@@ -28,12 +28,12 @@ export function PhotoFrame({
 
   return (
     <figure className="overflow-hidden rounded-xl border border-border bg-card">
-      <div className="aspect-[4/3] w-full bg-muted">
+      <div className={stored && url && !failed ? "w-full bg-muted" : "aspect-[4/3] w-full bg-muted"}>
         {stored && url && !failed ? (
           <button
             type="button"
             onClick={() => onOpen(url, caption)}
-            className="block h-full w-full"
+            className="block w-full"
             aria-label={`Open ${caption} full size`}
           >
             <img
@@ -42,7 +42,7 @@ export function PhotoFrame({
               loading="lazy"
               decoding="async"
               onError={() => setFailed(true)}
-             className="h-full w-full object-contain"
+             className="block h-auto w-full"
             />
           </button>
         ) : (
