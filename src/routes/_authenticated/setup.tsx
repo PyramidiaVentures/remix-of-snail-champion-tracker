@@ -214,6 +214,7 @@ interface FeedFormValues {
   cost_per_kg: string;
   dm_percent: string;
   dm_source: DmSource | "";
+  protein_percent: string;
   notes: string;
 }
 
@@ -223,6 +224,7 @@ function emptyFeedForm(): FeedFormValues {
     cost_per_kg: "",
     dm_percent: "",
     dm_source: "",
+    protein_percent: "",
     notes: "",
   };
 }
@@ -233,12 +235,19 @@ function feedToFormValues(feed: TablesRow<"feeds">): FeedFormValues {
     cost_per_kg: feed.cost_per_kg?.toString() ?? "",
     dm_percent: feed.dm_percent?.toString() ?? "",
     dm_source: feed.dm_source ?? "",
+    protein_percent: feed.protein_percent?.toString() ?? "",
     notes: feed.notes ?? "",
   };
 }
 
 function validateFeedForm(values: FeedFormValues): string | null {
   if (!values.name.trim()) return "Name is required.";
+  if (values.protein_percent.trim()) {
+    const p = Number(values.protein_percent);
+    if (Number.isNaN(p) || p < 0 || p > 100) {
+      return "Protein % must be between 0 and 100.";
+    }
+  }
   if (values.dm_percent.trim()) {
     const dm = Number(values.dm_percent);
     if (Number.isNaN(dm) || dm < 0 || dm > 100) {
