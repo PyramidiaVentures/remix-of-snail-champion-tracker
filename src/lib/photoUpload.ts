@@ -3,6 +3,21 @@ import { supabase } from "@/integrations/supabase/client";
 export const PHOTO_BUCKET = "field-photos";
 export type PhotoKind = "am" | "pm";
 
+/** Loads a photo with the camera's rotation already applied. */
+async function loadOriented(file: File): Promise<HTMLImageElement> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.style.imageOrientation = "from-image";
+    img.src = url;
+    await img.decode();
+    // naturalWidth/Height already reflect the EXIF rotation.
+    return Object.assign(img, { width: img.naturalWidth, height: img.naturalHeight });
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+}
+
 /** Downscale + JPEG-compress a file client-side before upload. */
 async function compressImage(file: File, maxDim = 1600, quality = 0.8): Promise<Blob> {
   try {
@@ -23,7 +38,6 @@ async function compressImage(file: File, maxDim = 1600, quality = 0.8): Promise<
       | null;
     if (!ctx) return file;
     ctx.drawImage(bitmap, 0, 0, w, h);
-    bitmap.close?.();
     if ("convertToBlob" in canvas) {
       return await (canvas as OffscreenCanvas).convertToBlob({ type: "image/jpeg", quality });
     }
