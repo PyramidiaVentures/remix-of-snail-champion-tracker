@@ -190,6 +190,22 @@ function AmPage() {
     return map;
   }, [assignments.data, treatments.data]);
 
+  // Leaf leftovers are thrown away (they go moldy); concentrate and fish feed
+  // are kept and topped up. The leftover instruction follows the pen's feed.
+  const feedIds = useMemo(() => [...new Set([...feedByPen.values()])], [feedByPen]);
+  const feeds = useQuery({
+    queryKey: ["feeds-leaf", feedIds],
+    enabled: feedIds.length > 0,
+    queryFn: async () =>
+      (await supabase.from("feeds").select("id,is_leaf").in("id", feedIds)).data ?? [],
+  });
+  const leafByPen = useMemo(() => {
+    const leafByFeed = new Map((feeds.data ?? []).map((f) => [f.id, f.is_leaf]));
+    const map = new Map<string, boolean>();
+    for (const [penId, feedId] of feedByPen) map.set(penId, leafByFeed.get(feedId) ?? false);
+    return map;
+  }, [feeds.data, feedByPen]);
+
   // Breeder pens are checked in the same walk, marked apart and counted apart.
   const trialPens: StepperPen[] = useMemo(
     () =>
@@ -495,6 +511,7 @@ function AmPage() {
                 trialId={trial.data!.id}
                 pen={pen}
                 feedId={feedByPen.get(pen.id)!}
+                isLeaf={leafByPen.get(pen.id) ?? false}
                 date={date}
                 obsRow={obsFor(pen.id)}
                 welfareRow={welfareFor(pen.id)}
