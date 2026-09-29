@@ -233,7 +233,7 @@ export function ResultsOverview(p: ResultsOverviewProps) {
             observations={p.observations}
             retentionFor={p.retentionFor}
             isOperating={p.isOperating}
-            until={p.date}
+            until="9999-12-31"
           />
         </>
       )}
