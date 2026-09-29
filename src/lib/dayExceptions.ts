@@ -60,7 +60,7 @@ export type DayException = {
   key: string;
   group: string;
   text: string;
-  to?: "/pm" | "/am" | "/weigh" | "/population";
+  to?: "/pm" | "/am" | "/weigh" | "/population" | "/trial";
   penId?: string;
 };
 
