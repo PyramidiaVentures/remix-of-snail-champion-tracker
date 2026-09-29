@@ -1286,6 +1286,42 @@ function WaterLossTest({
         />
       </label>
       <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm">{summary}</p>
+      {rows.length > 0 && (() => {
+        const sorted = [...pct].sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)]!;
+        return (
+          <div className="overflow-x-auto">
+            <h3 className="mb-1 text-sm font-medium">All control-dish readings</h3>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="py-1.5 pr-3">Evening fed</th>
+                  <th className="py-1.5 pr-3 text-right">Put in</th>
+                  <th className="py-1.5 pr-3 text-right">Left next morning</th>
+                  <th className="py-1.5 pr-3 text-right">Kept</th>
+                  <th className="py-1.5 text-right">Lost</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {[...rows].reverse().map((r) => {
+                  const k = (Number(r.remaining_g) / Number(r.offered_g)) * 100;
+                  const odd = Math.abs(k - median) > 15;
+                  return (
+                    <tr key={r.obs_date} className={odd ? "text-destructive" : ""}>
+                      <td className="py-1.5 pr-3">{short(r.obs_date)}{odd ? " — looks unusual" : ""}</td>
+                      <td className="py-1.5 pr-3 text-right tabular-nums">{Number(r.offered_g)} g</td>
+                      <td className="py-1.5 pr-3 text-right tabular-nums">{Number(r.remaining_g)} g</td>
+                      <td className="py-1.5 pr-3 text-right tabular-nums">{Math.round(k)}%</td>
+                      <td className="py-1.5 text-right tabular-nums">{Math.round(100 - k)}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p className="mt-1 text-xs text-muted-foreground">Red rows are more than 15 points away from the typical reading ({Math.round(median)}% kept).</p>
+          </div>
+        );
+      })()}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </section>
   );
