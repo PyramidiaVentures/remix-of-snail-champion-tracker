@@ -419,6 +419,34 @@ export function computeDayReview(args: {
     });
   }
 
+  // Control-dish sanity guard: if the water-loss correction makes a pen's
+  // leftover weigh more than what was offered, the control reading is suspect.
+  {
+    const bad: string[] = [];
+    let retPct: number | null = null;
+    for (const p of trialPens) {
+      const o = d.obs.find((r) => r.pen_id === p.id && r.obs_date === cursorDate);
+      if (!o || o.leftover_g == null || o.offered_g == null || Number(o.offered_g) <= 0) continue;
+      if (!args.controlFeedId || o.feed_id !== args.controlFeedId) continue;
+      const ret = retentionFor(o.feed_id, o.obs_date).retention;
+      if (ret == null || ret <= 0 || ret >= 1) continue;
+      if (Number(o.leftover_g) / ret > Number(o.offered_g)) {
+        bad.push(p.label);
+        retPct = Math.round(ret * 100);
+      }
+    }
+    if (bad.length) {
+      exceptions.push({
+        key: `control-suspect-${cursorDate}`,
+        group: "Refusal",
+        text: `Control dish reading looks wrong — with ${retPct}% kept overnight, ${bad.length} pen${bad.length === 1 ? "" : "s"} (${bad.join(", ")}) would have more left than was offered. Check the control dish weight`,
+        to: "/trial",
+      });
+    }
+  }
+
+
+
 
   // Dish emptied because spoiled.
   for (const o of obsToday.filter((r) => r.dish_action === "emptied_spoiled")) {
