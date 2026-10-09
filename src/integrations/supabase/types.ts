@@ -14,6 +14,21 @@ export type Database = {
   }
   public: {
     Tables: {
+      alert_log: {
+        Row: {
+          alert_key: string
+          sent_at: string
+        }
+        Insert: {
+          alert_key: string
+          sent_at?: string
+        }
+        Update: {
+          alert_key?: string
+          sent_at?: string
+        }
+        Relationships: []
+      }
       benchmarks: {
         Row: {
           citation: string
@@ -617,6 +632,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      telegram_chats: {
+        Row: {
+          chat_id: number
+          created_at: string
+          label: string | null
+        }
+        Insert: {
+          chat_id: number
+          created_at?: string
+          label?: string | null
+        }
+        Update: {
+          chat_id?: number
+          created_at?: string
+          label?: string | null
+        }
+        Relationships: []
       }
       treatments: {
         Row: {

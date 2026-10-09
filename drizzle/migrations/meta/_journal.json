@@ -99,6 +99,13 @@
       "when": 1790340458530,
       "tag": "0013_add_feed_is_leaf",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791531487862,
+      "tag": "0014_create_telegram_alert_tables",
+      "breakpoints": true
     }
   ]
 }
