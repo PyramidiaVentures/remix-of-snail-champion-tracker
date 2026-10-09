@@ -214,14 +214,24 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                 </tr>
               </thead>
               {groups.map((g) => {
-                const allEaten = g.rows.every((r) => r.iv.leftoverDays > 0);
+                const allEaten = g.rows.length > 0 && g.rows.every((r) => r.iv.leftoverDays > 0);
                 return (
                   <tbody key={g.t.treatmentId}>
-                    {groups.length > 1 && <tr><td colSpan={5} className="pt-2 font-medium">{g.t.label}</td></tr>}
-                    {g.rows.map(({ pen, iv }) => {
+                    {groups.length > 1 && <tr><td colSpan={6} className="pt-2 font-medium">{g.t.label}</td></tr>}
+                    {g.allRows.map(({ pen, iv }) => {
                       const noGain = iv.gain_g == null || iv.gain_g <= 0;
+                      const off = excluded.has(pen.penId);
                       return (
-                        <tr key={pen.penId} className="border-t border-border">
+                        <tr key={pen.penId} className={`border-t border-border ${off ? "opacity-40" : ""}`}>
+                          <td className="py-1.5 pr-1">
+                            <input
+                              type="checkbox"
+                              checked={off}
+                              onChange={() => toggleExcluded(pen.penId)}
+                              aria-label={`Exclude ${pen.label} from totals`}
+                              className="h-4 w-4 accent-primary"
+                            />
+                          </td>
                           <td className="py-1.5 pr-1 font-medium break-words">{pen.label}</td>
                           <td className="py-1.5 pr-1 text-right tabular-nums">{f(iv.offeredPerDay_g, 1)}</td>
                           <td className="py-1.5 pr-1 text-right tabular-nums">{iv.leftoverDays > 0 ? f(iv.eatenPerDay_g, 1) : <span className="text-muted-foreground">not weighed</span>}</td>
@@ -231,8 +241,9 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                       );
                     })}
                     <tr className="border-t border-border bg-muted/60 font-semibold">
-                      <td className="py-1.5 pr-1">All {g.rows.length} pens</td>
-                      <td className="py-1.5 pr-1 text-right tabular-nums">{f(meanOf(g.rows.map((r) => r.iv.offeredPerDay_g))!, 1)}</td>
+                      <td />
+                      <td className="py-1.5 pr-1">{g.rows.length === g.allRows.length ? `All ${g.rows.length} pens` : `${g.rows.length} of ${g.allRows.length} pens`}</td>
+                      <td className="py-1.5 pr-1 text-right tabular-nums">{(() => { const v = meanOf(g.rows.map((r) => r.iv.offeredPerDay_g)); return v == null ? "—" : f(v, 1); })()}</td>
                       <td className="py-1.5 pr-1 text-right tabular-nums">{allEaten ? f(meanOf(g.rows.map((r) => r.iv.eatenPerDay_g))!, 1) : "—"}</td>
                       <td className="py-1.5 pr-1 text-right tabular-nums">{g.pooled.economicFcr == null ? "—" : f(g.pooled.economicFcr, 1)}</td>
                       <td className="py-1.5 text-right tabular-nums">{g.pooled.biologicalFcr == null ? "—" : f(g.pooled.biologicalFcr, 1)}</td>
