@@ -16,6 +16,7 @@ export const pushDayAlerts = createServerFn({ method: "POST" })
       (a) =>
         a.key.startsWith("control-suspect-") ||
         a.key.startsWith("not-eaten-") ||
+        a.key.startsWith("overdue-") ||
         (a.key.startsWith("pm-") && !a.key.startsWith("pmstep-")) ||
         (a.key.startsWith("am-") && !a.key.startsWith("amstep-")),
     );
