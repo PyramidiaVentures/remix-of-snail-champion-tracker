@@ -10,7 +10,7 @@ import { today } from "@/lib/date";
 import { addDays, roundOut } from "@/lib/metrics";
 import { cumulativeMortality } from "@/lib/liveCount";
 import { NoActiveTrial, useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
-import { operatingDaysSentence, useSiteCalendar } from "@/lib/operatingDays";
+import { makeCalendar, operatingDaysSentence, useSiteCalendar } from "@/lib/operatingDays";
 import {
   computeDayReview,
   fetchDayInputs,
