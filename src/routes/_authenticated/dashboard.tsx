@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardList, Thermometer } from "lucide-react";
 
 import { makeRetention, observationBand, SHARE_BANDS } from "@/lib/metrics";
@@ -17,6 +17,7 @@ import {
   type DayReviewPen,
 } from "@/lib/dayExceptions";
 import DashboardTrends from "@/components/DashboardTrends";
+import { pushDayAlerts } from "@/lib/alerts.functions";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
