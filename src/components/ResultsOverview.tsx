@@ -137,13 +137,14 @@ export function ResultsOverview(p: ResultsOverviewProps) {
             <table className="w-full table-fixed text-xs">
               <thead>
                 <tr className="text-left text-muted-foreground">
+                  <th className="w-[9%] py-1 pr-1">Exclude</th>
                   <th className="w-[14%] py-1 pr-1">Pen</th>
                   <th className="w-[10%] py-1 pr-1 text-right">Snails</th>
-                  <th className="w-[22%] py-1 pr-1 text-right">Weight / snail (g)</th>
-                  <th className="w-[13%] py-1 pr-1 text-right">Growth / day (g)</th>
-                  <th className="w-[12%] py-1 pr-1 text-right">Growth</th>
-                  <th className="w-[11%] py-1 pr-1 text-right">SGR %/day</th>
-                  <th className="w-[18%] py-1 pl-1"><span className="sr-only">Flag</span></th>
+                  <th className="w-[20%] py-1 pr-1 text-right">Weight / snail (g)</th>
+                  <th className="w-[12%] py-1 pr-1 text-right">Growth / day (g)</th>
+                  <th className="w-[11%] py-1 pr-1 text-right">Growth</th>
+                  <th className="w-[10%] py-1 pr-1 text-right">SGR %/day</th>
+                  <th className="w-[14%] py-1 pl-1"><span className="sr-only">Flag</span></th>
                 </tr>
               </thead>
               {groups.map((g) => {
@@ -193,11 +194,12 @@ export function ResultsOverview(p: ResultsOverviewProps) {
             <table className="w-full table-fixed text-xs">
               <thead>
                 <tr className="text-left text-muted-foreground">
-                  <th className="w-[20%] py-1 pr-1">Pen</th>
-                  <th className="w-[20%] py-1 pr-1 text-right">Offered / day (g)</th>
-                  <th className="w-[20%] py-1 pr-1 text-right">Eaten / day (g)</th>
-                  <th className="w-[20%] py-1 pr-1 text-right">Economic FCR</th>
-                  <th className="w-[20%] py-1 text-right">Biological FCR</th>
+                  <th className="w-[9%] py-1 pr-1">Exclude</th>
+                  <th className="w-[19%] py-1 pr-1">Pen</th>
+                  <th className="w-[18%] py-1 pr-1 text-right">Offered / day (g)</th>
+                  <th className="w-[18%] py-1 pr-1 text-right">Eaten / day (g)</th>
+                  <th className="w-[18%] py-1 pr-1 text-right">Economic FCR</th>
+                  <th className="w-[18%] py-1 text-right">Biological FCR</th>
                 </tr>
               </thead>
               {groups.map((g) => {
