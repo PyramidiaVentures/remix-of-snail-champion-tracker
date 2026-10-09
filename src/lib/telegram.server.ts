@@ -44,3 +44,29 @@ export async function sendTelegramAlert(alertKey: string, text: string): Promise
   await Promise.all(chats.map((c) => sendMessage(Number(c.chat_id), text)));
   return true;
 }
+
+/**
+ * Claim a batch of alert keys and send the not-yet-sent ones as ONE combined
+ * message. Returns the number of new alerts included (0 = nothing sent).
+ */
+export async function sendTelegramAlertBatch(
+  alerts: { key: string; text: string }[],
+  header: string,
+): Promise<number> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  if (!alerts.length) return 0;
+
+  const fresh: string[] = [];
+  for (const a of alerts) {
+    const { error } = await supabaseAdmin.from("alert_log").insert({ alert_key: a.key });
+    if (!error) fresh.push(a.text);
+  }
+  if (!fresh.length) return 0;
+
+  const { data: chats } = await supabaseAdmin.from("telegram_chats").select("chat_id");
+  if (!chats?.length) return 0;
+
+  const text = `${header}\n${fresh.map((t) => `• ${t}`).join("\n")}`;
+  await Promise.all(chats.map((c) => sendMessage(Number(c.chat_id), text)));
+  return fresh.length;
+}
