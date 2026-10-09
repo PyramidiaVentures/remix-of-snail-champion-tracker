@@ -49,17 +49,26 @@ export function ResultsOverview(p: ResultsOverviewProps) {
   const sgrB = pickBenchmark(p.benchmarks, "sgr", p.siteId);
   const bfcrB = pickBenchmark(p.benchmarks, "bfcr_dm", p.siteId);
 
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const toggleExcluded = (penId: string) =>
+    setExcluded((prev) => {
+      const next = new Set(prev);
+      if (next.has(penId)) next.delete(penId); else next.add(penId);
+      return next;
+    });
+
   const groups = useMemo(() => {
     return (metrics?.treatments ?? [])
       .map((t) => {
-        const rows = t.pens
+        const allRows = t.pens
           .map((pen) => ({ pen, iv: pen.intervals.find((i) => i.to === p.date) ?? null }))
           .filter((r): r is { pen: typeof r.pen; iv: IntervalMetrics } => !!r.iv)
           .sort((a, b) => a.pen.label.localeCompare(b.pen.label, undefined, { numeric: true }));
-        return { t, rows, pooled: pooledFcr(rows.map((r) => r.iv)), sgr: meanOf(rows.map((r) => r.iv.sgr)) };
+        const rows = allRows.filter((r) => !excluded.has(r.pen.penId));
+        return { t, allRows, rows, pooled: pooledFcr(rows.map((r) => r.iv)), sgr: meanOf(rows.map((r) => r.iv.sgr)) };
       })
-      .filter((g) => g.rows.length > 0);
-  }, [metrics, p.date]);
+      .filter((g) => g.allRows.length > 0);
+  }, [metrics, p.date, excluded]);
 
   const allRows = groups.flatMap((g) => g.rows);
   const from = allRows.map((r) => r.iv.from).sort()[0];
@@ -99,7 +108,7 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                 <div key={g.t.treatmentId}>
                   <p className="mb-2 text-xs text-muted-foreground">
                     <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ background: colorOf(g.t.treatmentId) }} />
-                    {g.t.label} · {g.rows.length} pens · all feed ÷ all gain
+                    {g.t.label} · {g.rows.length === g.allRows.length ? `${g.rows.length} pens` : `${g.rows.length} of ${g.allRows.length} pens (excluded pens hidden from totals)`} · all feed ÷ all gain
                   </p>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <Tile
@@ -128,22 +137,23 @@ export function ResultsOverview(p: ResultsOverviewProps) {
             <table className="w-full table-fixed text-xs">
               <thead>
                 <tr className="text-left text-muted-foreground">
+                  <th className="w-[9%] py-1 pr-1">Exclude</th>
                   <th className="w-[14%] py-1 pr-1">Pen</th>
                   <th className="w-[10%] py-1 pr-1 text-right">Snails</th>
-                  <th className="w-[22%] py-1 pr-1 text-right">Weight / snail (g)</th>
-                  <th className="w-[13%] py-1 pr-1 text-right">Growth / day (g)</th>
-                  <th className="w-[12%] py-1 pr-1 text-right">Growth</th>
-                  <th className="w-[11%] py-1 pr-1 text-right">SGR %/day</th>
-                  <th className="w-[18%] py-1 pl-1"><span className="sr-only">Flag</span></th>
+                  <th className="w-[20%] py-1 pr-1 text-right">Weight / snail (g)</th>
+                  <th className="w-[12%] py-1 pr-1 text-right">Growth / day (g)</th>
+                  <th className="w-[11%] py-1 pr-1 text-right">Growth</th>
+                  <th className="w-[10%] py-1 pr-1 text-right">SGR %/day</th>
+                  <th className="w-[14%] py-1 pl-1"><span className="sr-only">Flag</span></th>
                 </tr>
               </thead>
               {groups.map((g) => {
-                const w1 = meanOf(g.rows.map((r) => r.iv.meanWeight1))!;
-                const w2 = meanOf(g.rows.map((r) => r.iv.meanWeight2))!;
+                const w1 = meanOf(g.rows.map((r) => r.iv.meanWeight1));
+                const w2 = meanOf(g.rows.map((r) => r.iv.meanWeight2));
                 return (
                   <tbody key={g.t.treatmentId}>
-                    {groups.length > 1 && <tr><td colSpan={7} className="pt-2 font-medium">{g.t.label}</td></tr>}
-                    {g.rows.map(({ pen, iv }) => {
+                    {groups.length > 1 && <tr><td colSpan={8} className="pt-2 font-medium">{g.t.label}</td></tr>}
+                    {g.allRows.map(({ pen, iv }) => {
                       const pct = iv.meanWeight1 > 0 ? (iv.growthPerSnail_g / iv.meanWeight1) * 100 : null;
                       const penRow = p.pens.find((x) => x.id === pen.penId);
                       const expected = penRow ? liveCount(penRow, p.population, iv.to) : null;
@@ -153,8 +163,18 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                         : (pct != null && pct > 15) || countOff
                           ? <span className="text-earth" title={countOff ? `Death log says ${expected} snails` : "Growth above 15% in one interval"}>⚠ check</span>
                           : null;
+                      const off = excluded.has(pen.penId);
                       return (
-                        <tr key={pen.penId} className="border-t border-border">
+                        <tr key={pen.penId} className={`border-t border-border ${off ? "opacity-40" : ""}`}>
+                          <td className="py-1.5 pr-1">
+                            <input
+                              type="checkbox"
+                              checked={off}
+                              onChange={() => toggleExcluded(pen.penId)}
+                              aria-label={`Exclude ${pen.label} from totals`}
+                              className="h-4 w-4 accent-primary"
+                            />
+                          </td>
                           <td className="py-1.5 pr-1 font-medium break-words">{pen.label}</td>
                           <td className="py-1.5 pr-1 text-right tabular-nums">{iv.survivingCount}</td>
                           <td className="py-1.5 pr-1 text-right tabular-nums">{f(iv.meanWeight1, 1)} → {f(iv.meanWeight2, 1)}</td>
@@ -166,11 +186,12 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                       );
                     })}
                     <tr className="border-t border-border bg-muted/60 font-semibold">
+                      <td />
                       <td className="py-1.5 pr-1">Average</td>
                       <td />
-                      <td className="py-1.5 pr-1 text-right tabular-nums">{f(w1, 1)} → {f(w2, 1)}</td>
-                      <td className="py-1.5 pr-1 text-right tabular-nums">{signed(meanOf(g.rows.map((r) => r.iv.growthPerSnailPerDay_g))!, 2)}</td>
-                      <td className="py-1.5 pr-1 text-right tabular-nums">{signed(((w2 - w1) / w1) * 100, 1)}%</td>
+                      <td className="py-1.5 pr-1 text-right tabular-nums">{w1 != null && w2 != null ? `${f(w1, 1)} → ${f(w2, 1)}` : "—"}</td>
+                      <td className="py-1.5 pr-1 text-right tabular-nums">{(() => { const v = meanOf(g.rows.map((r) => r.iv.growthPerSnailPerDay_g)); return v == null ? "—" : signed(v, 2); })()}</td>
+                      <td className="py-1.5 pr-1 text-right tabular-nums">{w1 != null && w2 != null ? `${signed(((w2 - w1) / w1) * 100, 1)}%` : "—"}</td>
                       <td className="py-1.5 pr-1 text-right tabular-nums">{g.sgr == null ? "—" : f(g.sgr, 2)}</td>
                       <td />
                     </tr>
@@ -184,22 +205,33 @@ export function ResultsOverview(p: ResultsOverviewProps) {
             <table className="w-full table-fixed text-xs">
               <thead>
                 <tr className="text-left text-muted-foreground">
-                  <th className="w-[20%] py-1 pr-1">Pen</th>
-                  <th className="w-[20%] py-1 pr-1 text-right">Offered / day (g)</th>
-                  <th className="w-[20%] py-1 pr-1 text-right">Eaten / day (g)</th>
-                  <th className="w-[20%] py-1 pr-1 text-right">Economic FCR</th>
-                  <th className="w-[20%] py-1 text-right">Biological FCR</th>
+                  <th className="w-[9%] py-1 pr-1">Exclude</th>
+                  <th className="w-[19%] py-1 pr-1">Pen</th>
+                  <th className="w-[18%] py-1 pr-1 text-right">Offered / day (g)</th>
+                  <th className="w-[18%] py-1 pr-1 text-right">Eaten / day (g)</th>
+                  <th className="w-[18%] py-1 pr-1 text-right">Economic FCR</th>
+                  <th className="w-[18%] py-1 text-right">Biological FCR</th>
                 </tr>
               </thead>
               {groups.map((g) => {
-                const allEaten = g.rows.every((r) => r.iv.leftoverDays > 0);
+                const allEaten = g.rows.length > 0 && g.rows.every((r) => r.iv.leftoverDays > 0);
                 return (
                   <tbody key={g.t.treatmentId}>
-                    {groups.length > 1 && <tr><td colSpan={5} className="pt-2 font-medium">{g.t.label}</td></tr>}
-                    {g.rows.map(({ pen, iv }) => {
+                    {groups.length > 1 && <tr><td colSpan={6} className="pt-2 font-medium">{g.t.label}</td></tr>}
+                    {g.allRows.map(({ pen, iv }) => {
                       const noGain = iv.gain_g == null || iv.gain_g <= 0;
+                      const off = excluded.has(pen.penId);
                       return (
-                        <tr key={pen.penId} className="border-t border-border">
+                        <tr key={pen.penId} className={`border-t border-border ${off ? "opacity-40" : ""}`}>
+                          <td className="py-1.5 pr-1">
+                            <input
+                              type="checkbox"
+                              checked={off}
+                              onChange={() => toggleExcluded(pen.penId)}
+                              aria-label={`Exclude ${pen.label} from totals`}
+                              className="h-4 w-4 accent-primary"
+                            />
+                          </td>
                           <td className="py-1.5 pr-1 font-medium break-words">{pen.label}</td>
                           <td className="py-1.5 pr-1 text-right tabular-nums">{f(iv.offeredPerDay_g, 1)}</td>
                           <td className="py-1.5 pr-1 text-right tabular-nums">{iv.leftoverDays > 0 ? f(iv.eatenPerDay_g, 1) : <span className="text-muted-foreground">not weighed</span>}</td>
@@ -209,8 +241,9 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                       );
                     })}
                     <tr className="border-t border-border bg-muted/60 font-semibold">
-                      <td className="py-1.5 pr-1">All {g.rows.length} pens</td>
-                      <td className="py-1.5 pr-1 text-right tabular-nums">{f(meanOf(g.rows.map((r) => r.iv.offeredPerDay_g))!, 1)}</td>
+                      <td />
+                      <td className="py-1.5 pr-1">{g.rows.length === g.allRows.length ? `All ${g.rows.length} pens` : `${g.rows.length} of ${g.allRows.length} pens`}</td>
+                      <td className="py-1.5 pr-1 text-right tabular-nums">{(() => { const v = meanOf(g.rows.map((r) => r.iv.offeredPerDay_g)); return v == null ? "—" : f(v, 1); })()}</td>
                       <td className="py-1.5 pr-1 text-right tabular-nums">{allEaten ? f(meanOf(g.rows.map((r) => r.iv.eatenPerDay_g))!, 1) : "—"}</td>
                       <td className="py-1.5 pr-1 text-right tabular-nums">{g.pooled.economicFcr == null ? "—" : f(g.pooled.economicFcr, 1)}</td>
                       <td className="py-1.5 text-right tabular-nums">{g.pooled.biologicalFcr == null ? "—" : f(g.pooled.biologicalFcr, 1)}</td>
