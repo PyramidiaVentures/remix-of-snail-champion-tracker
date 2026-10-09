@@ -35,6 +35,9 @@ export interface Retention {
   status: RetentionStatus;
 }
 
+/** Agreed overnight retention of the control feed: mean of the plausible control-dish readings (76%). */
+export const AGREED_RETENTION_NIGHT = 0.76;
+
 /** Build a lookup for the water-loss retention applied to a feeding. */
 export function makeRetention(ctx: RetentionContext | null | undefined) {
   const nightsFor = ctx?.nightsFor ?? (() => 1);
@@ -61,23 +64,16 @@ export function makeRetention(ctx: RetentionContext | null | undefined) {
   }
   flush();
 
+  void runs;
   return (feedId: string | null | undefined, date: string): Retention => {
     const nights = Math.max(1, nightsFor(date));
     if (!ctx?.controlFeedId || feedId !== ctx.controlFeedId) {
       return { retention: 1, retentionNight: 1, nights, status: "dry feed, not corrected" };
     }
-    const measured = perNight.get(date);
-    if (measured != null) {
-      return { retention: Math.pow(measured, nights), retentionNight: measured, nights, status: "measured" };
-    }
-    if (runs.length) {
-      // Most recent test ending on or before D; a feeding before any test
-      // uses the earliest test.
-      const before = runs.filter((r) => r.end <= date);
-      const run = before.length ? before[before.length - 1]! : runs[0]!;
-      return { retention: Math.pow(run.mean, nights), retentionNight: run.mean, nights, status: "from test" };
-    }
-    return { retention: 1, retentionNight: 1, nights, status: "not tested" };
+    // Team decision (Oct 2026): use the average of the plausible control-dish
+    // readings for every feeding instead of individual (often unreliable) readings.
+    const r = AGREED_RETENTION_NIGHT;
+    return { retention: Math.pow(r, nights), retentionNight: r, nights, status: "from test" };
   };
 }
 
