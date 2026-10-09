@@ -142,6 +142,22 @@ function DashboardPage() {
     amComplete = () => 0,
   } = review ?? {};
 
+  // Push the day's alert-worthy exceptions to Telegram. Only for the current
+  // cycle (today / last completed day) — browsing old days stays silent, and
+  // each alert is sent only once thanks to server-side dedupe.
+  useEffect(() => {
+    if (!review || exceptions.length === 0) return;
+    if (date < lastCompleted) return;
+    pushDayAlerts({
+      data: {
+        date,
+        siteName: siteName || "",
+        alerts: exceptions.map((e) => ({ key: e.key, text: e.text })),
+      },
+    }).catch((err) => console.error("Telegram alerts failed", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [review, date, lastCompleted, siteName]);
+
   /* ----------------------------------------------------------- numbers */
 
   const d = data.data;
