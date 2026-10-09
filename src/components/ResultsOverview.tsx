@@ -148,12 +148,12 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                 </tr>
               </thead>
               {groups.map((g) => {
-                const w1 = meanOf(g.rows.map((r) => r.iv.meanWeight1))!;
-                const w2 = meanOf(g.rows.map((r) => r.iv.meanWeight2))!;
+                const w1 = meanOf(g.rows.map((r) => r.iv.meanWeight1));
+                const w2 = meanOf(g.rows.map((r) => r.iv.meanWeight2));
                 return (
                   <tbody key={g.t.treatmentId}>
-                    {groups.length > 1 && <tr><td colSpan={7} className="pt-2 font-medium">{g.t.label}</td></tr>}
-                    {g.rows.map(({ pen, iv }) => {
+                    {groups.length > 1 && <tr><td colSpan={8} className="pt-2 font-medium">{g.t.label}</td></tr>}
+                    {g.allRows.map(({ pen, iv }) => {
                       const pct = iv.meanWeight1 > 0 ? (iv.growthPerSnail_g / iv.meanWeight1) * 100 : null;
                       const penRow = p.pens.find((x) => x.id === pen.penId);
                       const expected = penRow ? liveCount(penRow, p.population, iv.to) : null;
@@ -163,8 +163,18 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                         : (pct != null && pct > 15) || countOff
                           ? <span className="text-earth" title={countOff ? `Death log says ${expected} snails` : "Growth above 15% in one interval"}>⚠ check</span>
                           : null;
+                      const off = excluded.has(pen.penId);
                       return (
-                        <tr key={pen.penId} className="border-t border-border">
+                        <tr key={pen.penId} className={`border-t border-border ${off ? "opacity-40" : ""}`}>
+                          <td className="py-1.5 pr-1">
+                            <input
+                              type="checkbox"
+                              checked={off}
+                              onChange={() => toggleExcluded(pen.penId)}
+                              aria-label={`Exclude ${pen.label} from totals`}
+                              className="h-4 w-4 accent-primary"
+                            />
+                          </td>
                           <td className="py-1.5 pr-1 font-medium break-words">{pen.label}</td>
                           <td className="py-1.5 pr-1 text-right tabular-nums">{iv.survivingCount}</td>
                           <td className="py-1.5 pr-1 text-right tabular-nums">{f(iv.meanWeight1, 1)} → {f(iv.meanWeight2, 1)}</td>
@@ -176,11 +186,12 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                       );
                     })}
                     <tr className="border-t border-border bg-muted/60 font-semibold">
+                      <td />
                       <td className="py-1.5 pr-1">Average</td>
                       <td />
-                      <td className="py-1.5 pr-1 text-right tabular-nums">{f(w1, 1)} → {f(w2, 1)}</td>
-                      <td className="py-1.5 pr-1 text-right tabular-nums">{signed(meanOf(g.rows.map((r) => r.iv.growthPerSnailPerDay_g))!, 2)}</td>
-                      <td className="py-1.5 pr-1 text-right tabular-nums">{signed(((w2 - w1) / w1) * 100, 1)}%</td>
+                      <td className="py-1.5 pr-1 text-right tabular-nums">{w1 != null && w2 != null ? `${f(w1, 1)} → ${f(w2, 1)}` : "—"}</td>
+                      <td className="py-1.5 pr-1 text-right tabular-nums">{(() => { const v = meanOf(g.rows.map((r) => r.iv.growthPerSnailPerDay_g)); return v == null ? "—" : signed(v, 2); })()}</td>
+                      <td className="py-1.5 pr-1 text-right tabular-nums">{w1 != null && w2 != null ? `${signed(((w2 - w1) / w1) * 100, 1)}%` : "—"}</td>
                       <td className="py-1.5 pr-1 text-right tabular-nums">{g.sgr == null ? "—" : f(g.sgr, 2)}</td>
                       <td />
                     </tr>
