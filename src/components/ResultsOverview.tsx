@@ -49,17 +49,26 @@ export function ResultsOverview(p: ResultsOverviewProps) {
   const sgrB = pickBenchmark(p.benchmarks, "sgr", p.siteId);
   const bfcrB = pickBenchmark(p.benchmarks, "bfcr_dm", p.siteId);
 
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const toggleExcluded = (penId: string) =>
+    setExcluded((prev) => {
+      const next = new Set(prev);
+      if (next.has(penId)) next.delete(penId); else next.add(penId);
+      return next;
+    });
+
   const groups = useMemo(() => {
     return (metrics?.treatments ?? [])
       .map((t) => {
-        const rows = t.pens
+        const allRows = t.pens
           .map((pen) => ({ pen, iv: pen.intervals.find((i) => i.to === p.date) ?? null }))
           .filter((r): r is { pen: typeof r.pen; iv: IntervalMetrics } => !!r.iv)
           .sort((a, b) => a.pen.label.localeCompare(b.pen.label, undefined, { numeric: true }));
-        return { t, rows, pooled: pooledFcr(rows.map((r) => r.iv)), sgr: meanOf(rows.map((r) => r.iv.sgr)) };
+        const rows = allRows.filter((r) => !excluded.has(r.pen.penId));
+        return { t, allRows, rows, pooled: pooledFcr(rows.map((r) => r.iv)), sgr: meanOf(rows.map((r) => r.iv.sgr)) };
       })
-      .filter((g) => g.rows.length > 0);
-  }, [metrics, p.date]);
+      .filter((g) => g.allRows.length > 0);
+  }, [metrics, p.date, excluded]);
 
   const allRows = groups.flatMap((g) => g.rows);
   const from = allRows.map((r) => r.iv.from).sort()[0];
