@@ -108,7 +108,7 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                 <div key={g.t.treatmentId}>
                   <p className="mb-2 text-xs text-muted-foreground">
                     <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ background: colorOf(g.t.treatmentId) }} />
-                    {g.t.label} · {g.rows.length} pens · all feed ÷ all gain
+                    {g.t.label} · {g.rows.length === g.allRows.length ? `${g.rows.length} pens` : `${g.rows.length} of ${g.allRows.length} pens (excluded pens hidden from totals)`} · all feed ÷ all gain
                   </p>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <Tile
