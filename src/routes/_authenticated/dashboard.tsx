@@ -10,7 +10,7 @@ import { today } from "@/lib/date";
 import { addDays, roundOut } from "@/lib/metrics";
 import { cumulativeMortality } from "@/lib/liveCount";
 import { NoActiveTrial, useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
-import { operatingDaysSentence, useSiteCalendar } from "@/lib/operatingDays";
+import { makeCalendar, operatingDaysSentence, useSiteCalendar } from "@/lib/operatingDays";
 import {
   computeDayReview,
   fetchDayInputs,
@@ -157,6 +157,56 @@ function DashboardPage() {
     }).catch((err) => console.error("Telegram alerts failed", err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [review, date, lastCompleted, siteName]);
+
+  // Also push alerts for every other site, so opening one site's dashboard
+  // covers the whole operation — nobody has to visit each site's dashboard.
+  useEffect(() => {
+    if (!review || date < lastCompleted) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: sites } = await supabase.from("sites").select("id,name,non_operating_weekdays");
+        for (const site of (sites ?? []).filter((s) => s.id !== siteId)) {
+          if (cancelled) return;
+          const [{ data: closures }, { data: sTrial }, { data: sPens }] = await Promise.all([
+            supabase.from("site_closures").select("closure_date,reason").eq("site_id", site.id),
+            supabase.from("trials").select("*").eq("status", "active").eq("site_id", site.id).maybeSingle(),
+            supabase.from("pens").select("*").eq("site_id", site.id),
+          ]);
+          if (!sTrial) continue;
+          const sCal = makeCalendar(site.non_operating_weekdays, closures ?? []);
+          const sDate = sCal.previousOperatingDay(today());
+          if (sCal.isNonOperating(sDate)) continue;
+          const { data: sAssignments } = await supabase
+            .from("pen_assignments").select("pen_id,treatment_id,start_date").eq("trial_id", sTrial.id);
+          const sData = await fetchDayInputs(sTrial.id, sDate);
+          const sReview = computeDayReview({
+            pens: (sPens ?? []) as DayReviewPen[],
+            assignments: sAssignments ?? [],
+            trialInterval: sTrial.weighing_interval_days,
+            data: sData,
+            calendar: sCal,
+            date: sDate,
+            siteName: site.name,
+            controlActive: !!sTrial.control_active && !!sTrial.control_feed_id,
+            controlFeedId: sTrial.control_feed_id ?? null,
+          });
+          if (cancelled || sReview.exceptions.length === 0) continue;
+          await pushDayAlerts({
+            data: {
+              date: sDate,
+              siteName: site.name,
+              alerts: sReview.exceptions.map((e) => ({ key: e.key, text: e.text })),
+            },
+          });
+        }
+      } catch (err) {
+        console.error("Cross-site Telegram alerts failed", err);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [review, date, lastCompleted, siteId]);
 
   /* ----------------------------------------------------------- numbers */
 
