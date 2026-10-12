@@ -1,0 +1,2 @@
+ALTER TABLE public.population_events ADD COLUMN IF NOT EXISTS dead_weight_g numeric NULL CHECK (dead_weight_g IS NULL OR dead_weight_g >= 0);
+COMMENT ON COLUMN public.population_events.dead_weight_g IS 'Total weight in grams of the snails in a mortality event, weighed when found. Added to interval gain.';
