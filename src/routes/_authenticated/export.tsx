@@ -369,6 +369,14 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
         includeAcclimation,
         dryMatter: false,
         retention: await retentionCtxFor(trialId),
+        deaths: popEvents
+          .filter((e) => e['trial_id'] === trialId && e['event_type'] === "mortality")
+          .map((e) => ({
+            pen_id: e['pen_id'] as string,
+            event_date: e['event_date'] as string,
+            count: Number(e['count']),
+            dead_weight_g: e['dead_weight_g'] == null ? null : Number(e['dead_weight_g']),
+          })),
       });
 
       const rows: Row[] = [];
