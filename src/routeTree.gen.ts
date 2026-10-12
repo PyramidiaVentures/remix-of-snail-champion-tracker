@@ -9,85 +9,40 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AuthenticatedAmRouteImport } from './routes/_authenticated/am'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedExportRouteImport } from './routes/_authenticated/export'
-import { Route as AuthenticatedGuideRouteImport } from './routes/_authenticated/guide'
-import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
-import { Route as AuthenticatedPhotosRouteImport } from './routes/_authenticated/photos'
-import { Route as AuthenticatedPmRouteImport } from './routes/_authenticated/pm'
-import { Route as AuthenticatedPopulationRouteImport } from './routes/_authenticated/population'
-import { Route as AuthenticatedResultsRouteImport } from './routes/_authenticated/results'
-import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
-import { Route as AuthenticatedTrialRouteImport } from './routes/_authenticated/trial'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedWeighRouteImport } from './routes/_authenticated/weigh'
+import { Route as AuthenticatedTrialRouteImport } from './routes/_authenticated/trial'
+import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
+import { Route as AuthenticatedResultsRouteImport } from './routes/_authenticated/results'
+import { Route as AuthenticatedPopulationRouteImport } from './routes/_authenticated/population'
+import { Route as AuthenticatedPmRouteImport } from './routes/_authenticated/pm'
+import { Route as AuthenticatedPhotosRouteImport } from './routes/_authenticated/photos'
+import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
+import { Route as AuthenticatedGuideRouteImport } from './routes/_authenticated/guide'
+import { Route as AuthenticatedExportRouteImport } from './routes/_authenticated/export'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedAmRouteImport } from './routes/_authenticated/am'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAmRoute = AuthenticatedAmRouteImport.update({
-  id: '/am',
-  path: '/am',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedExportRoute = AuthenticatedExportRouteImport.update({
-  id: '/export',
-  path: '/export',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedGuideRoute = AuthenticatedGuideRouteImport.update({
-  id: '/guide',
-  path: '/guide',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
-  id: '/home',
-  path: '/home',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedPhotosRoute = AuthenticatedPhotosRouteImport.update({
-  id: '/photos',
-  path: '/photos',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedPmRoute = AuthenticatedPmRouteImport.update({
-  id: '/pm',
-  path: '/pm',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedPopulationRoute = AuthenticatedPopulationRouteImport.update({
-  id: '/population',
-  path: '/population',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedResultsRoute = AuthenticatedResultsRouteImport.update({
-  id: '/results',
-  path: '/results',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
-  id: '/setup',
-  path: '/setup',
+const AuthenticatedWeighRoute = AuthenticatedWeighRouteImport.update({
+  id: '/weigh',
+  path: '/weigh',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedTrialRoute = AuthenticatedTrialRouteImport.update({
@@ -95,9 +50,54 @@ const AuthenticatedTrialRoute = AuthenticatedTrialRouteImport.update({
   path: '/trial',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedWeighRoute = AuthenticatedWeighRouteImport.update({
-  id: '/weigh',
-  path: '/weigh',
+const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedResultsRoute = AuthenticatedResultsRouteImport.update({
+  id: '/results',
+  path: '/results',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPopulationRoute = AuthenticatedPopulationRouteImport.update({
+  id: '/population',
+  path: '/population',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPmRoute = AuthenticatedPmRouteImport.update({
+  id: '/pm',
+  path: '/pm',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPhotosRoute = AuthenticatedPhotosRouteImport.update({
+  id: '/photos',
+  path: '/photos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
+  id: '/home',
+  path: '/home',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedGuideRoute = AuthenticatedGuideRouteImport.update({
+  id: '/guide',
+  path: '/guide',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedExportRoute = AuthenticatedExportRouteImport.update({
+  id: '/export',
+  path: '/export',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAmRoute = AuthenticatedAmRouteImport.update({
+  id: '/am',
+  path: '/am',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const ApiPublicTelegramWebhookRoute =
@@ -224,11 +224,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -238,81 +238,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/am': {
-      id: '/_authenticated/am'
-      path: '/am'
-      fullPath: '/am'
-      preLoaderRoute: typeof AuthenticatedAmRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/export': {
-      id: '/_authenticated/export'
-      path: '/export'
-      fullPath: '/export'
-      preLoaderRoute: typeof AuthenticatedExportRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/guide': {
-      id: '/_authenticated/guide'
-      path: '/guide'
-      fullPath: '/guide'
-      preLoaderRoute: typeof AuthenticatedGuideRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/home': {
-      id: '/_authenticated/home'
-      path: '/home'
-      fullPath: '/home'
-      preLoaderRoute: typeof AuthenticatedHomeRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/photos': {
-      id: '/_authenticated/photos'
-      path: '/photos'
-      fullPath: '/photos'
-      preLoaderRoute: typeof AuthenticatedPhotosRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/pm': {
-      id: '/_authenticated/pm'
-      path: '/pm'
-      fullPath: '/pm'
-      preLoaderRoute: typeof AuthenticatedPmRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/population': {
-      id: '/_authenticated/population'
-      path: '/population'
-      fullPath: '/population'
-      preLoaderRoute: typeof AuthenticatedPopulationRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/results': {
-      id: '/_authenticated/results'
-      path: '/results'
-      fullPath: '/results'
-      preLoaderRoute: typeof AuthenticatedResultsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/setup': {
-      id: '/_authenticated/setup'
-      path: '/setup'
-      fullPath: '/setup'
-      preLoaderRoute: typeof AuthenticatedSetupRouteImport
+    '/_authenticated/weigh': {
+      id: '/_authenticated/weigh'
+      path: '/weigh'
+      fullPath: '/weigh'
+      preLoaderRoute: typeof AuthenticatedWeighRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/trial': {
@@ -322,11 +259,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTrialRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/weigh': {
-      id: '/_authenticated/weigh'
-      path: '/weigh'
-      fullPath: '/weigh'
-      preLoaderRoute: typeof AuthenticatedWeighRouteImport
+    '/_authenticated/setup': {
+      id: '/_authenticated/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof AuthenticatedSetupRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/results': {
+      id: '/_authenticated/results'
+      path: '/results'
+      fullPath: '/results'
+      preLoaderRoute: typeof AuthenticatedResultsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/population': {
+      id: '/_authenticated/population'
+      path: '/population'
+      fullPath: '/population'
+      preLoaderRoute: typeof AuthenticatedPopulationRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/pm': {
+      id: '/_authenticated/pm'
+      path: '/pm'
+      fullPath: '/pm'
+      preLoaderRoute: typeof AuthenticatedPmRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/photos': {
+      id: '/_authenticated/photos'
+      path: '/photos'
+      fullPath: '/photos'
+      preLoaderRoute: typeof AuthenticatedPhotosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/home': {
+      id: '/_authenticated/home'
+      path: '/home'
+      fullPath: '/home'
+      preLoaderRoute: typeof AuthenticatedHomeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/guide': {
+      id: '/_authenticated/guide'
+      path: '/guide'
+      fullPath: '/guide'
+      preLoaderRoute: typeof AuthenticatedGuideRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/export': {
+      id: '/_authenticated/export'
+      path: '/export'
+      fullPath: '/export'
+      preLoaderRoute: typeof AuthenticatedExportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/am': {
+      id: '/_authenticated/am'
+      path: '/am'
+      fullPath: '/am'
+      preLoaderRoute: typeof AuthenticatedAmRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/public/telegram/webhook': {
