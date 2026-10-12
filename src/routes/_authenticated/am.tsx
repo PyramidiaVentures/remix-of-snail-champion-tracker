@@ -131,7 +131,7 @@ function AmPage() {
     queryFn: async () =>
       (await supabase
         .from("population_events")
-        .select("id,pen_id,event_date,event_type,count")
+        .select("id,pen_id,event_date,event_type,count,dead_weight_g")
         .eq("trial_id", trialId!)
         .order("created_at")).data ?? [],
   });
@@ -601,7 +601,7 @@ function PenCard({
   sessionTempMax: number | null;
   sessionHumidityMin: number | null;
   sessionHumidityMax: number | null;
-  penEvents: { id: string; event_type: PopulationEventType; count: number }[];
+  penEvents: { id: string; event_type: PopulationEventType; count: number; dead_weight_g?: number | null }[];
   liveCountValue: number;
   onSaved: () => void;
 }) {
@@ -668,10 +668,13 @@ function PenCard({
 
   const [eventType, setEventType] = useState<PopulationEventType>("mortality");
   const [eventCount, setEventCount] = useState<string>("1");
+  const [deadWeight, setDeadWeight] = useState<string>("");
 
   const logEvent = async () => {
     const count = Number(eventCount);
     if (!Number.isFinite(count) || count <= 0) return;
+    const w = deadWeight.trim() === "" ? null : Number(deadWeight);
+    const dead_weight_g = eventType === "mortality" && w != null && Number.isFinite(w) && w >= 0 ? w : null;
     setEventState("saving");
     try {
       await writeWithRetry("population_events", () =>
@@ -681,10 +684,12 @@ function PenCard({
           event_date: date,
           event_type: eventType,
           count,
+          dead_weight_g,
         } as never),
       );
       setEventState("saved");
       setEventCount("1");
+      setDeadWeight("");
       onSaved();
     } catch {
       setEventState("failed");
@@ -833,12 +838,29 @@ function PenCard({
             <Plus className="h-4 w-4" />Add
           </button>
         </div>
+        {eventType === "mortality" && (
+          <label className="flex items-center gap-2 text-sm">
+            <span className="flex-1">Weight of the dead snail(s), shell included (g)</span>
+            <input
+              type="number" inputMode="decimal" min="0" step="0.1"
+              value={deadWeight}
+              onChange={(e) => setDeadWeight(e.target.value)}
+              placeholder="g"
+              className="num-input w-24"
+            />
+          </label>
+        )}
+        {eventType === "mortality" && (
+          <p className="text-xs text-muted-foreground">
+            Weigh before removing. The growth it made counts toward the pen's gain, so its feed isn't wasted in the FCR.
+          </p>
+        )}
 
         {penEvents.length > 0 && (
           <ul className="space-y-1">
             {penEvents.map((e) => (
               <li key={e.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
-                <span>{EVENT_LABEL[e.event_type] ?? e.event_type} · {e.count}</span>
+                <span>{EVENT_LABEL[e.event_type] ?? e.event_type} · {e.count}{e.dead_weight_g != null ? ` · ${Number(e.dead_weight_g)} g` : ""}</span>
                 <button
                   type="button"
                   aria-label="Remove event"

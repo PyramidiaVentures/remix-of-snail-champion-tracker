@@ -199,6 +199,17 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                 );
               })}
             </table>
+            {(() => {
+              const notes = groups.flatMap((g) => g.allRows)
+                .filter(({ pen, iv }) => iv.deadCount > 0 && !excluded.has(pen.penId))
+                .map(({ pen, iv }) =>
+                  `${pen.label}: ${iv.deadCount} died, ${iv.deadWeighedCount} weighed (${iv.deadGain_g >= 0 ? "+" : ""}${iv.deadGain_g.toFixed(1)} g added to gain)`);
+              return notes.length ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Snails that died and were weighed count toward gain; unweighed deaths add nothing. {notes.join(" · ")}
+                </p>
+              ) : null;
+            })()}
           </Card>
 
           <Card title="Feed" sub={`Per pen per day, ${day(from!)} → ${day(prevDay(p.date))} feedings`}>

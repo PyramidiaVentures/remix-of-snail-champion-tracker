@@ -433,6 +433,7 @@ export type Database = {
           cause: Database["public"]["Enums"]["population_cause"] | null
           count: number
           created_at: string
+          dead_weight_g: number | null
           event_date: string
           event_type: Database["public"]["Enums"]["population_event_type"]
           id: string
@@ -446,6 +447,7 @@ export type Database = {
           cause?: Database["public"]["Enums"]["population_cause"] | null
           count: number
           created_at?: string
+          dead_weight_g?: number | null
           event_date: string
           event_type: Database["public"]["Enums"]["population_event_type"]
           id?: string
@@ -459,6 +461,7 @@ export type Database = {
           cause?: Database["public"]["Enums"]["population_cause"] | null
           count?: number
           created_at?: string
+          dead_weight_g?: number | null
           event_date?: string
           event_type?: Database["public"]["Enums"]["population_event_type"]
           id?: string
