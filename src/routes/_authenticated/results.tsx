@@ -183,6 +183,14 @@ function ResultsPage() {
     [observations.data, rangeStart, rangeEnd, selectedPenIds],
   );
 
+  const deathsQ = useQuery({
+    queryKey: ["trial-deaths", trialId], enabled: !!trialId,
+    queryFn: async () =>
+      ((await supabase.from("population_events").select("pen_id,event_date,count,dead_weight_g").eq("trial_id", trialId!).eq("event_type", "mortality")).data ?? [])
+        .map((d) => ({ ...d, dead_weight_g: d.dead_weight_g == null ? null : Number(d.dead_weight_g) })),
+  });
+  const deaths = deathsQ.data;
+
   const metrics: TrialMetrics | null = useMemo(() => {
     if (!trial.data || !pens.data || !feeds.data || !treatments.data || !assignments.data || !observations.data || !biomass.data) return null;
     if (selectedIntervals.length === 0 || selectedPenIds.size === 0) return null;
@@ -197,8 +205,9 @@ function ResultsPage() {
       includeAcclimation,
       dryMatter,
       retention,
+      deaths,
     });
-  }, [retention, trial.data, pens.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, assignedPens, selectedPenIds, scopedObservations, scopedBiomass, selectedIntervals.length, includeAcclimation, dryMatter]);
+  }, [deaths, retention, trial.data, pens.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, assignedPens, selectedPenIds, scopedObservations, scopedBiomass, selectedIntervals.length, includeAcclimation, dryMatter]);
 
 
   // "Weighing of <date>": the same metrics, over every recorded day, for the
@@ -222,8 +231,9 @@ function ResultsPage() {
       includeAcclimation,
       dryMatter,
       retention,
+      deaths,
     };
-  }, [trial.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, assignedPens, includeAcclimation, dryMatter, retention]);
+  }, [deaths, trial.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, assignedPens, includeAcclimation, dryMatter, retention]);
 
   const { siteId, siteName } = useSiteScope();
   const sitePens = useQuery({
@@ -254,8 +264,9 @@ function ResultsPage() {
       includeAcclimation,
       dryMatter: false,
       retention,
+      deaths,
     };
-  }, [trial.data, sitePens.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, includeAcclimation, retention]);
+  }, [deaths, trial.data, sitePens.data, feeds.data, treatments.data, assignments.data, observations.data, biomass.data, includeAcclimation, retention]);
   const nextScheduled = useMemo(() => {
     if (!selectedWeighing || !sitePens.data || !assignments.data || !biomass.data) return null;
     const assigned = new Set(assignments.data.map((a) => a.pen_id));

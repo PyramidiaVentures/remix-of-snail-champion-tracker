@@ -187,6 +187,8 @@ export interface MetricsInput {
   includeAcclimation: boolean;
   dryMatter: boolean;
   retention?: RetentionContext | null;
+  /** Mortality events; weighed deaths add their growth back into interval gain. */
+  deaths?: { pen_id: string; event_date: string; count: number; dead_weight_g: number | null }[];
 }
 
 export interface IntervalMetrics {
@@ -198,6 +200,11 @@ export interface IntervalMetrics {
   growthPerSnail_g: number;
   growthPerSnailPerDay_g: number;
   survivingCount: number;
+  /** Snails that died in (from, to]; weighed ones are credited to gain. */
+  deadCount: number;
+  deadWeighedCount: number;
+  /** Growth of weighed dead snails added to gain: dead weight − start mean × count. */
+  deadGain_g: number;
   gain_g: number | null;
   gainPerDay_g: number | null;
   offered_g: number;
@@ -445,8 +452,18 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
       const meanWeight1 = valid ? a.net_biomass_g / a.live_count : NaN;
       const meanWeight2 = valid ? b.net_biomass_g / b.live_count : NaN;
       const growthPerSnail = meanWeight2 - meanWeight1;
-      // Gain = change in MEAN weight × surviving count.
-      const gain_g = valid ? (meanWeight2 - meanWeight1) * b.live_count : null;
+      // Gain = change in MEAN weight × surviving count, plus the growth of
+      // snails that died in (A, B] and were weighed when found.
+      const penDeaths = (input.deaths ?? []).filter(
+        (x) => x.pen_id === pen.id && x.event_date > a.event_date && x.event_date <= b.event_date,
+      );
+      const deadCount = penDeaths.reduce((s, x) => s + x.count, 0);
+      const weighedDeaths = penDeaths.filter((x) => x.dead_weight_g != null);
+      const deadWeighedCount = weighedDeaths.reduce((s, x) => s + x.count, 0);
+      const deadGain_g = valid
+        ? weighedDeaths.reduce((s, x) => s + (Number(x.dead_weight_g) - meanWeight1 * x.count), 0)
+        : 0;
+      const gain_g = valid ? (meanWeight2 - meanWeight1) * b.live_count + deadGain_g : null;
 
       let offered = 0;
       let eaten = 0;
@@ -479,6 +496,9 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
         growthPerSnail_g: growthPerSnail,
         growthPerSnailPerDay_g: growthPerSnail / days,
         survivingCount: b.live_count,
+        deadCount,
+        deadWeighedCount,
+        deadGain_g,
         gain_g,
         gainPerDay_g: gain_g == null ? null : gain_g / days,
         offered_g: offered,
