@@ -296,13 +296,13 @@ function PhotosPage() {
               return (
                 <div className="space-y-3">
                   <CycleHeading penLabel={pen.label} date={date} morning={morning} />
-                  <div className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <PhotoFrame stored={s?.photo_pm_url} session="Before — feed offered" penLabel={pen.label}
                       siteName={siteName} date={date} onOpen={(url, caption) => setLightbox({ url, caption })} />
                     <PhotoFrame stored={s?.photo_am_url} session={afterLabel(date, morning)} penLabel={pen.label}
                       siteName={siteName} date={morning} onOpen={(url, caption) => setLightbox({ url, caption })} />
-                    <CycleDetails observation={observationFor(pen.id)} />
                   </div>
+                  <CycleDetails observation={observationFor(pen.id)} />
                   {weigh && (
                     <div className="max-w-md">
                       <PhotoFrame stored={weigh} session="Weighing" penLabel={pen.label}
@@ -349,13 +349,13 @@ function PhotosPage() {
                    return (
                    <div key={row.date} className="space-y-3 border-b border-border pb-5 last:border-0">
                      <CycleHeading penLabel={label} date={row.date} morning={morning} />
-                     <div className="space-y-3">
-                       <PhotoFrame stored={row.pm} session="Before — feed offered" penLabel={label}
-                         siteName={siteName} date={row.date} onOpen={(url, caption) => setLightbox({ url, caption })} />
-                       <PhotoFrame stored={row.am} session={afterLabel(row.date, morning)} penLabel={label}
-                         siteName={siteName} date={morning} onOpen={(url, caption) => setLightbox({ url, caption })} />
-                       <CycleDetails observation={row.observation} />
-                    </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <PhotoFrame stored={row.pm} session="Before — feed offered" penLabel={label}
+                          siteName={siteName} date={row.date} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                        <PhotoFrame stored={row.am} session={afterLabel(row.date, morning)} penLabel={label}
+                          siteName={siteName} date={morning} onOpen={(url, caption) => setLightbox({ url, caption })} />
+                      </div>
+                      <CycleDetails observation={row.observation} />
                      {row.weigh && (
                        <div className="max-w-md">
                          <PhotoFrame stored={row.weigh} session="Weighing" penLabel={label}

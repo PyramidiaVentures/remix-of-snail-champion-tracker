@@ -110,7 +110,13 @@ function AuthenticatedShell() {
         </div>
       </header>
 
-      <main className="flex-1 mx-auto w-full max-w-2xl px-4 py-4 pb-24">
+      {/* Photo review needs the whole screen: full width on desktop so the
+          evening and morning photos can sit side by side for comparison. */}
+      <main
+        className={`flex-1 mx-auto w-full max-w-2xl px-4 py-4 pb-24 ${
+          pathname.startsWith("/photos") ? "sm:max-w-none" : ""
+        }`}
+      >
         <Outlet />
       </main>
 
