@@ -27,6 +27,14 @@ import { BookOpen, AlertTriangle, CheckCircle2, Loader2, Save, Plus, Trash2 } fr
 
 export const Route = createFileRoute("/_authenticated/am")({
   component: AmPage,
+  head: () => ({ meta: [
+    { title: "AM Check | SNOVA" },
+    { name: "description", content: "Record morning leftovers, control-dish weights and snail welfare at SNOVA." },
+    { property: "og:title", content: "AM Check | SNOVA" },
+    { property: "og:description", content: "Record morning leftovers, control-dish weights and snail welfare at SNOVA." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   validateSearch: (search: Record<string, unknown>): { pen?: string } =>
     typeof search['pen'] === "string" ? { pen: search['pen'] } : {},
 });

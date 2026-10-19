@@ -16,6 +16,14 @@ import { liveCount } from "@/lib/liveCount";
 
 export const Route = createFileRoute("/_authenticated/trial")({
   component: TrialPage,
+  head: () => ({ meta: [
+    { title: "Trial Management | SNOVA" },
+    { name: "description", content: "Manage snail feeding trials and review control-dish readings at SNOVA." },
+    { property: "og:title", content: "Trial Management | SNOVA" },
+    { property: "og:description", content: "Manage snail feeding trials and review control-dish readings at SNOVA." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
 });
 
 type Trial = {
