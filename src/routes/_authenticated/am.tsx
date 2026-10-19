@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { upsertRow, writeWithRetry, OBSERVATIONS_TRIAL_KEY, WELFARE_CHECKS_KEY } from "@/lib/upsertRow";
+import { controlLeftoverPatch } from "@/lib/controlDish";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
 
 import { useCallback, useMemo, useState } from "react";
@@ -26,6 +27,14 @@ import { BookOpen, AlertTriangle, CheckCircle2, Loader2, Save, Plus, Trash2 } fr
 
 export const Route = createFileRoute("/_authenticated/am")({
   component: AmPage,
+  head: () => ({ meta: [
+    { title: "AM Check | SNOVA" },
+    { name: "description", content: "Record morning leftovers, control-dish weights and snail welfare at SNOVA." },
+    { property: "og:title", content: "AM Check | SNOVA" },
+    { property: "og:description", content: "Record morning leftovers, control-dish weights and snail welfare at SNOVA." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   validateSearch: (search: Record<string, unknown>): { pen?: string } =>
     typeof search['pen'] === "string" ? { pen: search['pen'] } : {},
 });
@@ -499,7 +508,7 @@ function AmPage() {
                   siteId={trial.data!.site_id}
                   feedId={controlFeedId!}
                   feedName={controlFeed.data?.name ?? "the control feed"}
-                  portionG={Number(trial.data!.control_portion_g)}
+                  portionG={control.data?.offered_g != null ? Number(control.data.offered_g) : null}
                   date={date}
                   remainingG={control.data?.remaining_g != null ? Number(control.data.remaining_g) : null}
                   onSaved={refresh}
@@ -1134,7 +1143,7 @@ function ControlCard({
   siteId: string;
   feedId: string;
   feedName: string;
-  portionG: number;
+  portionG: number | null;
   date: string;
   remainingG: number | null;
   onSaved: () => void;
@@ -1143,13 +1152,12 @@ function ControlCard({
   const save = async (value: number | null) => {
     setState("saving");
     try {
-      // offered_g is copied from the current setting at save time, so a later
-      // change to the portion never rewrites history.
-      await upsertRow(
-        "moisture_controls",
-        { site_id: siteId, trial_id: trialId, feed_id: feedId, obs_date: date, offered_g: portionG, remaining_g: value },
-        "trial_id,feed_id,obs_date",
-      );
+      if (portionG == null) throw new Error("Record the actual evening amount in PM Feeding first.");
+      await writeWithRetry("control leftover", async () => {
+        const result = await supabase.from("moisture_controls").update(controlLeftoverPatch(value))
+          .eq("site_id", siteId).eq("trial_id", trialId).eq("feed_id", feedId).eq("obs_date", date).select("id").single();
+        return { error: result.error };
+      });
       setState("saved");
       onSaved();
     } catch {
@@ -1162,10 +1170,11 @@ function ControlCard({
         <div className="text-lg font-bold">Control dish</div>
         <StatusPill state={state === "idle" && remainingG != null ? "saved" : state} />
       </div>
-      <p className="text-sm text-muted-foreground">This dish got {portionG} g of {feedName} last evening.</p>
+      <p className="text-sm text-muted-foreground">{portionG == null ? `The actual evening amount of ${feedName} has not been recorded. Enter it in PM Feeding for ${date} first.` : `This dish got ${portionG} g of ${feedName} last evening.`}</p>
       <NumberField
         key={`control-${date}`}
         label="Control leftover (g)"
+        disabled={portionG == null}
         suffix="g"
         min={0}
         step="0.1"

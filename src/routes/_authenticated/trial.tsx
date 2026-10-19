@@ -16,6 +16,14 @@ import { liveCount } from "@/lib/liveCount";
 
 export const Route = createFileRoute("/_authenticated/trial")({
   component: TrialPage,
+  head: () => ({ meta: [
+    { title: "Trial Management | SNOVA" },
+    { name: "description", content: "Manage snail feeding trials and review control-dish readings at SNOVA." },
+    { property: "og:title", content: "Trial Management | SNOVA" },
+    { property: "og:description", content: "Manage snail feeding trials and review control-dish readings at SNOVA." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
 });
 
 type Trial = {
@@ -1269,22 +1277,7 @@ function WaterLossTest({
           onChange={(e) => void save({ control_active: e.target.checked })}
         />
       </label>
-      <label className="block">
-        <span className="text-sm font-medium">Control portion (g)</span>
-        <input
-          key={`portion-${t.control_portion_g}`}
-          type="number"
-          inputMode="decimal"
-          step="0.1"
-          min="0.1"
-          defaultValue={t.control_portion_g}
-          onBlur={(e) => {
-            const v = Number(e.currentTarget.value);
-            if (Number.isFinite(v) && v > 0 && v !== Number(t.control_portion_g)) void save({ control_portion_g: v });
-          }}
-          className="num-input mt-1"
-        />
-      </label>
+      <p className="text-sm text-muted-foreground">Planned portion: {Number(t.control_portion_g)} g. Actual grams are recorded each evening in PM Feeding.</p>
       <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm">{summary}</p>
       {rows.length > 0 && (() => {
         const sorted = [...pct].sort((a, b) => a - b);

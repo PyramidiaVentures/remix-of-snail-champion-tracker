@@ -10,6 +10,7 @@ import { NumberField } from "@/components/NumberField";
 import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { ClosedDayNotice } from "@/components/ClosedDayNotice";
+import { ControlDishEvening } from "@/components/ControlDishEvening";
 
 import { useUploads } from "@/lib/photoUploads.store";
 import { upsertRow, OBSERVATIONS_TRIAL_KEY } from "@/lib/upsertRow";
@@ -25,6 +26,14 @@ import { BookOpen, Save, CheckCircle2, Loader2, AlertTriangle } from "lucide-rea
 
 export const Route = createFileRoute("/_authenticated/pm")({
   component: PmPage,
+  head: () => ({ meta: [
+    { title: "PM Feeding | SNOVA" },
+    { name: "description", content: "Record evening feed portions, control-dish amounts and photos at SNOVA." },
+    { property: "og:title", content: "PM Feeding | SNOVA" },
+    { property: "og:description", content: "Record evening feed portions, control-dish amounts and photos at SNOVA." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   validateSearch: (search: Record<string, unknown>): { pen?: string } =>
     typeof search['pen'] === "string" ? { pen: search['pen'] } : {},
 });
@@ -117,7 +126,7 @@ function PmPage() {
     queryKey: ["moisture-controls-all", trialId],
     enabled: !!trialId,
     queryFn: async () =>
-      (await supabase.from("moisture_controls").select("obs_date,offered_g,remaining_g").eq("trial_id", trialId!)).data ?? [],
+      (await supabase.from("moisture_controls").select("obs_date,feed_id,offered_g,remaining_g").eq("trial_id", trialId!)).data ?? [],
   });
 
   const retentionFor = useMemo(
@@ -146,6 +155,7 @@ function PmPage() {
   const controlOn = !!trial.data?.control_active && !!trial.data?.control_feed_id;
   const controlFeedName =
     (feeds.data ?? []).find((f) => f.id === trial.data?.control_feed_id)?.name ?? "the control feed";
+  const controlAmountSaved = (controls.data ?? []).some((c) => c.obs_date === date && c.feed_id === trial.data?.control_feed_id && Number(c.offered_g) > 0);
 
   const feedByPen = useMemo(() => {
     const treatmentById = new Map((treatments.data ?? []).map((t) => [t.id, t]));
@@ -247,7 +257,7 @@ function PmPage() {
     .map((step) => step.key === PM_CONTROL_STEP_KEY
       ? {
           ...step,
-          label: `Put ${Number(trial.data?.control_portion_g ?? 0)} g of ${controlFeedName} in the control dish. Keep humidity and every other condition the same as in the snail pens.`,
+          label: `Put ${Number(trial.data?.control_portion_g ?? 0)} g of ${controlFeedName} in the control dish and record the actual grams in the control-dish section. Keep humidity and every other condition the same as in the snail pens.`,
         }
       : step);
   const overrides = checklistItems.map((step) =>
@@ -303,6 +313,10 @@ function PmPage() {
 
       {!!siteId && !trial.isLoading && !trial.data && <NoActiveTrial siteName={siteName} />}
 
+      {trial.data?.control_active && trial.data.control_feed_id && (
+        <ControlDishEvening key={`${trial.data.id}-${trial.data.control_feed_id}-${date}`} trialId={trial.data.id} siteId={trial.data.site_id} feedId={trial.data.control_feed_id} feedName={controlFeedName} date={date} plannedGrams={Number(trial.data.control_portion_g)} />
+      )}
+
 
       {trial.data && (
         <PenStepper
@@ -314,8 +328,8 @@ function PmPage() {
           summaryFooter={
             <>
             {controlOn && (
-              <a href="#pm-checklist" className={`block text-sm underline ${controlTicked ? "text-primary" : "text-amber-600"}`}>
-                Control dish: {controlTicked ? "ticked" : "not ticked yet"}
+              <a href={controlAmountSaved ? "#pm-checklist" : "#pm-control-dish"} className={`block text-sm underline ${controlTicked && controlAmountSaved ? "text-primary" : "text-muted-foreground"}`}>
+                Control dish: {controlTicked ? "ticked" : "not ticked yet"}{!controlAmountSaved ? " · actual grams not recorded" : " · amount recorded"}
               </a>
             )}
             <SessionCompleteButton
@@ -326,7 +340,7 @@ function PmPage() {
               enabled={
                 stepperPens.length > 0 &&
                 stepperPens.every((p) => stateFor(p.id) === "complete") &&
-                checklistAll
+                checklistAll && (!controlOn || controlAmountSaved)
               }
             />
             </>

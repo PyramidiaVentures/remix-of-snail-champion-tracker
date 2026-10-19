@@ -8,3 +8,4 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+- Daily control measurements use field-owned writes: PM records actual offered grams and AM updates only remaining grams, so morning saves cannot replace the evening measurement with trial settings.
