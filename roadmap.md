@@ -68,6 +68,6 @@
 - [x] Verify Nairobi 23 Sept figures
 
 ## Daily control-dish amount (2026-10-19)
-- [ ] Record actual grams in PM and require a saved amount before completing PM.
-- [ ] Preserve the evening amount in AM and remove trial-page portion editing.
-- [ ] Test field-owned writes and verify the evening-to-morning flow.
+- [x] Record actual grams in PM and require a saved amount before completing PM.
+- [x] Preserve the evening amount in AM and remove trial-page portion editing.
+- [x] Test field-owned writes and verify the evening-to-morning flow.
