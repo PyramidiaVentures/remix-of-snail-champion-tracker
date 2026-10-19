@@ -499,7 +499,7 @@ function AmPage() {
                   siteId={trial.data!.site_id}
                   feedId={controlFeedId!}
                   feedName={controlFeed.data?.name ?? "the control feed"}
-                  portionG={Number(trial.data!.control_portion_g)}
+                  portionG={control.data?.offered_g != null ? Number(control.data.offered_g) : null}
                   date={date}
                   remainingG={control.data?.remaining_g != null ? Number(control.data.remaining_g) : null}
                   onSaved={refresh}
@@ -1134,7 +1134,7 @@ function ControlCard({
   siteId: string;
   feedId: string;
   feedName: string;
-  portionG: number;
+  portionG: number | null;
   date: string;
   remainingG: number | null;
   onSaved: () => void;
@@ -1143,13 +1143,12 @@ function ControlCard({
   const save = async (value: number | null) => {
     setState("saving");
     try {
-      // offered_g is copied from the current setting at save time, so a later
-      // change to the portion never rewrites history.
-      await upsertRow(
-        "moisture_controls",
-        { site_id: siteId, trial_id: trialId, feed_id: feedId, obs_date: date, offered_g: portionG, remaining_g: value },
-        "trial_id,feed_id,obs_date",
-      );
+      if (portionG == null) throw new Error("Record the actual evening amount in PM Feeding first.");
+      await writeWithRetry("control leftover", async () => {
+        const result = await supabase.from("moisture_controls").update(controlLeftoverPatch(value))
+          .eq("site_id", siteId).eq("trial_id", trialId).eq("feed_id", feedId).eq("obs_date", date).select("id").single();
+        return { error: result.error };
+      });
       setState("saved");
       onSaved();
     } catch {
@@ -1162,10 +1161,11 @@ function ControlCard({
         <div className="text-lg font-bold">Control dish</div>
         <StatusPill state={state === "idle" && remainingG != null ? "saved" : state} />
       </div>
-      <p className="text-sm text-muted-foreground">This dish got {portionG} g of {feedName} last evening.</p>
+      <p className="text-sm text-muted-foreground">{portionG == null ? `The actual evening amount of ${feedName} has not been recorded. Enter it in PM Feeding for ${date} first.` : `This dish got ${portionG} g of ${feedName} last evening.`}</p>
       <NumberField
         key={`control-${date}`}
         label="Control leftover (g)"
+        disabled={portionG == null}
         suffix="g"
         min={0}
         step="0.1"
