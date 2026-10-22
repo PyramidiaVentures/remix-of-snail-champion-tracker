@@ -62,15 +62,16 @@ export function makeRetention(ctx: RetentionContext | null | undefined) {
     if (future) {
       const matches = (r: ControlReading) => r.feed_id === feedId && (r.portion_g ?? r.offered_g) === portion &&
         Number.isFinite(r.offered_g) && r.offered_g > 0 && r.remaining_g != null && Number.isFinite(r.remaining_g) && r.remaining_g > 0 && r.remaining_g <= r.offered_g;
-      const trays = (ctx?.trays ?? []).filter(matches);
+      // The single control dish is the daily control; legacy tray rows still count if present.
+      const legacy = (ctx?.readings ?? []).map((r) => ({ ...r, feed_id: r.feed_id ?? ctx?.controlFeedId ?? undefined }));
+      const trays = [...(ctx?.trays ?? []), ...legacy].filter(matches);
       const daily = trays.filter((r) => r.obs_date === date);
       if (daily.length) {
         const retentionNight = daily.reduce((s, r) => s + Math.pow(Number(r.remaining_g) / r.offered_g, 1 / readingNights(r)), 0) / daily.length;
         return { retention: Math.pow(retentionNight, nights), retentionNight, nights, status: "measured", controls: daily.length };
       }
       // Historic controls remain inputs only; never retroactively change historic calculations.
-      const prior = [...trays, ...(ctx?.readings ?? []).map((r) => ({ ...r, feed_id: r.feed_id ?? ctx?.controlFeedId ?? undefined }))]
-        .filter((r) => r.obs_date < date && matches(r));
+      const prior = trays.filter((r) => r.obs_date < date);
       const retentionNight = meanOf(prior.map((r) => Math.pow(Number(r.remaining_g) / r.offered_g, 1 / readingNights(r))));
       if (retentionNight != null) return { retention: Math.pow(retentionNight, nights), retentionNight, nights, status: "from test", controls: prior.length };
       return { retention: 0, retentionNight: 0, nights, status: "not tested", controls: 0 };

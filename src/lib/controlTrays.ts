@@ -34,4 +34,5 @@ export function traysComplete(trays: ControlTray[], date: string, portions: Cont
     return matching.length >= 2 && matching.every((t) => !morning || t.remaining_g != null);
   }) && trays.filter((t) => t.obs_date === date).every((t) => !morning || t.remaining_g != null);
 }
-export const usesPairedControls = (date: string) => date >= RETENTION_PROTOCOL_START;
+/** Paired trays were tried and dropped (Oct 2026): the team keeps one control dish. */
+export const usesPairedControls = (_date: string) => false;
