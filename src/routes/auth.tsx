@@ -5,6 +5,11 @@ import { Leaf } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
+  head: () => ({ meta: [
+    { title: "Sign in — SNOVA" }, { name: "description", content: "Sign in to your SNOVA field study account." },
+    { property: "og:title", content: "Sign in — SNOVA" }, { property: "og:description", content: "Access SNOVA feeding and growth records." },
+    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
+  ] }),
 });
 
 function AuthPage() {

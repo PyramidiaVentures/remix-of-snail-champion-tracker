@@ -15,6 +15,11 @@ import { useSiteFeeds, useSitePens, useSiteScope, useSiteTrial } from "@/lib/sit
 
 export const Route = createFileRoute("/_authenticated/setup")({
   component: SetupPage,
+  head: () => ({ meta: [
+    { title: "Pens and Feeds — SNOVA Setup" }, { name: "description", content: "Manage SNOVA pens, feed composition and literature benchmarks." },
+    { property: "og:title", content: "Pens and Feeds — SNOVA Setup" }, { property: "og:description", content: "Manage field-study pens and feed composition." },
+    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
+  ] }),
 });
 
 type DmSource = Database["public"]["Enums"]["dm_source"];

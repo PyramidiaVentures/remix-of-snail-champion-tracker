@@ -145,6 +145,73 @@ export type Database = {
           },
         ]
       }
+      control_trays: {
+        Row: {
+          created_at: string
+          exposure: string
+          feed_id: string
+          id: string
+          obs_date: string
+          offered_g: number
+          portion_g: number
+          remaining_g: number | null
+          site_id: string
+          tray_no: number
+          trial_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          exposure: string
+          feed_id: string
+          id?: string
+          obs_date: string
+          offered_g: number
+          portion_g: number
+          remaining_g?: number | null
+          site_id: string
+          tray_no: number
+          trial_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          exposure?: string
+          feed_id?: string
+          id?: string
+          obs_date?: string
+          offered_g?: number
+          portion_g?: number
+          remaining_g?: number | null
+          site_id?: string
+          tray_no?: number
+          trial_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "control_trays_feed_id_fkey"
+            columns: ["feed_id"]
+            isOneToOne: false
+            referencedRelation: "feeds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "control_trays_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "control_trays_trial_id_fkey"
+            columns: ["trial_id"]
+            isOneToOne: false
+            referencedRelation: "trials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feeds: {
         Row: {
           cost_per_kg: number | null

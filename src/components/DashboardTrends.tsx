@@ -73,7 +73,7 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
     queryKey: ["dash-trends", trialId, from, to],
     enabled: !!trialId && rangeValid,
     queryFn: async () => {
-      const [obs, welfare, controls] = await Promise.all([
+      const [obs, welfare, controls, trays] = await Promise.all([
         supabase
           .from("observations")
           .select("pen_id,feed_id,obs_date,offered_g,leftover_g,refusal_score")
@@ -90,8 +90,9 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
           .from("moisture_controls")
           .select("obs_date,offered_g,remaining_g,feed_id")
           .eq("trial_id", trialId!),
+        supabase.from("control_trays").select("*").eq("trial_id", trialId ?? ""),
       ]);
-      return { obs: obs.data ?? [], welfare: welfare.data ?? [], controls: controls.data ?? [] };
+      return { obs: obs.data ?? [], welfare: welfare.data ?? [], controls: controls.data ?? [], trays: trays.data ?? [] };
     },
   });
 
@@ -117,6 +118,7 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
           .filter((c) => c.feed_id === controlFeedId)
           .map((c) => ({ obs_date: c.obs_date, offered_g: Number(c.offered_g), remaining_g: c.remaining_g == null ? null : Number(c.remaining_g) })),
         calendar,
+        trends.data?.trays ?? [],
       ),
     );
     const banded = rows
@@ -130,7 +132,7 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
       });
     }
     return byScore;
-  }, [trends.data?.obs, trends.data?.controls, controlFeedId, calendar, days, treatmentFilter, treatmentByPen, breederPenIds]);
+  }, [trends.data?.obs, trends.data?.controls, trends.data?.trays, controlFeedId, calendar, days, treatmentFilter, treatmentByPen, breederPenIds]);
 
   const refusalMax = useMemo(() => {
     let max = 0;

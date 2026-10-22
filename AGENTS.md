@@ -9,3 +9,5 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 - Daily control measurements use field-owned writes: PM records actual offered grams and AM updates only remaining grams, so morning saves cannot replace the evening measurement with trial settings.
+- Replicate controls live separately from legacy moisture controls to preserve the published single-control workflow and all historical data.
+- Retention and intake policies are centralized in metrics.ts with a prospective date boundary; row intake and signed aggregate intake are separate outputs so display clipping never alters totals.

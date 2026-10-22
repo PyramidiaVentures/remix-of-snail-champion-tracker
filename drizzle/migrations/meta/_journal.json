@@ -113,6 +113,13 @@
       "when": 1791811386313,
       "tag": "0015_add_dead_weight_to_population_events",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792672068342,
+      "tag": "0016_paired_control_trays",
+      "breakpoints": true
     }
   ]
 }

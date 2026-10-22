@@ -1,5 +1,6 @@
 import { feedEaten, makeRetention } from "@/lib/metrics";
 import { retentionContext } from "@/lib/retention";
+import { traysComplete, usesPairedControls, type ControlTray } from "@/lib/controlTrays";
 import { supabase } from "@/integrations/supabase/client";
 import { today } from "@/lib/date";
 import { addDays, roundOut } from "@/lib/metrics";
@@ -102,11 +103,12 @@ export type DayInputs = {
   control: { remaining_g: number | null } | null;
   /** Every control-dish reading for the trial up to the date. */
   controlReadings: { obs_date: string; offered_g: number; remaining_g: number | null; feed_id: string }[];
+  controlTrays?: ControlTray[];
 };
 
 /** Fetch every dataset the day review reads, for one trial and date. */
 export async function fetchDayInputs(trialId: string, date: string): Promise<DayInputs> {
-  const [obs, welfare, photos, pop, biomass, checklists, control, controlReadings] = await Promise.all([
+  const [obs, welfare, photos, pop, biomass, checklists, control, controlReadings, trays] = await Promise.all([
     supabase.from("observations")
       .select("pen_id,obs_date,offered_g,dish_action,refusal_score,leftover_g,feed_id")
       .eq("trial_id", trialId).lte("obs_date", date),
@@ -125,6 +127,7 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
       .eq("trial_id", trialId).eq("obs_date", date).maybeSingle(),
     supabase.from("moisture_controls").select("obs_date,offered_g,remaining_g,feed_id")
       .eq("trial_id", trialId).lte("obs_date", date),
+    supabase.from("control_trays").select("*").eq("trial_id", trialId).lte("obs_date", date),
   ]);
   return {
     obs: obs.data ?? [],
@@ -135,6 +138,7 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
     checklists: checklists.data ?? [],
     control: control.data ?? null,
     controlReadings: (controlReadings.data ?? []).map((c) => ({ ...c, offered_g: Number(c.offered_g), remaining_g: c.remaining_g == null ? null : Number(c.remaining_g) })),
+    controlTrays: trays.data ?? [],
   };
 }
 
@@ -233,7 +237,9 @@ export function computeDayReview(args: {
   const pmComplete = (list: DayReviewPen[]) => list.filter((p) => pmMissing(p.id).length === 0).length;
   const amComplete = (list: DayReviewPen[]) => list.filter((p) => amMissing(p.id).length === 0).length;
 
-  const controlMissing = controlActive && (d.control?.remaining_g ?? null) == null;
+  const controlMissing = controlActive && (usesPairedControls(date)
+    ? !traysComplete(d.controlTrays ?? [], date, d.obs.filter((o) => o.obs_date === date && o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g })), true)
+    : (d.control?.remaining_g ?? null) == null);
 
   const pmPhotosAll = watched.length > 0 && watched.every((p) => !!photoFor(p.id)?.photo_pm_url);
   const amPhotosAll = watched.length > 0 && watched.every((p) => !!photoFor(p.id)?.photo_am_url);
@@ -359,12 +365,13 @@ export function computeDayReview(args: {
       args.controlFeedId,
       d.controlReadings.filter((c) => c.feed_id === args.controlFeedId),
       calendar,
+      d.controlTrays ?? [],
     ),
   );
   const shareRun = (penId: string, test: (share: number) => boolean) => {
     const byDate = new Map<string, number | null>();
     for (const o of d.obs.filter((r) => r.pen_id === penId)) {
-      const e = feedEaten(o.offered_g, o.leftover_g, retentionFor(o.feed_id, o.obs_date).retention);
+      const e = feedEaten(o.offered_g, o.leftover_g, retentionFor(o.feed_id, o.obs_date, o.offered_g).retention, o.obs_date);
       byDate.set(o.obs_date, e ? e.shareLeft : null);
     }
     let n = 0;
@@ -408,7 +415,7 @@ export function computeDayReview(args: {
   for (const p of trialPens) {
     const o = d.obs.find((r) => r.pen_id === p.id && r.obs_date === cursorDate);
     if (!o) continue;
-    const e = feedEaten(o.offered_g, o.leftover_g, retentionFor(o.feed_id, o.obs_date).retention);
+    const e = feedEaten(o.offered_g, o.leftover_g, retentionFor(o.feed_id, o.obs_date, o.offered_g).retention, o.obs_date);
     if (!e || e.shareLeft < 1 - NOT_EATEN_SHARE) continue;
     exceptions.push({
       key: `not-eaten-${p.id}`,

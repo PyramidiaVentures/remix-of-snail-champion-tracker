@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { retentionContext } from "@/lib/retention";
+import { useControlTrays } from "@/lib/controlTrays";
+import { FeedingRetentionTable } from "@/components/FeedingRetentionTable";
 import {
   computeMetrics, daysBetween, intervalExtras, meanOf, addDays, incompleteLabel, makeRetention, feedingShare, portionChanges, meanOf as meanOfValues,
   METRIC_EXPLANATIONS, METRIC_LABELS,
@@ -77,6 +79,7 @@ function ResultsPage() {
   // The active trial of the site selected in the header — never "first active trial found".
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
+  const trays = useControlTrays(trialId);
   // Closed days never count as missing feeding days.
   const isOperating = calendarFor(trial.data?.site_id).isOperating;
 
@@ -127,8 +130,9 @@ function ResultsPage() {
         .filter((c) => c.feed_id === trial.data?.control_feed_id)
         .map((c) => ({ obs_date: c.obs_date, offered_g: Number(c.offered_g), remaining_g: c.remaining_g == null ? null : Number(c.remaining_g) })),
       siteCalendar,
+      trays.data ?? [],
     ),
-    [controlReadings.data, trial.data?.control_feed_id, siteCalendar],
+    [controlReadings.data, trial.data?.control_feed_id, siteCalendar, trays.data],
   );
 
   // Breeder pens are never part of a treatment mean, so Results never sees them.
@@ -330,6 +334,8 @@ function ResultsPage() {
         isOperating={isOperating}
         nextWeighing={nextScheduled}
       />
+
+      <FeedingRetentionTable observations={observations.data ?? []} pens={pens.data ?? []} retentionFor={makeRetention(retention)} />
 
       <details className="group rounded-2xl border border-border bg-card shadow-sm">
         <summary className="cursor-pointer list-none px-4 py-3 text-sm">
@@ -1030,7 +1036,7 @@ function PenDetail({
       case "survival": return cell(r.iv.survival, 1);
       case "missing": return r.extras.missingFeedingDays;
       case "fcrEaten": return r.iv.eatenPerKgGain != null ? cell(r.iv.eatenPerKgGain) : r.iv.gain_g != null && r.iv.gain_g > 0 ? incompleteLabel(r.iv.leftoverDays, r.iv.feedingDays) : "—";
-      case "eaten": return cell(r.iv.eaten_g, 1);
+      case "eaten": return cell(Math.max(0, r.iv.eaten_g), 1);
       case "coverage": return cell(r.iv.leftoverCoverage != null ? r.iv.leftoverCoverage * 100 : null, 0);
       case "shareLeft": return cell(r.iv.meanShareLeft != null ? r.iv.meanShareLeft * 100 : null, 1);
       default: return "";
