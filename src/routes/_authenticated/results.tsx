@@ -120,7 +120,7 @@ function ResultsPage() {
 
   const controlReadings = useQuery({
     queryKey: ["moisture-controls", trialId, trial.data?.control_feed_id], enabled: !!trialId,
-    queryFn: async () => (await supabase.from("moisture_controls").select("obs_date,offered_g,remaining_g,feed_id").eq("trial_id", trialId!)).data ?? [],
+    queryFn: async () => (await supabase.from("moisture_controls").select("checked_on,obs_date,offered_g,remaining_g,feed_id").eq("trial_id", trialId!)).data ?? [],
   });
   const siteCalendar = calendarFor(trial.data?.site_id);
   const retention = useMemo(

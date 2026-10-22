@@ -203,7 +203,7 @@ function AmPage() {
     queryKey: ["moisture-control-readings", trialId, controlFeedId],
     enabled: !!trialId && !!controlFeedId,
     queryFn: async () =>
-      (await supabase.from("moisture_controls").select("obs_date,offered_g,remaining_g,feed_id").eq("trial_id", trialId!).eq("feed_id", controlFeedId!)).data ?? [],
+      (await supabase.from("moisture_controls").select("checked_on,obs_date,offered_g,remaining_g,feed_id").eq("trial_id", trialId!).eq("feed_id", controlFeedId!)).data ?? [],
   });
   const retentionFor = useMemo(
     () => makeRetention(retentionContext(controlFeedId, controlReadings.data ?? [], calendar, trays.data ?? [])),

@@ -125,7 +125,7 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
       .eq("trial_id", trialId).eq("obs_date", date),
     supabase.from("moisture_controls").select("remaining_g")
       .eq("trial_id", trialId).eq("obs_date", date).maybeSingle(),
-    supabase.from("moisture_controls").select("obs_date,offered_g,remaining_g,feed_id")
+    supabase.from("moisture_controls").select("checked_on,obs_date,offered_g,remaining_g,feed_id")
       .eq("trial_id", trialId).lte("obs_date", date),
     supabase.from("control_trays").select("*").eq("trial_id", trialId).lte("obs_date", date),
   ]);

@@ -88,7 +88,7 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
           .lte("obs_date", to),
         supabase
           .from("moisture_controls")
-          .select("obs_date,offered_g,remaining_g,feed_id")
+          .select("checked_on,obs_date,offered_g,remaining_g,feed_id")
           .eq("trial_id", trialId!),
         supabase.from("control_trays").select("*").eq("trial_id", trialId ?? ""),
       ]);
