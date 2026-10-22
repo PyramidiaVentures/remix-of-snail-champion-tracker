@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { retentionContext } from "@/lib/retention";
 import { useControlTrays } from "@/lib/controlTrays";
+import { FeedingRetentionTable } from "@/components/FeedingRetentionTable";
 import {
   computeMetrics, daysBetween, intervalExtras, meanOf, addDays, incompleteLabel, makeRetention, feedingShare, portionChanges, meanOf as meanOfValues,
   METRIC_EXPLANATIONS, METRIC_LABELS,
@@ -1033,7 +1034,7 @@ function PenDetail({
       case "survival": return cell(r.iv.survival, 1);
       case "missing": return r.extras.missingFeedingDays;
       case "fcrEaten": return r.iv.eatenPerKgGain != null ? cell(r.iv.eatenPerKgGain) : r.iv.gain_g != null && r.iv.gain_g > 0 ? incompleteLabel(r.iv.leftoverDays, r.iv.feedingDays) : "—";
-      case "eaten": return cell(r.iv.eaten_g, 1);
+      case "eaten": return cell(Math.max(0, r.iv.eaten_g), 1);
       case "coverage": return cell(r.iv.leftoverCoverage != null ? r.iv.leftoverCoverage * 100 : null, 0);
       case "shareLeft": return cell(r.iv.meanShareLeft != null ? r.iv.meanShareLeft * 100 : null, 1);
       default: return "";

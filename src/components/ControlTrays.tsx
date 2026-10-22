@@ -5,7 +5,6 @@ import { NumberField } from "@/components/NumberField";
 import { supabase } from "@/integrations/supabase/client";
 import { controlOfferedPatch, controlLeftoverPatch } from "@/lib/controlDish";
 import { requiredControlPortions, useControlTrays, useRefreshControls, type ControlTray, type ControlPortion } from "@/lib/controlTrays";
-import { upsertRow } from "@/lib/upsertRow";
 
 export function ControlTrays({ trialId, siteId, date, feeds, portions, morning = false }: {
   trialId: string; siteId: string; date: string; feeds: { id: string; name: string }[]; portions: ControlPortion[]; morning?: boolean;

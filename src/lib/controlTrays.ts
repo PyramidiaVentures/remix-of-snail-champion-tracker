@@ -19,7 +19,7 @@ export function useRefreshControls() {
   const qc = useQueryClient();
   return () => qc.invalidateQueries({ predicate: (q) => {
     const key = String(q.queryKey[0]);
-    return key.includes("control") || key === "day-inputs" || key === "trial-observations" || key === "dash-trends";
+    return key.includes("control") || key === "dash-data" || key === "home-exceptions" || key === "other-site-status" || key === "trial-observations" || key === "dash-trends";
   } });
 }
 export type ControlPortion = { feed_id: string; offered_g: number | null };
