@@ -14,14 +14,19 @@ export interface ControlReading {
   obs_date: string;
   offered_g: number;
   remaining_g: number | null;
+  feed_id?: string;
+  portion_g?: number;
 }
 
 export type RetentionStatus = "dry feed, not corrected" | "measured" | "from test" | "not tested";
+export const RETENTION_PROTOCOL_START = "2026-10-22";
+export const protocolNights = (date: string) => new Date(`${date}T00:00:00Z`).getUTCDay() === 6 ? 2 : 1;
 
 export interface RetentionContext {
   /** The trial's control feed — the only feed ever corrected. */
   controlFeedId: string | null;
   readings: ControlReading[];
+  trays?: ControlReading[];
   /** Nights from feeding date D to the morning it was weighed (normally 1). */
   nightsFor: (date: string) => number;
   /** Next feeding day after D — used to find consecutive test readings. */
@@ -33,6 +38,7 @@ export interface Retention {
   retentionNight: number;
   nights: number;
   status: RetentionStatus;
+  controls?: number;
 }
 
 /** Agreed overnight retention of the control feed: mean of the plausible control-dish readings (76%). */
@@ -41,32 +47,25 @@ export const AGREED_RETENTION_NIGHT = 0.76;
 /** Build a lookup for the water-loss retention applied to a feeding. */
 export function makeRetention(ctx: RetentionContext | null | undefined) {
   const nightsFor = ctx?.nightsFor ?? (() => 1);
-  const perNight = new Map<string, number>();
-  for (const r of ctx?.readings ?? []) {
-    if (r.remaining_g == null || !(r.offered_g > 0)) continue;
-    const n = Math.max(1, nightsFor(r.obs_date));
-    perNight.set(r.obs_date, Math.pow(r.remaining_g / r.offered_g, 1 / n));
-  }
-  // Runs of consecutive readings (consecutive feeding days).
-  const dates = Array.from(perNight.keys()).sort();
-  const runs: { end: string; mean: number }[] = [];
-  let cur: string[] = [];
-  const flush = () => {
-    if (!cur.length) return;
-    const m = cur.reduce((s, d) => s + perNight.get(d)!, 0) / cur.length;
-    runs.push({ end: cur[cur.length - 1]!, mean: m });
-    cur = [];
-  };
-  for (const d of dates) {
-    const prev = cur[cur.length - 1];
-    if (prev && ctx && ctx.nextFeedingDay(prev) !== d) flush();
-    cur.push(d);
-  }
-  flush();
-
-  void runs;
-  return (feedId: string | null | undefined, date: string): Retention => {
-    const nights = Math.max(1, nightsFor(date));
+  return (feedId: string | null | undefined, date: string, portion?: number | null): Retention => {
+    const future = date >= RETENTION_PROTOCOL_START;
+    const nights = future ? protocolNights(date) : Math.max(1, nightsFor(date));
+    if (future) {
+      const matches = (r: ControlReading) => r.feed_id === feedId && (r.portion_g ?? r.offered_g) === portion &&
+        Number.isFinite(r.offered_g) && r.offered_g > 0 && r.remaining_g != null && Number.isFinite(r.remaining_g) && r.remaining_g > 0 && r.remaining_g <= r.offered_g;
+      const trays = (ctx?.trays ?? []).filter(matches);
+      const daily = trays.filter((r) => r.obs_date === date);
+      if (daily.length) {
+        const retention = daily.reduce((s, r) => s + Number(r.remaining_g) / r.offered_g, 0) / daily.length;
+        return { retention, retentionNight: Math.pow(retention, 1 / nights), nights, status: "measured", controls: daily.length };
+      }
+      // Historic controls remain inputs only; never retroactively change historic calculations.
+      const prior = [...trays, ...(ctx?.readings ?? []).map((r) => ({ ...r, feed_id: r.feed_id ?? ctx?.controlFeedId ?? undefined }))]
+        .filter((r) => r.obs_date < date && matches(r));
+      const retentionNight = meanOf(prior.map((r) => Math.pow(Number(r.remaining_g) / r.offered_g, 1 / protocolNights(r.obs_date))));
+      if (retentionNight != null) return { retention: Math.pow(retentionNight, nights), retentionNight, nights, status: "from test", controls: prior.length };
+      return { retention: 0, retentionNight: 0, nights, status: "not tested", controls: 0 };
+    }
     if (!ctx?.controlFeedId || feedId !== ctx.controlFeedId) {
       return { retention: 1, retentionNight: 1, nights, status: "dry feed, not corrected" };
     }
@@ -80,6 +79,7 @@ export function makeRetention(ctx: RetentionContext | null | undefined) {
 export interface FeedEaten {
   leftoverAsOffered_g: number;
   eaten_g: number;
+  totalEaten_g: number;
   shareLeft: number; // 0..1+
 }
 
@@ -88,11 +88,13 @@ export function feedEaten(
   offered_g: number | null | undefined,
   leftover_g: number | null | undefined,
   retention: number,
+  date?: string,
 ): FeedEaten | null {
-  if (offered_g == null || leftover_g == null || !(offered_g > 0) || !(retention > 0)) return null;
+  if (offered_g == null || leftover_g == null || !Number.isFinite(offered_g) || !Number.isFinite(leftover_g) || !Number.isFinite(retention) || !(offered_g > 0) || !(retention > 0)) return null;
   const leftoverAsOffered_g = leftover_g / retention;
   const eaten_g = Math.min(offered_g, Math.max(0, offered_g - leftoverAsOffered_g));
-  return { leftoverAsOffered_g, eaten_g, shareLeft: leftoverAsOffered_g / offered_g };
+  const totalEaten_g = date && date >= RETENTION_PROTOCOL_START ? Math.min(offered_g, offered_g - leftoverAsOffered_g) : eaten_g;
+  return { leftoverAsOffered_g, eaten_g, totalEaten_g, shareLeft: leftoverAsOffered_g / offered_g };
 }
 
 /**
@@ -140,7 +142,7 @@ export function observationBand(
   o: { feed_id?: string | null; obs_date: string; offered_g: number | null; leftover_g?: number | null; refusal_score?: string | null },
   retentionFor: ReturnType<typeof makeRetention>,
 ): { band: ShareBand; visual: boolean; shareLeft: number | null } | null {
-  const e = feedEaten(o.offered_g, o.leftover_g, retentionFor(o.feed_id, o.obs_date).retention);
+  const e = feedEaten(o.offered_g, o.leftover_g, retentionFor(o.feed_id, o.obs_date, o.offered_g).retention, o.obs_date);
   if (e) return { band: shareBand(e.shareLeft), visual: false, shareLeft: e.shareLeft };
   if (o.refusal_score && SCORE_BAND[o.refusal_score]) return { band: SCORE_BAND[o.refusal_score]!, visual: true, shareLeft: null };
   return null;
@@ -409,11 +411,11 @@ export function computeMetrics(input: MetricsInput): TrialMetrics {
         const pct = dmByFeed.get(o.feed_id);
         if (o.offered_g != null) fed = true;
         fresh += o.offered_g ?? 0;
-        const e = feedEaten(o.offered_g, o.leftover_g, retentionFor(o.feed_id, o.obs_date).retention);
+        const e = feedEaten(o.offered_g, o.leftover_g, retentionFor(o.feed_id, o.obs_date, o.offered_g).retention, o.obs_date);
         if (e) {
           weighed = true;
-          eaten += e.eaten_g;
-          const edm = eatenDryMatter(e.eaten_g, pct);
+          eaten += e.totalEaten_g;
+          const edm = eatenDryMatter(e.totalEaten_g, pct);
           eatenDm = eatenDm == null || edm == null ? null : eatenDm + edm;
           offeredWeighed += o.offered_g!;
           leftWeighed += e.leftoverAsOffered_g;
@@ -638,6 +640,12 @@ export function correctionStatus(status: RetentionStatus): CorrectionStatus {
   return "uncorrected";
 }
 
+export function retentionFlag(r: Retention): string {
+  if (r.status === "measured") return "measured retention";
+  if (r.status === "from test") return "estimated retention";
+  return r.status === "not tested" ? "retention unavailable" : "uncorrected";
+}
+
 export interface FeedingShare {
   obs_date: string;
   offered_g: number;
@@ -654,7 +662,7 @@ export function feedingShare(
 ): FeedingShare | null {
   if (o.offered_g == null || !(Number(o.offered_g) > 0)) return null;
   const offered = Number(o.offered_g);
-  const e = feedEaten(offered, o.leftover_g == null ? null : Number(o.leftover_g), retentionFor(o.feed_id, o.obs_date).retention);
+  const e = feedEaten(offered, o.leftover_g == null ? null : Number(o.leftover_g), retentionFor(o.feed_id, o.obs_date, offered).retention, o.obs_date);
   if (e) return { obs_date: o.obs_date, offered_g: offered, eaten_g: e.eaten_g, shareLeft: e.shareLeft, visual: false };
   const s = o.refusal_score != null ? SCORE_SHARE[o.refusal_score] : undefined;
   return { obs_date: o.obs_date, offered_g: offered, eaten_g: null, shareLeft: s ?? null, visual: s != null };
