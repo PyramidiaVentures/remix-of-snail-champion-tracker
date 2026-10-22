@@ -102,7 +102,7 @@ export type DayInputs = {
   /** The control dish reading for the date (null when none saved). */
   control: { remaining_g: number | null } | null;
   /** Every control-dish reading for the trial up to the date. */
-  controlReadings: { obs_date: string; offered_g: number; remaining_g: number | null; feed_id: string }[];
+  controlReadings: { obs_date: string; offered_g: number; remaining_g: number | null; feed_id: string; checked_on?: string | null }[];
   controlTrays?: ControlTray[];
 };
 
@@ -125,7 +125,7 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
       .eq("trial_id", trialId).eq("obs_date", date),
     supabase.from("moisture_controls").select("remaining_g")
       .eq("trial_id", trialId).eq("obs_date", date).maybeSingle(),
-    supabase.from("moisture_controls").select("obs_date,offered_g,remaining_g,feed_id")
+    supabase.from("moisture_controls").select("checked_on,obs_date,offered_g,remaining_g,feed_id")
       .eq("trial_id", trialId).lte("obs_date", date),
     supabase.from("control_trays").select("*").eq("trial_id", trialId).lte("obs_date", date),
   ]);
@@ -237,9 +237,14 @@ export function computeDayReview(args: {
   const pmComplete = (list: DayReviewPen[]) => list.filter((p) => pmMissing(p.id).length === 0).length;
   const amComplete = (list: DayReviewPen[]) => list.filter((p) => amMissing(p.id).length === 0).length;
 
+  // No evening entry for the dish on this date (holiday, missed day): the dish
+  // is assumed unchanged since its last evening portion, like a weekend gap.
+  const carried = controlActive && !usesPairedControls(date) && d.control == null
+    ? [...d.controlReadings].filter((c) => c.obs_date < date && c.feed_id === args.controlFeedId).sort((a, b) => b.obs_date.localeCompare(a.obs_date))[0] ?? null
+    : null;
   const controlMissing = controlActive && (usesPairedControls(date)
     ? !traysComplete(d.controlTrays ?? [], date, d.obs.filter((o) => o.obs_date === date && o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g })), true)
-    : (d.control?.remaining_g ?? null) == null);
+    : (d.control?.remaining_g ?? null) == null && !(carried && carried.remaining_g != null && (carried.checked_on ?? "") > date));
 
   const pmPhotosAll = watched.length > 0 && watched.every((p) => !!photoFor(p.id)?.photo_pm_url);
   const amPhotosAll = watched.length > 0 && watched.every((p) => !!photoFor(p.id)?.photo_am_url);
@@ -331,6 +336,22 @@ export function computeDayReview(args: {
       : `${p.label} — morning entry in progress, still to record ${miss.join(", ")}`;
     (amInProgress ? inProgress : exceptions).push({
       key: `am-${p.id}`, group: "AM session", text: amInProgress ? pending : text, to: "/am", penId: p.id,
+    });
+  }
+
+  const trayGap = controlActive && usesPairedControls(date) && !(d.controlTrays ?? []).some((t) => t.obs_date === date)
+    ? (d.controlTrays ?? []).map((t) => t.obs_date).filter((x) => x < date).sort().at(-1) ?? null
+    : null;
+  if (trayGap) {
+    exceptions.push({
+      key: `control-carried-${date}`, group: "AM session", to: "/am" as const,
+      text: `Control trays — no evening entry on ${date}; assumed unchanged since ${trayGap}`,
+    });
+  }
+  if (carried) {
+    exceptions.push({
+      key: `control-carried-${date}`, group: "AM session", to: "/am" as const,
+      text: `Control dish — no evening entry on ${date}; assumed unchanged since ${carried.obs_date} (${carried.offered_g} g)`,
     });
   }
 

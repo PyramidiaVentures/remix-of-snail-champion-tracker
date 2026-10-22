@@ -6,8 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { controlOfferedPatch, controlLeftoverPatch } from "@/lib/controlDish";
 import { requiredControlPortions, useControlTrays, useRefreshControls, type ControlTray, type ControlPortion } from "@/lib/controlTrays";
 
-export function ControlTrays({ trialId, siteId, date, feeds, portions, morning = false }: {
-  trialId: string; siteId: string; date: string; feeds: { id: string; name: string }[]; portions: ControlPortion[]; morning?: boolean;
+export function ControlTrays({ trialId, siteId, date, feeds, portions, morning = false, checkDate }: {
+  trialId: string; siteId: string; date: string; feeds: { id: string; name: string }[]; portions: ControlPortion[]; morning?: boolean; checkDate?: string;
 }) {
   const query = useControlTrays(trialId);
   const refresh = useRefreshControls();
@@ -15,7 +15,14 @@ export function ControlTrays({ trialId, siteId, date, feeds, portions, morning =
   const [saving, setSaving] = useState(false);
   const [feed, setFeed] = useState("");
   const selectedFeed = feed || feeds[0]?.id || "";
-  const rows = (query.data ?? []).filter((t) => t.obs_date === date);
+  const dated = (query.data ?? []).filter((t) => t.obs_date === date);
+  // No evening entry for this date (holiday, missed day): trays not yet weighed
+  // out are assumed unchanged since their last evening, like a weekend gap.
+  const open = morning && dated.length === 0
+    ? (query.data ?? []).filter((t) => t.obs_date < date && (t.remaining_g == null || t.checked_on === checkDate))
+    : [];
+  const carriedFrom = open.length ? open.map((t) => t.obs_date).sort().at(-1)! : null;
+  const rows = carriedFrom ? open.filter((t) => t.obs_date === carriedFrom) : dated;
   const required = requiredControlPortions(portions);
   const groups = [...new Map([...required, ...rows.map((t) => ({ feedId: t.feed_id, portion: Number(t.portion_g) }))]
     .map((p) => [`${p.feedId}|${p.portion}`, p])).values()];
@@ -26,9 +33,10 @@ export function ControlTrays({ trialId, siteId, date, feeds, portions, morning =
       const matching = rows.filter((t) => t.feed_id === p.feedId && Number(t.portion_g) === p.portion);
       return <div key={`${p.feedId}-${p.portion}`} className="border-b border-border pb-3 space-y-2">
         <h3 className="text-sm font-medium">{feeds.find((f) => f.id === p.feedId)?.name ?? "Feed"} · {p.portion} g <span className="text-muted-foreground">({matching.length} trays{matching.length < 2 ? " — needs at least 2" : ""})</span></h3>
-        {matching.map((t) => <TrayReading key={`${t.id}-${t.updated_at}`} tray={t} morning={morning} onSaved={refresh} />)}
+        {matching.map((t) => <TrayReading key={`${t.id}-${t.updated_at}`} tray={t} morning={morning} checkDate={checkDate} onSaved={refresh} />)}
       </div>;
     })}
+    {carriedFrom && <p className="text-sm text-amber-700">No evening entry on {date}. These trays are assumed unchanged since {carriedFrom}; their leftovers count over all nights since then. This is flagged as an exception.</p>}
     {morning && rows.length === 0 && <p className="text-sm text-amber-700">No evening control trays were recorded for {date}. Enter what was actually placed last evening below, then each tray's leftover.</p>}
     {(!morning || rows.length === 0) && <form className="space-y-3" onSubmit={async (event) => {
       event.preventDefault();
@@ -44,7 +52,7 @@ export function ControlTrays({ trialId, siteId, date, feeds, portions, morning =
         if (!Number.isInteger(count) || count < 2) throw new Error("Record at least two trays.");
         const max = Math.max(0, ...rows.filter((t) => t.feed_id === selectedFeed && Number(t.portion_g) === portion).map((t) => t.tray_no));
         // Read every actual measurement explicitly; a planned portion is never copied into offered_g.
-        const records = Array.from({ length: count }, (_, i) => ({ site_id: siteId, trial_id: trialId, feed_id: selectedFeed, obs_date: date, portion_g: portion, tray_no: max + i + 1, exposure, ...controlOfferedPatch(Number(data.get(`grams-${i}`))) }));
+        const records = Array.from({ length: count }, (_, i) => ({ ...(morning && checkDate ? { checked_on: checkDate } : {}), site_id: siteId, trial_id: trialId, feed_id: selectedFeed, obs_date: date, portion_g: portion, tray_no: max + i + 1, exposure, ...controlOfferedPatch(Number(data.get(`grams-${i}`))) }));
         const { error: saveError } = await supabase.from("control_trays").insert(records);
         if (saveError) throw saveError;
         await refresh();
@@ -68,7 +76,7 @@ function ExtraTrays() {
     <Button type="button" variant="outline" onClick={() => setCount((n) => n + 1)}><Plus className="h-4 w-4" />Add another tray</Button>
   </div>;
 }
-function TrayReading({ tray, morning, onSaved }: { tray: ControlTray; morning: boolean; onSaved: () => Promise<unknown> }) {
+function TrayReading({ tray, morning, checkDate, onSaved }: { tray: ControlTray; morning: boolean; checkDate?: string; onSaved: () => Promise<unknown> }) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -77,7 +85,7 @@ function TrayReading({ tray, morning, onSaved }: { tray: ControlTray; morning: b
     const grams = Number(new FormData(event.currentTarget).get("grams"));
     setSaving(true); setError(null);
     try {
-      const patch = morning ? controlLeftoverPatch(grams) : controlOfferedPatch(grams);
+      const patch = morning ? { ...controlLeftoverPatch(grams), checked_on: checkDate ?? null } : controlOfferedPatch(grams);
       // Updates are field-owned and address one immutable tray id only.
       const { error: saveError } = await supabase.from("control_trays").update(patch).eq("id", tray.id).select("id").single();
       if (saveError) throw saveError;

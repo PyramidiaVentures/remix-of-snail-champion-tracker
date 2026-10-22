@@ -190,10 +190,17 @@ function AmPage() {
     queryFn: async () => (await supabase.from("feeds").select("id,name").eq("id", controlFeedId!).maybeSingle()).data,
   });
   const control = useQuery({
-    queryKey: ["moisture-control", trialId, date],
+    queryKey: ["moisture-control", trialId, date, checkDate],
     enabled: !!trialId && controlOn,
-    queryFn: async () =>
-      (await supabase.from("moisture_controls").select("*").eq("trial_id", trialId!).eq("feed_id", controlFeedId!).eq("obs_date", date).maybeSingle()).data,
+    queryFn: async () => {
+      const exact = (await supabase.from("moisture_controls").select("*").eq("trial_id", trialId!).eq("feed_id", controlFeedId!).eq("obs_date", date).maybeSingle()).data;
+      if (exact) return { ...exact, carried: false };
+      // No evening entry (holiday or missed day): the dish is assumed unchanged
+      // since its last evening portion, as long as nobody has weighed it out since.
+      const prior = (await supabase.from("moisture_controls").select("*").eq("trial_id", trialId!).eq("feed_id", controlFeedId!).lt("obs_date", date).order("obs_date", { ascending: false }).limit(1).maybeSingle()).data;
+      if (prior && (prior.remaining_g == null || prior.checked_on === checkDate)) return { ...prior, carried: true };
+      return null;
+    },
   });
 
   // Every control-dish reading builds the water-loss correction behind the
@@ -203,7 +210,7 @@ function AmPage() {
     queryKey: ["moisture-control-readings", trialId, controlFeedId],
     enabled: !!trialId && !!controlFeedId,
     queryFn: async () =>
-      (await supabase.from("moisture_controls").select("obs_date,offered_g,remaining_g,feed_id").eq("trial_id", trialId!).eq("feed_id", controlFeedId!)).data ?? [],
+      (await supabase.from("moisture_controls").select("checked_on,obs_date,offered_g,remaining_g,feed_id").eq("trial_id", trialId!).eq("feed_id", controlFeedId!)).data ?? [],
   });
   const retentionFor = useMemo(
     () => makeRetention(retentionContext(controlFeedId, controlReadings.data ?? [], calendar, trays.data ?? [])),
@@ -288,7 +295,7 @@ function AmPage() {
 
   const controlComplete = usesPairedControls(date)
     ? traysComplete(trays.data ?? [], date, (obs.data ?? []).filter((o) => o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g })), true)
-    : control.data?.remaining_g != null;
+    : control.data?.remaining_g != null && (!control.data.carried || control.data.checked_on === checkDate);
 
   const stateFor = (penId: string): PenCompletion => {
     if (uploads.get(penPhotoKey(trialId ?? "", penId, date, "am"))?.status === "uploading") return "uploading";
@@ -510,7 +517,7 @@ function AmPage() {
             }
             renderPen={(pen) =>
               pen.role === "control" ? (
-                usesPairedControls(date) && trial.data ? <ControlTrays trialId={trial.data.id} siteId={trial.data.site_id} date={date} morning feeds={feeds.data ?? []} portions={(obs.data ?? []).filter((o) => o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g }))} /> : <ControlCard
+                usesPairedControls(date) && trial.data ? <ControlTrays trialId={trial.data.id} siteId={trial.data.site_id} date={date} checkDate={checkDate} morning feeds={feeds.data ?? []} portions={(obs.data ?? []).filter((o) => o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g }))} /> : <ControlCard
                   key={`${CONTROL_ID}-${date}`}
                   trialId={trial.data!.id}
                   siteId={trial.data!.site_id}
@@ -518,6 +525,9 @@ function AmPage() {
                   feedName={controlFeed.data?.name ?? "the control feed"}
                   portionG={control.data?.offered_g != null ? Number(control.data.offered_g) : null}
                   date={date}
+                  checkDate={checkDate}
+                  rowId={control.data?.id ?? null}
+                  carriedFrom={control.data?.carried ? control.data.obs_date : null}
                   remainingG={control.data?.remaining_g != null ? Number(control.data.remaining_g) : null}
                   onSaved={refresh}
                 />
@@ -1146,8 +1156,11 @@ function BreederCard({
 
 /** The one control dish: the team only weighs what is left of last evening's portion. */
 function ControlCard({
-  trialId, siteId, feedId, feedName, portionG, date, remainingG, onSaved,
+  trialId, siteId, feedId, feedName, portionG, date, checkDate, rowId, carriedFrom, remainingG, onSaved,
 }: {
+  checkDate: string;
+  rowId: string | null;
+  carriedFrom: string | null;
   trialId: string;
   siteId: string;
   feedId: string;
@@ -1163,8 +1176,10 @@ function ControlCard({
     try {
       if (portionG == null) throw new Error("Record the actual evening amount in PM Feeding first.");
       await writeWithRetry("control leftover", async () => {
-        const result = await supabase.from("moisture_controls").update(controlLeftoverPatch(value))
-          .eq("site_id", siteId).eq("trial_id", trialId).eq("feed_id", feedId).eq("obs_date", date).select("id").single();
+        if (!rowId) throw new Error("No control dish record.");
+        // AM owns only the leftover and the morning it was weighed.
+        const result = await supabase.from("moisture_controls").update({ ...controlLeftoverPatch(value), checked_on: value == null ? null : checkDate })
+          .eq("id", rowId).select("id").single();
         return { error: result.error };
       });
       setState("saved");
@@ -1194,7 +1209,7 @@ function ControlCard({
             const leftover = leftoverRaw === "" ? null : Number(leftoverRaw);
             setState("saving");
             try {
-              const row = { site_id: siteId, trial_id: trialId, feed_id: feedId, obs_date: date, ...controlOfferedPatch(offered), ...controlLeftoverPatch(leftover), notes: "Evening amount entered in AM Check" };
+              const row = { site_id: siteId, trial_id: trialId, feed_id: feedId, obs_date: date, ...controlOfferedPatch(offered), ...controlLeftoverPatch(leftover), checked_on: checkDate, notes: "Evening amount entered in AM Check" };
               await writeWithRetry("control late entry", async () => {
                 const result = await supabase.from("moisture_controls").insert(row);
                 return { error: result.error };
@@ -1221,9 +1236,13 @@ function ControlCard({
         <div className="text-lg font-bold">Control dish</div>
         <StatusPill state={state === "idle" && remainingG != null ? "saved" : state} />
       </div>
-      <p className="text-sm text-muted-foreground">{`This dish got ${portionG} g of ${feedName} last evening.`}</p>
+      {carriedFrom ? (
+        <p className="text-sm text-amber-700">No evening entry on {date}. The dish is assumed unchanged since {carriedFrom}, when it got {portionG} g of {feedName}; the leftover counts over all nights since then. This is flagged as an exception.</p>
+      ) : (
+        <p className="text-sm text-muted-foreground">{`This dish got ${portionG} g of ${feedName} last evening.`}</p>
+      )}
       <NumberField
-        key={`control-${date}`}
+        key={`control-${date}-${rowId}`}
         label="Control leftover (g)"
         suffix="g"
         min={0}

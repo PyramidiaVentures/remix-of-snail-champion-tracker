@@ -147,6 +147,7 @@ export type Database = {
       }
       control_trays: {
         Row: {
+          checked_on: string | null
           created_at: string
           exposure: string
           feed_id: string
@@ -161,6 +162,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          checked_on?: string | null
           created_at?: string
           exposure: string
           feed_id: string
@@ -175,6 +177,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          checked_on?: string | null
           created_at?: string
           exposure?: string
           feed_id?: string
@@ -261,6 +264,7 @@ export type Database = {
       }
       moisture_controls: {
         Row: {
+          checked_on: string | null
           created_at: string
           feed_id: string
           id: string
@@ -274,6 +278,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          checked_on?: string | null
           created_at?: string
           feed_id: string
           id?: string
@@ -287,6 +292,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          checked_on?: string | null
           created_at?: string
           feed_id?: string
           id?: string
