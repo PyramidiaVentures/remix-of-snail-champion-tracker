@@ -339,6 +339,15 @@ export function computeDayReview(args: {
     });
   }
 
+  const trayGap = controlActive && usesPairedControls(date) && !(d.controlTrays ?? []).some((t) => t.obs_date === date)
+    ? (d.controlTrays ?? []).map((t) => t.obs_date).filter((x) => x < date).sort().at(-1) ?? null
+    : null;
+  if (trayGap) {
+    exceptions.push({
+      key: `control-carried-${date}`, group: "AM session", to: "/am" as const,
+      text: `Control trays — no evening entry on ${date}; assumed unchanged since ${trayGap}`,
+    });
+  }
   if (carried) {
     exceptions.push({
       key: `control-carried-${date}`, group: "AM session", to: "/am" as const,
