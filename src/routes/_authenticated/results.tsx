@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { retentionContext } from "@/lib/retention";
 import { useControlTrays } from "@/lib/controlTrays";
 import { FeedingRetentionTable } from "@/components/FeedingRetentionTable";
+import { EnvRangeCharts, envDailyFrom } from "@/components/EnvRangeCharts";
 import {
   computeMetrics, daysBetween, intervalExtras, meanOf, addDays, incompleteLabel, makeRetention, feedingShare, portionChanges, meanOf as meanOfValues,
   METRIC_EXPLANATIONS, METRIC_LABELS,
@@ -80,6 +81,10 @@ function ResultsPage() {
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
   const trays = useControlTrays(trialId);
+  const environment = useQuery({
+    queryKey: ["trial-environment", trialId], enabled: !!trialId,
+    queryFn: async () => (await supabase.from("welfare_checks").select("obs_date,temp_c,humidity_pct,temp_min_c,temp_max_c,humidity_min_pct,humidity_max_pct").eq("trial_id", trialId!)).data ?? [],
+  });
   // Closed days never count as missing feeding days.
   const isOperating = calendarFor(trial.data?.site_id).isOperating;
 
@@ -335,6 +340,11 @@ function ResultsPage() {
         nextWeighing={nextScheduled}
       />
 
+      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
+        <h2 className="font-semibold">Temperature and humidity</h2>
+        <p className="text-xs text-muted-foreground">Lowest and highest reading recorded each day across all pens, over the whole trial.</p>
+        <EnvRangeCharts data={envDailyFrom(environment.data ?? [])} />
+      </section>
       <FeedingRetentionTable observations={observations.data ?? []} pens={pens.data ?? []} retentionFor={makeRetention(retention)} />
 
       <details className="group rounded-2xl border border-border bg-card shadow-sm">

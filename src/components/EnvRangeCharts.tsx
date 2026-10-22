@@ -33,7 +33,7 @@ export function EnvRangeCharts({ data }: { data: EnvDay[] }) {
                 <h4 className="text-xs font-semibold">{c.title} — daily minimum to maximum</h4>
                 <div className="h-56">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={envDaily} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                    <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                       <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 10 }} minTickGap={16} />
                       <YAxis domain={[(m: number) => Math.floor(m - 2), (m: number) => Math.ceil(m + 2)]} allowDecimals={false} tickFormatter={(v: number) => String(Math.round(v))} tick={{ fontSize: 10 }} width={36} />
