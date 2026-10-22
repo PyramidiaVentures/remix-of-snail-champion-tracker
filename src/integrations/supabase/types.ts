@@ -145,6 +145,48 @@ export type Database = {
           },
         ]
       }
+      control_dish_skips: {
+        Row: {
+          created_at: string
+          id: string
+          obs_date: string
+          reason: string
+          site_id: string
+          trial_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          obs_date: string
+          reason?: string
+          site_id: string
+          trial_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          obs_date?: string
+          reason?: string
+          site_id?: string
+          trial_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "control_dish_skips_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "control_dish_skips_trial_id_fkey"
+            columns: ["trial_id"]
+            isOneToOne: false
+            referencedRelation: "trials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       control_trays: {
         Row: {
           checked_on: string | null
