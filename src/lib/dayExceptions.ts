@@ -104,11 +104,13 @@ export type DayInputs = {
   /** Every control-dish reading for the trial up to the date. */
   controlReadings: { obs_date: string; offered_g: number; remaining_g: number | null; feed_id: string; checked_on?: string | null }[];
   controlTrays?: ControlTray[];
+  /** The team recorded that nothing was put in the control dish that evening. */
+  controlSkipped?: boolean;
 };
 
 /** Fetch every dataset the day review reads, for one trial and date. */
 export async function fetchDayInputs(trialId: string, date: string): Promise<DayInputs> {
-  const [obs, welfare, photos, pop, biomass, checklists, control, controlReadings, trays] = await Promise.all([
+  const [obs, welfare, photos, pop, biomass, checklists, control, controlReadings, trays, skip] = await Promise.all([
     supabase.from("observations")
       .select("pen_id,obs_date,offered_g,dish_action,refusal_score,leftover_g,feed_id")
       .eq("trial_id", trialId).lte("obs_date", date),
@@ -128,6 +130,7 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
     supabase.from("moisture_controls").select("checked_on,obs_date,offered_g,remaining_g,feed_id")
       .eq("trial_id", trialId).lte("obs_date", date),
     supabase.from("control_trays").select("*").eq("trial_id", trialId).lte("obs_date", date),
+    supabase.from("control_dish_skips").select("id").eq("trial_id", trialId).eq("obs_date", date).maybeSingle(),
   ]);
   return {
     obs: obs.data ?? [],
@@ -139,6 +142,7 @@ export async function fetchDayInputs(trialId: string, date: string): Promise<Day
     control: control.data ?? null,
     controlReadings: (controlReadings.data ?? []).map((c) => ({ ...c, offered_g: Number(c.offered_g), remaining_g: c.remaining_g == null ? null : Number(c.remaining_g) })),
     controlTrays: trays.data ?? [],
+    controlSkipped: !!skip.data,
   };
 }
 
@@ -239,10 +243,10 @@ export function computeDayReview(args: {
 
   // No evening entry for the dish on this date (holiday, missed day): the dish
   // is assumed unchanged since its last evening portion, like a weekend gap.
-  const carried = controlActive && !usesPairedControls(date) && d.control == null
+  const carried = controlActive && !usesPairedControls(date) && d.control == null && !d.controlSkipped
     ? [...d.controlReadings].filter((c) => c.obs_date < date && c.feed_id === args.controlFeedId).sort((a, b) => b.obs_date.localeCompare(a.obs_date))[0] ?? null
     : null;
-  const controlMissing = controlActive && (usesPairedControls(date)
+  const controlMissing = controlActive && !d.controlSkipped && (usesPairedControls(date)
     ? !traysComplete(d.controlTrays ?? [], date, d.obs.filter((o) => o.obs_date === date && o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g })), true)
     : (d.control?.remaining_g ?? null) == null && !(carried && carried.remaining_g != null && (carried.checked_on ?? "") > date));
 
@@ -346,6 +350,12 @@ export function computeDayReview(args: {
     exceptions.push({
       key: `control-carried-${date}`, group: "AM session", to: "/am" as const,
       text: `Control trays — no evening entry on ${date}; assumed unchanged since ${trayGap}`,
+    });
+  }
+  if (controlActive && d.controlSkipped) {
+    exceptions.push({
+      key: `control-carried-${date}`, group: "AM session", to: "/am" as const,
+      text: `Control dish — nothing placed on the evening of ${date}; no water-loss reading`,
     });
   }
   if (carried) {
