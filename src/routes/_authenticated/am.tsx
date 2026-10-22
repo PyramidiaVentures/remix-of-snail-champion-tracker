@@ -203,6 +203,12 @@ function AmPage() {
     },
   });
 
+  const controlSkip = useQuery({
+    queryKey: ["moisture-control-skip", trialId, date],
+    enabled: !!trialId && controlOn,
+    queryFn: async () => (await supabase.from("control_dish_skips").select("id").eq("trial_id", trialId!).eq("obs_date", date).maybeSingle()).data,
+  });
+
   // Every control-dish reading builds the water-loss correction behind the
   // expected leftover — including readings from before the test was switched
   // off, so yesterday's feedings stay corrected.
@@ -295,7 +301,7 @@ function AmPage() {
 
   const controlComplete = usesPairedControls(date)
     ? traysComplete(trays.data ?? [], date, (obs.data ?? []).filter((o) => o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g })), true)
-    : control.data?.remaining_g != null && (!control.data.carried || control.data.checked_on === checkDate);
+    : !!controlSkip.data || (control.data?.remaining_g != null && (!control.data.carried || control.data.checked_on === checkDate));
 
   const stateFor = (penId: string): PenCompletion => {
     if (uploads.get(penPhotoKey(trialId ?? "", penId, date, "am"))?.status === "uploading") return "uploading";
@@ -369,6 +375,7 @@ function AmPage() {
     void qc.invalidateQueries({ queryKey: ["trial-photos", trialId, date] });
     void qc.invalidateQueries({ queryKey: ["pop-events", trialId] });
     void qc.invalidateQueries({ queryKey: ["moisture-control", trialId, date] });
+    void qc.invalidateQueries({ queryKey: ["moisture-control-skip", trialId, date] });
   };
 
   /** Rewrite the session reading on every welfare row already saved for this date. */
@@ -527,6 +534,7 @@ function AmPage() {
                   date={date}
                   checkDate={checkDate}
                   rowId={control.data?.id ?? null}
+                  skipped={!!controlSkip.data}
                   carriedFrom={control.data?.carried ? control.data.obs_date : null}
                   remainingG={control.data?.remaining_g != null ? Number(control.data.remaining_g) : null}
                   onSaved={refresh}
@@ -1156,8 +1164,9 @@ function BreederCard({
 
 /** The one control dish: the team only weighs what is left of last evening's portion. */
 function ControlCard({
-  trialId, siteId, feedId, feedName, portionG, date, checkDate, rowId, carriedFrom, remainingG, onSaved,
+  trialId, siteId, feedId, feedName, portionG, date, checkDate, rowId, carriedFrom, remainingG, onSaved, skipped,
 }: {
+  skipped: boolean;
   checkDate: string;
   rowId: string | null;
   carriedFrom: string | null;
@@ -1188,6 +1197,31 @@ function ControlCard({
       setState("failed");
     }
   };
+  const setSkip = async (on: boolean) => {
+    setState("saving");
+    try {
+      await writeWithRetry("control skip", async () => {
+        const result = on
+          ? await supabase.from("control_dish_skips").upsert({ site_id: siteId, trial_id: trialId, obs_date: date }, { onConflict: "trial_id,obs_date" })
+          : await supabase.from("control_dish_skips").delete().eq("trial_id", trialId).eq("obs_date", date);
+        return { error: result.error };
+      });
+      setState("idle");
+    } catch {
+      setState("failed");
+    }
+    onSaved();
+  };
+  if (skipped) {
+    return (
+      <section className="rounded-2xl border border-dashed border-primary/60 bg-card p-4 shadow-sm space-y-3">
+        <div className="text-lg font-bold">Control dish</div>
+        <p className="text-sm">Recorded: nothing was placed in the control dish on the evening of {date}. There is nothing to weigh this morning. This is flagged as an exception.</p>
+        <Button type="button" variant="outline" disabled={state === "saving"} onClick={() => void setSkip(false)}>Undo — something was placed</Button>
+        {state === "failed" && <p role="alert" className="text-sm text-destructive">Could not save. Reload and try again.</p>}
+      </section>
+    );
+  }
   if (portionG == null) {
     // The evening amount was never saved. Let the morning team record both
     // readings here instead of locking the box; insert-only, so it can never
@@ -1198,7 +1232,7 @@ function ControlCard({
           <div className="text-lg font-bold">Control dish</div>
           <StatusPill state={state} />
         </div>
-        <p className="text-sm text-amber-700">The evening amount of {feedName} for {date} was not recorded in PM Feeding. Enter what was actually placed last evening, then the leftover.</p>
+        <p className="text-sm text-amber-700">The evening amount of {feedName} for {date} was not recorded in PM Feeding. If food was put in, enter what was placed and the leftover. If nothing was put in, tap “Nothing was placed last evening” below.</p>
         <form
           className="space-y-3"
           onSubmit={async (event) => {
@@ -1225,6 +1259,10 @@ function ControlCard({
           <NumberField name="offered" label="Placed last evening (g)" suffix="g" min="0.1" step="0.1" required />
           <NumberField name="leftover" label="Control leftover (g)" suffix="g" min={0} step="0.1" required />
           <Button type="submit" disabled={state === "saving"}>{state === "saving" ? "Saving…" : "Save control dish"}</Button>
+          <div className="border-t border-border pt-3 space-y-2">
+            <p className="text-sm text-muted-foreground">Dish was empty because nothing was put in last evening?</p>
+            <Button type="button" variant="outline" disabled={state === "saving"} onClick={() => void setSkip(true)}>Nothing was placed last evening</Button>
+          </div>
           {state === "failed" && <p role="alert" className="text-sm text-destructive">Could not save. Reload and try again.</p>}
         </form>
       </section>
