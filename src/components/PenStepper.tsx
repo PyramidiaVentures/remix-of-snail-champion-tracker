@@ -90,6 +90,10 @@ export function PenStepper({ pens, stateFor, missingFor, renderPen, paramName = 
 
   const go = useCallback(
     (next: number) => {
+      // Blur the focused field first so its blur-save fires before the card
+      // unmounts. A touch swipe never blurs an input on its own, so without
+      // this a typed value is silently lost when swiping to the next pen.
+      (document.activeElement as HTMLElement | null)?.blur?.();
       const clamped = Math.max(0, Math.min(n, next));
       setIndex(clamped);
       const params = new URLSearchParams(window.location.search);
