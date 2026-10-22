@@ -102,7 +102,7 @@ export type DayInputs = {
   /** The control dish reading for the date (null when none saved). */
   control: { remaining_g: number | null } | null;
   /** Every control-dish reading for the trial up to the date. */
-  controlReadings: { obs_date: string; offered_g: number; remaining_g: number | null; feed_id: string }[];
+  controlReadings: { obs_date: string; offered_g: number; remaining_g: number | null; feed_id: string; checked_on?: string | null }[];
   controlTrays?: ControlTray[];
 };
 
@@ -237,9 +237,14 @@ export function computeDayReview(args: {
   const pmComplete = (list: DayReviewPen[]) => list.filter((p) => pmMissing(p.id).length === 0).length;
   const amComplete = (list: DayReviewPen[]) => list.filter((p) => amMissing(p.id).length === 0).length;
 
+  // No evening entry for the dish on this date (holiday, missed day): the dish
+  // is assumed unchanged since its last evening portion, like a weekend gap.
+  const carried = controlActive && !usesPairedControls(date) && d.control == null
+    ? [...d.controlReadings].filter((c) => c.obs_date < date && c.feed_id === args.controlFeedId).sort((a, b) => b.obs_date.localeCompare(a.obs_date))[0] ?? null
+    : null;
   const controlMissing = controlActive && (usesPairedControls(date)
     ? !traysComplete(d.controlTrays ?? [], date, d.obs.filter((o) => o.obs_date === date && o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g })), true)
-    : (d.control?.remaining_g ?? null) == null);
+    : (d.control?.remaining_g ?? null) == null && !(carried && carried.remaining_g != null && (carried.checked_on ?? "") > date));
 
   const pmPhotosAll = watched.length > 0 && watched.every((p) => !!photoFor(p.id)?.photo_pm_url);
   const amPhotosAll = watched.length > 0 && watched.every((p) => !!photoFor(p.id)?.photo_am_url);
@@ -331,6 +336,13 @@ export function computeDayReview(args: {
       : `${p.label} — morning entry in progress, still to record ${miss.join(", ")}`;
     (amInProgress ? inProgress : exceptions).push({
       key: `am-${p.id}`, group: "AM session", text: amInProgress ? pending : text, to: "/am", penId: p.id,
+    });
+  }
+
+  if (carried) {
+    exceptions.push({
+      key: `control-carried-${date}`, group: "AM session", to: "/am" as const,
+      text: `Control dish — no evening entry on ${date}; assumed unchanged since ${carried.obs_date} (${carried.offered_g} g)`,
     });
   }
 
