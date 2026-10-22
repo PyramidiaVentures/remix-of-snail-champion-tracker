@@ -29,7 +29,8 @@ export function ControlTrays({ trialId, siteId, date, feeds, portions, morning =
         {matching.map((t) => <TrayReading key={`${t.id}-${t.updated_at}`} tray={t} morning={morning} onSaved={refresh} />)}
       </div>;
     })}
-    {!morning && <form className="space-y-3" onSubmit={async (event) => {
+    {morning && rows.length === 0 && <p className="text-sm text-amber-700">No evening control trays were recorded for {date}. Enter what was actually placed last evening below, then each tray's leftover.</p>}
+    {(!morning || rows.length === 0) && <form className="space-y-3" onSubmit={async (event) => {
       event.preventDefault();
       const form = event.currentTarget;
       const data = new FormData(form);
@@ -57,7 +58,6 @@ export function ControlTrays({ trialId, siteId, date, feeds, portions, morning =
       <label className="block text-sm font-medium">Matching pen exposure<input name="exposure" required placeholder="e.g. same shaded position as Pens 1–5" className="mt-1 w-full rounded-md border border-input bg-card p-2" /></label>
       <Button type="submit" disabled={saving || query.isPending || query.isError}><Save className="h-4 w-4" />{saving ? "Saving…" : "Save control trays"}</Button>
     </form>}
-    {morning && rows.length === 0 && <p className="text-sm text-destructive">No evening control trays recorded for {date}. Record their actual evening amounts in PM Feeding first.</p>}
     {(error || query.isError) && <p role="alert" className="text-sm text-destructive">{error ?? "Could not load control trays."}</p>}
   </section>;
 }

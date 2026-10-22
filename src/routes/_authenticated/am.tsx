@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { upsertRow, writeWithRetry, OBSERVATIONS_TRIAL_KEY, WELFARE_CHECKS_KEY } from "@/lib/upsertRow";
-import { controlLeftoverPatch } from "@/lib/controlDish";
+import { controlLeftoverPatch, controlOfferedPatch } from "@/lib/controlDish";
+import { Button } from "@/components/ui/button";
 import { NoActiveTrial, useSitePens, useSiteScope, useSiteTrial } from "@/lib/siteScope";
 
 import { useCallback, useMemo, useState } from "react";
@@ -1172,17 +1173,58 @@ function ControlCard({
       setState("failed");
     }
   };
+  if (portionG == null) {
+    // The evening amount was never saved. Let the morning team record both
+    // readings here instead of locking the box; insert-only, so it can never
+    // overwrite an evening amount saved in PM Feeding.
+    return (
+      <section className="rounded-2xl border border-dashed border-primary/60 bg-card p-4 shadow-sm space-y-3">
+        <div className="flex items-baseline justify-between">
+          <div className="text-lg font-bold">Control dish</div>
+          <StatusPill state={state} />
+        </div>
+        <p className="text-sm text-amber-700">The evening amount of {feedName} for {date} was not recorded in PM Feeding. Enter what was actually placed last evening, then the leftover.</p>
+        <form
+          className="space-y-3"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const data = new FormData(event.currentTarget);
+            const offered = Number(data.get("offered"));
+            const leftoverRaw = String(data.get("leftover") ?? "").trim();
+            const leftover = leftoverRaw === "" ? null : Number(leftoverRaw);
+            setState("saving");
+            try {
+              const row = { site_id: siteId, trial_id: trialId, feed_id: feedId, obs_date: date, ...controlOfferedPatch(offered), ...controlLeftoverPatch(leftover), notes: "Evening amount entered in AM Check" };
+              await writeWithRetry("control late entry", async () => {
+                const result = await supabase.from("moisture_controls").insert(row);
+                return { error: result.error };
+              });
+              setState("saved");
+              onSaved();
+            } catch {
+              setState("failed");
+              onSaved();
+            }
+          }}
+        >
+          <NumberField name="offered" label="Placed last evening (g)" suffix="g" min="0.1" step="0.1" required />
+          <NumberField name="leftover" label="Control leftover (g)" suffix="g" min={0} step="0.1" required />
+          <Button type="submit" disabled={state === "saving"}>{state === "saving" ? "Saving…" : "Save control dish"}</Button>
+          {state === "failed" && <p role="alert" className="text-sm text-destructive">Could not save. Reload and try again.</p>}
+        </form>
+      </section>
+    );
+  }
   return (
     <section className="rounded-2xl border border-dashed border-primary/60 bg-card p-4 shadow-sm space-y-3">
       <div className="flex items-baseline justify-between">
         <div className="text-lg font-bold">Control dish</div>
         <StatusPill state={state === "idle" && remainingG != null ? "saved" : state} />
       </div>
-      <p className="text-sm text-muted-foreground">{portionG == null ? `The actual evening amount of ${feedName} has not been recorded. Enter it in PM Feeding for ${date} first.` : `This dish got ${portionG} g of ${feedName} last evening.`}</p>
+      <p className="text-sm text-muted-foreground">{`This dish got ${portionG} g of ${feedName} last evening.`}</p>
       <NumberField
         key={`control-${date}`}
         label="Control leftover (g)"
-        disabled={portionG == null}
         suffix="g"
         min={0}
         step="0.1"
