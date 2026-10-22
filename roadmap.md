@@ -71,3 +71,6 @@
 - [x] Record actual grams in PM and require a saved amount before completing PM.
 - [x] Preserve the evening amount in AM and remove trial-page portion editing.
 - [x] Test field-owned writes and verify the evening-to-morning flow.
+
+## Nairobi consumption analysis (2026-10-22)
+- [ ] Calculate recorded grams eaten per day across the trial and explain missing coverage.
