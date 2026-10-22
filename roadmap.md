@@ -73,4 +73,4 @@
 - [x] Test field-owned writes and verify the evening-to-morning flow.
 
 ## Nairobi consumption analysis (2026-10-22)
-- [ ] Calculate recorded grams eaten per day across the trial and explain missing coverage.
+- [x] Calculate recorded grams eaten per day across the trial and explain missing coverage.
