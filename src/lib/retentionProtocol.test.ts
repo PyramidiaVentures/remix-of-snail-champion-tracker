@@ -53,3 +53,15 @@ describe("prospective retention protocol", () => {
     assert.equal(traysComplete(pair, row.obs_date, [...portions, { feed_id: "pellet", offered_g: 50 }], false), false);
   });
 });
+describe("unchanged dish over a missed day", () => {
+  it("spreads a carried reading over every night until it was weighed", async () => {
+    const { readingNights } = await import("./metrics");
+    // Evening of Mon 19 Oct, nobody worked Tue 20 Oct, weighed Wed 21 Oct morning = 2 nights.
+    assert.equal(readingNights({ obs_date: "2026-10-19", checked_on: "2026-10-21" }), 2);
+    assert.equal(readingNights({ obs_date: "2026-10-23" }), 1);
+    const ret = makeRetention({ controlFeedId: "leaf", readings: [], trays: [
+      { obs_date: "2026-10-22", offered_g: 100, remaining_g: 64, feed_id: "leaf", portion_g: 100, checked_on: "2026-10-24" },
+    ], nightsFor: () => 1, nextFeedingDay: (d) => d })("leaf", "2026-10-26", 100);
+    assert.ok(Math.abs(ret.retentionNight - 0.8) < 1e-9);
+  });
+});
