@@ -76,7 +76,7 @@
 - [x] Calculate recorded grams eaten per day across the trial and explain missing coverage.
 
 ## Prospective paired retention controls (2026-10-22)
-- [ ] Record two or more trays per feed/portion/day in PM and AM, with matching exposure.
-- [ ] Apply daily mean / flagged portion-average fallback to future records only; signed totals, nonnegative rows, Saturday two nights, cap at offered.
-- [ ] Add retention flags to feeding rows and exports; test and verify PM-to-AM flow.
-- [ ] Audit 50 g controls and report 12–16 October sensitivity at 76%, 78%, 81% without changing historical data.
+- [x] Record two or more trays per feed/portion/day in PM and AM, with matching exposure.
+- [x] Apply daily mean / flagged portion-average fallback to future records only; signed totals, nonnegative rows, Saturday two nights, cap at offered.
+- [x] Add retention flags to feeding rows and exports; test and verify PM-to-AM flow.
+- [x] Audit 50 g controls and report 12–16 October sensitivity at 76%, 78%, 81% without changing historical data.

@@ -335,6 +335,8 @@ function ResultsPage() {
         nextWeighing={nextScheduled}
       />
 
+      <FeedingRetentionTable observations={observations.data ?? []} pens={pens.data ?? []} retentionFor={makeRetention(retention)} />
+
       <details className="group rounded-2xl border border-border bg-card shadow-sm">
         <summary className="cursor-pointer list-none px-4 py-3 text-sm">
           <span className="font-semibold text-primary">More detail <span className="inline-block transition-transform group-open:rotate-90">▸</span></span>

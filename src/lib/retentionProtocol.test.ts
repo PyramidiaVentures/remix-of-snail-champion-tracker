@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { makeRetention, feedEaten, protocolNights, computeMetrics } from "./metrics";
+import { traysComplete, type ControlTray } from "./controlTrays";
 
 const ctx = { controlFeedId: "leaf", readings: [], nightsFor: () => 3, nextFeedingDay: (d: string) => d };
 const tray = (date: string, remaining: number, feed = "leaf", portion = 90) => ({ obs_date: date, feed_id: feed, offered_g: portion, portion_g: portion, remaining_g: remaining });
@@ -40,5 +41,15 @@ describe("prospective retention protocol", () => {
   it("aggregates signed intake, not displayed zeros", () => {
     const result = computeMetrics({ trial: { id: "t", start_date: "2026-10-22", acclimation_days: 0 }, pens: [{ id: "p", label: "P" }], feeds: [{ id: "leaf", name: "Leaves", dm_percent: 20 }], treatments: [{ id: "tr", feed_id: "leaf", label: "Leaves" }], assignments: [{ pen_id: "p", treatment_id: "tr" }], observations: [{ pen_id: "p", feed_id: "leaf", obs_date: "2026-10-22", offered_g: 50, leftover_g: 46, dish_action: null }], biomass: [{ pen_id: "p", event_date: "2026-10-22", net_biomass_g: 100, live_count: 1 }, { pen_id: "p", event_date: "2026-10-23", net_biomass_g: 110, live_count: 1 }], includeAcclimation: true, dryMatter: false, retention: { ...ctx, trays: [tray("2026-10-22", 38, "leaf", 50), tray("2026-10-22", 38, "leaf", 50)] } });
     assert.ok(Math.abs(result.pens[0].cumEaten_g - (50 - 46 / .76)) < 1e-10);
+  });
+  it("requires two trays for each feed and portion; morning needs every remaining weight", () => {
+    const row: ControlTray = { id: "1", site_id: "s", trial_id: "t", feed_id: "leaf", obs_date: "2026-10-22", portion_g: 90, tray_no: 1, offered_g: 90, remaining_g: null, exposure: "matching shade", created_at: "", updated_at: "" };
+    const portions = [{ feed_id: "leaf", offered_g: 90 }];
+    assert.equal(traysComplete([row], row.obs_date, portions, false), false);
+    const pair = [row, { ...row, id: "2", tray_no: 2 }];
+    assert.equal(traysComplete(pair, row.obs_date, portions, false), true);
+    assert.equal(traysComplete(pair, row.obs_date, portions, true), false);
+    assert.equal(traysComplete(pair.map((t) => ({ ...t, remaining_g: 74 })), row.obs_date, portions, true), true);
+    assert.equal(traysComplete(pair, row.obs_date, [...portions, { feed_id: "pellet", offered_g: 50 }], false), false);
   });
 });
