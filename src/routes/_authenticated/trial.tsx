@@ -1203,7 +1203,7 @@ function Field({ label, children, className }: { label: string; children: React.
   );
 }
 
-/** Water-loss test (leaves): one control dish in an empty matching pen. */
+/** Review both preserved legacy controls and the prospective replicate trays. */
 function WaterLossTest({
   trial, feeds, onSaved,
 }: {
@@ -1218,7 +1218,7 @@ function WaterLossTest({
     queryFn: async () =>
       (await supabase
         .from("moisture_controls")
-        .select("obs_date,offered_g,remaining_g")
+        .select("id,feed_id,obs_date,offered_g,remaining_g")
         .eq("trial_id", t.id)
         .not("remaining_g", "is", null)
         .order("obs_date")).data ?? [],
@@ -1231,8 +1231,13 @@ function WaterLossTest({
     onSaved();
   };
 
-  const rows = (readings.data ?? []).filter((r) => Number(r.offered_g) > 0);
-  const pct = rows.map((r) => (Number(r.remaining_g) / Number(r.offered_g)) * 100);
+  const trays = useQuery({ queryKey: ["control-trays", t.id], queryFn: async () => {
+    const { data, error } = await supabase.from("control_trays").select("*").eq("trial_id", t.id).order("obs_date");
+    if (error) throw error;
+    return data ?? [];
+  } });
+  const rows = [...(readings.data ?? []).map((r) => ({ ...r, tray_no: null as number | null, exposure: "Legacy single control" })), ...(trays.data ?? [])].filter((r) => Number(r.offered_g) > 0).sort((a, b) => a.obs_date.localeCompare(b.obs_date));
+  const pct = rows.filter((r) => r.remaining_g != null).map((r) => (Number(r.remaining_g) / Number(r.offered_g)) * 100);
   const short = (d: string) => {
     const v = new Date(`${d}T00:00:00Z`);
     const m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
@@ -1249,7 +1254,7 @@ function WaterLossTest({
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-3">
-      <h2 className="font-semibold">Water-loss test (leaves)</h2>
+      <h2 className="font-semibold">Water-loss test · leaves and pellets</h2>
       <p className="text-xs text-muted-foreground">
         Put the control dish in an empty pen of the same build, same lid and substrate, no snails. This shows how much weight the leaves lose overnight. The team puts the
         portion in every evening and only weighs what is left in the morning.
@@ -1278,7 +1283,7 @@ function WaterLossTest({
         />
       </label>
       <p className="text-sm text-muted-foreground">Planned portion: {Number(t.control_portion_g)} g. Actual grams are recorded each evening in PM Feeding.</p>
-      <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm">{summary}</p>
+      <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm">Historical calculation: 76% overnight retention for the control feed. From 22 Oct: daily mean per feed and portion size; missing controls use that portion's prior average, flagged estimated. {summary}</p>
       {rows.length > 0 && (() => {
         const sorted = [...pct].sort((a, b) => a - b);
         const median = sorted[Math.floor(sorted.length / 2)]!;
@@ -1289,6 +1294,7 @@ function WaterLossTest({
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="py-1.5 pr-3">Evening fed</th>
+                  <th className="py-1.5 pr-3">Feed / tray</th>
                   <th className="py-1.5 pr-3 text-right">Put in</th>
                   <th className="py-1.5 pr-3 text-right">Left next morning</th>
                   <th className="py-1.5 pr-3 text-right">Kept</th>
@@ -1300,12 +1306,13 @@ function WaterLossTest({
                   const k = (Number(r.remaining_g) / Number(r.offered_g)) * 100;
                   const odd = Math.abs(k - median) > 15;
                   return (
-                    <tr key={r.obs_date} className={odd ? "text-destructive" : ""}>
+                    <tr key={r.id} className={odd ? "text-destructive" : ""}>
                       <td className="py-1.5 pr-3">{short(r.obs_date)}{odd ? " — looks unusual" : ""}</td>
+                      <td className="py-1.5 pr-3">{feeds.find((f) => f.id === r.feed_id)?.name ?? "Feed"} · {r.tray_no == null ? "single" : `tray ${r.tray_no}`}<span className="block text-xs text-muted-foreground">{r.exposure}</span></td>
                       <td className="py-1.5 pr-3 text-right tabular-nums">{Number(r.offered_g)} g</td>
-                      <td className="py-1.5 pr-3 text-right tabular-nums">{Number(r.remaining_g)} g</td>
-                      <td className="py-1.5 pr-3 text-right tabular-nums">{Math.round(k)}%</td>
-                      <td className="py-1.5 text-right tabular-nums">{Math.round(100 - k)}%</td>
+                      <td className="py-1.5 pr-3 text-right tabular-nums">{r.remaining_g == null ? "pending" : `${Number(r.remaining_g)} g`}</td>
+                      <td className="py-1.5 pr-3 text-right tabular-nums">{r.remaining_g == null ? "—" : `${Math.round(k)}%`}</td>
+                      <td className="py-1.5 text-right tabular-nums">{r.remaining_g == null ? "—" : `${Math.round(100 - k)}%`}</td>
                     </tr>
                   );
                 })}

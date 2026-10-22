@@ -4,7 +4,7 @@ import {
 } from "recharts";
 import {
   compareBenchmark, computeMetrics, daysBetween, displayEaten, feedingShare, literatureWeight, meanOf, pickBenchmark,
-  pooledFcr, portionChanges,
+  pooledFcr, portionChanges, retentionFlag,
   type Benchmark, type BenchmarkVerdict, type FeedingShare, type IntervalMetrics, type MetricsInput, type makeRetention,
 } from "@/lib/metrics";
 import { liveCount, type PopulationEventLike } from "@/lib/liveCount";
@@ -222,13 +222,14 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                   <th className="w-[18%] py-1 pr-1 text-right">Eaten / day (g)</th>
                   <th className="w-[18%] py-1 pr-1 text-right">Economic FCR</th>
                   <th className="w-[18%] py-1 text-right">Biological FCR</th>
+                  <th className="py-1 pl-2">Retention flag</th>
                 </tr>
               </thead>
               {groups.map((g) => {
                 const allEaten = g.rows.length > 0 && g.rows.every((r) => r.iv.leftoverDays > 0);
                 return (
                   <tbody key={g.t.treatmentId}>
-                    {groups.length > 1 && <tr><td colSpan={6} className="pt-2 font-medium">{g.t.label}</td></tr>}
+                    {groups.length > 1 && <tr><td colSpan={7} className="pt-2 font-medium">{g.t.label}</td></tr>}
                     {g.allRows.map(({ pen, iv }) => {
                       const noGain = iv.gain_g == null || iv.gain_g <= 0;
                       const off = excluded.has(pen.penId);
@@ -245,9 +246,10 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                           </td>
                           <td className="py-1.5 pr-1 font-medium break-words">{pen.label}</td>
                           <td className="py-1.5 pr-1 text-right tabular-nums">{f(iv.offeredPerDay_g, 1)}</td>
-                          <td className="py-1.5 pr-1 text-right tabular-nums">{iv.leftoverDays > 0 ? f(iv.eatenPerDay_g, 1) : <span className="text-muted-foreground">not weighed</span>}</td>
+                          <td className="py-1.5 pr-1 text-right tabular-nums">{iv.leftoverDays > 0 ? f(Math.max(0, iv.eatenPerDay_g), 1) : <span className="text-muted-foreground">not weighed</span>}</td>
                           <td className="py-1.5 pr-1 text-right tabular-nums">{noGain ? <span className="text-muted-foreground">no gain</span> : f(iv.offeredPerKgGain!, 1)}</td>
                           <td className="py-1.5 text-right tabular-nums">{iv.eatenPerKgGain != null ? f(iv.eatenPerKgGain, 1) : noGain && iv.leftoverDays > 0 ? <span className="text-muted-foreground">no gain</span> : <span className="text-muted-foreground">—</span>}</td>
+                          <td className="py-1.5 pl-2 break-words">{[...new Set(p.observations.filter((o) => o.pen_id === pen.penId && o.obs_date >= iv.from && o.obs_date < iv.to && o.offered_g != null).map((o) => retentionFlag(p.retentionFor(o.feed_id, o.obs_date, o.offered_g))))].join(" / ") || "—"}</td>
                         </tr>
                       );
                     })}
@@ -258,6 +260,7 @@ export function ResultsOverview(p: ResultsOverviewProps) {
                       <td className="py-1.5 pr-1 text-right tabular-nums">{allEaten ? f(meanOf(g.rows.map((r) => r.iv.eatenPerDay_g))!, 1) : "—"}</td>
                       <td className="py-1.5 pr-1 text-right tabular-nums">{g.pooled.economicFcr == null ? "—" : f(g.pooled.economicFcr, 1)}</td>
                       <td className="py-1.5 text-right tabular-nums">{g.pooled.biologicalFcr == null ? "—" : f(g.pooled.biologicalFcr, 1)}</td>
+                      <td />
                     </tr>
                   </tbody>
                 );

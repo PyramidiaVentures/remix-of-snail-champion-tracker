@@ -25,6 +25,11 @@ import {
 
 export const Route = createFileRoute("/_authenticated/weigh")({
   component: WeighPage,
+  head: () => ({ meta: [
+    { title: "Weigh Day — SNOVA" }, { name: "description", content: "Record due snail weighings, live counts and biomass photos." },
+    { property: "og:title", content: "Weigh Day — SNOVA" }, { property: "og:description", content: "Record snail weights and reconcile weighing sessions." },
+    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
+  ] }),
   // The pen stepper remembers the current pen here, so other screens can link
   // straight to one pen.
   validateSearch: (search: Record<string, unknown>): { pen?: string } =>

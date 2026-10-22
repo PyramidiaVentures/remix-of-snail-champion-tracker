@@ -237,7 +237,9 @@ export function computeDayReview(args: {
   const pmComplete = (list: DayReviewPen[]) => list.filter((p) => pmMissing(p.id).length === 0).length;
   const amComplete = (list: DayReviewPen[]) => list.filter((p) => amMissing(p.id).length === 0).length;
 
-  const controlMissing = controlActive && (d.control?.remaining_g ?? null) == null;
+  const controlMissing = controlActive && (usesPairedControls(date)
+    ? !traysComplete(d.controlTrays ?? [], date, d.obs.filter((o) => o.obs_date === date && o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g })), true)
+    : (d.control?.remaining_g ?? null) == null);
 
   const pmPhotosAll = watched.length > 0 && watched.every((p) => !!photoFor(p.id)?.photo_pm_url);
   const amPhotosAll = watched.length > 0 && watched.every((p) => !!photoFor(p.id)?.photo_am_url);
