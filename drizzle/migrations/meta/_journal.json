@@ -120,6 +120,13 @@
       "when": 1792672068342,
       "tag": "0016_paired_control_trays",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792673628500,
+      "tag": "0017_control_checked_on",
+      "breakpoints": true
     }
   ]
 }
