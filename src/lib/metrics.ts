@@ -63,7 +63,7 @@ export function makeRetention(ctx: RetentionContext | null | undefined) {
       const matches = (r: ControlReading) => r.feed_id === feedId && (r.portion_g ?? r.offered_g) === portion &&
         Number.isFinite(r.offered_g) && r.offered_g > 0 && r.remaining_g != null && Number.isFinite(r.remaining_g) && r.remaining_g > 0 && r.remaining_g <= r.offered_g;
       // The single control dish is the daily control; legacy tray rows still count if present.
-      const legacy = (ctx?.readings ?? []).map((r) => ({ ...r, feed_id: r.feed_id ?? ctx?.controlFeedId ?? undefined }));
+      const legacy = (ctx?.readings ?? []).map((r) => ({ ...r, feed_id: r.feed_id ?? ctx?.controlFeedId ?? undefined, portion_g: portion ?? undefined }));
       const trays = [...(ctx?.trays ?? []), ...legacy].filter(matches);
       const daily = trays.filter((r) => r.obs_date === date);
       if (daily.length) {
