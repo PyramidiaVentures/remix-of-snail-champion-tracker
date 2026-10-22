@@ -43,7 +43,7 @@ describe("prospective retention protocol", () => {
     assert.ok(Math.abs(result.pens[0].cumEaten_g - (50 - 46 / .76)) < 1e-10);
   });
   it("requires two trays for each feed and portion; morning needs every remaining weight", () => {
-    const row: ControlTray = { id: "1", site_id: "s", trial_id: "t", feed_id: "leaf", obs_date: "2026-10-22", portion_g: 90, tray_no: 1, offered_g: 90, remaining_g: null, exposure: "matching shade", created_at: "", updated_at: "" };
+    const row: ControlTray = { id: "1", site_id: "s", trial_id: "t", feed_id: "leaf", obs_date: "2026-10-22", portion_g: 90, tray_no: 1, offered_g: 90, remaining_g: null, checked_on: null, exposure: "matching shade", created_at: "", updated_at: "" };
     const portions = [{ feed_id: "leaf", offered_g: 90 }];
     assert.equal(traysComplete([row], row.obs_date, portions, false), false);
     const pair = [row, { ...row, id: "2", tray_no: 2 }];
