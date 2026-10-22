@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  Area,
   CartesianGrid,
+  ComposedChart,
   Line,
   LineChart,
   ReferenceArea,
@@ -165,6 +167,8 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
         tempMax: tMax,
         humMin: hMin,
         humMax: hMax,
+        tempRange: tMin != null && tMax != null ? [tMin, tMax] : null,
+        humRange: hMin != null && hMax != null ? [hMin, hMax] : null,
       };
     });
   }, [trends.data?.welfare, days]);
@@ -328,40 +332,39 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
             <div>
               <h3 className="text-sm font-semibold">Temperature and humidity</h3>
               <p className="text-xs text-muted-foreground">
-                 Daily range midpoint, with recorded minima and maxima in the weekly table. Every pen in the room, breeder pens included. Target bands 25–30 °C and 70–95 % are shaded.
+                 Lowest and highest reading recorded each day, across pens. Every pen in the room, breeder pens included. Target bands 25–30 °C and 70–95 % are shaded.
               </p>
             </div>
 
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={envDaily} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 10 }} minTickGap={16} />
-                  <YAxis yAxisId="t" domain={[15, 40]} tick={{ fontSize: 10 }} width={38} />
-                  <YAxis yAxisId="h" orientation="right" domain={[40, 100]} tick={{ fontSize: 10 }} width={38} />
-                  <ReferenceArea yAxisId="t" y1={TEMP_MIN} y2={TEMP_MAX} fill="var(--color-primary)" fillOpacity={0.08} />
-                  <ReferenceArea yAxisId="h" y1={HUM_MIN} y2={HUM_MAX} fill="var(--color-earth)" fillOpacity={0.08} />
-                  <Tooltip
-                    labelFormatter={(v) => shortDate(String(v))}
-                    formatter={(v, name) =>
-                      typeof v === "number"
-                        ? [name === "Humidity" ? `${roundOut(v, 0)} %` : `${roundOut(v, 1)} °C`, String(name)]
-                        : ["—", String(name)]
-                    }
-                  />
-                  <Line yAxisId="t" name="Temperature" type="monotone" dataKey="temp" stroke="var(--color-primary)" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
-                  <Line yAxisId="h" name="Humidity" type="monotone" dataKey="hum" stroke="var(--color-earth)" strokeWidth={2} strokeDasharray="4 3" dot={false} connectNulls isAnimationActive={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex gap-4 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                 <span className="inline-block h-0.5 w-5 bg-primary" /> Daily range midpoint, temperature (left)
-              </span>
-              <span className="flex items-center gap-1">
-                 <span className="inline-block h-0.5 w-5 bg-earth" /> Daily range midpoint, humidity (right)
-              </span>
-            </div>
+            {([
+              { title: "Temperature", unit: " °C", dp: 1, range: "tempRange", min: "tempMin", max: "tempMax", lo: TEMP_MIN, hi: TEMP_MAX, color: "var(--color-primary)" },
+              { title: "Humidity", unit: " %", dp: 0, range: "humRange", min: "humMin", max: "humMax", lo: HUM_MIN, hi: HUM_MAX, color: "var(--color-earth)" },
+            ] as const).map((c) => (
+              <div key={c.title} className="space-y-1">
+                <h4 className="text-xs font-semibold">{c.title} — daily minimum to maximum</h4>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={envDaily} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                      <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 10 }} minTickGap={16} />
+                      <YAxis domain={[(m: number) => Math.floor(m - 2), (m: number) => Math.ceil(m + 2)]} allowDecimals={false} tickFormatter={(v: number) => String(Math.round(v))} tick={{ fontSize: 10 }} width={36} />
+                      <ReferenceArea y1={c.lo} y2={c.hi} fill="var(--color-muted-foreground)" fillOpacity={0.08} ifOverflow="extendDomain" />
+                      <Tooltip
+                        labelFormatter={(v) => shortDate(String(v))}
+                        formatter={(v, name) =>
+                          Array.isArray(v) ? [`${roundOut(Number(v[0]), c.dp)}–${roundOut(Number(v[1]), c.dp)}${c.unit}`, "Range"]
+                            : typeof v === "number" ? [`${roundOut(v, c.dp)}${c.unit}`, String(name)] : ["—", String(name)]
+                        }
+                      />
+                      <Area dataKey={c.range} name="Range" stroke="none" fill={c.color} fillOpacity={0.25} connectNulls isAnimationActive={false} />
+                      <Line dataKey={c.max} name="Maximum" stroke={c.color} strokeWidth={2} dot={{ r: 2 }} connectNulls isAnimationActive={false} />
+                      <Line dataKey={c.min} name="Minimum" stroke={c.color} strokeWidth={2} strokeDasharray="4 3" dot={{ r: 2 }} connectNulls isAnimationActive={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+                <p className="text-xs text-muted-foreground">Solid line: daily maximum · dashed line: daily minimum · shaded band between them: the day's range · grey band: target {c.lo}–{c.hi}{c.unit}.</p>
+              </div>
+            ))}
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
