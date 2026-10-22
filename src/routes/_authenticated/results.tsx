@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { retentionContext } from "@/lib/retention";
+import { useControlTrays } from "@/lib/controlTrays";
 import {
   computeMetrics, daysBetween, intervalExtras, meanOf, addDays, incompleteLabel, makeRetention, feedingShare, portionChanges, meanOf as meanOfValues,
   METRIC_EXPLANATIONS, METRIC_LABELS,
@@ -77,6 +78,7 @@ function ResultsPage() {
   // The active trial of the site selected in the header — never "first active trial found".
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
+  const trays = useControlTrays(trialId);
   // Closed days never count as missing feeding days.
   const isOperating = calendarFor(trial.data?.site_id).isOperating;
 
@@ -127,8 +129,9 @@ function ResultsPage() {
         .filter((c) => c.feed_id === trial.data?.control_feed_id)
         .map((c) => ({ obs_date: c.obs_date, offered_g: Number(c.offered_g), remaining_g: c.remaining_g == null ? null : Number(c.remaining_g) })),
       siteCalendar,
+      trays.data ?? [],
     ),
-    [controlReadings.data, trial.data?.control_feed_id, siteCalendar],
+    [controlReadings.data, trial.data?.control_feed_id, siteCalendar, trays.data],
   );
 
   // Breeder pens are never part of a treatment mean, so Results never sees them.

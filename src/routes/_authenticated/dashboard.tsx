@@ -244,6 +244,7 @@ function DashboardPage() {
       trial.data?.control_feed_id,
       (d?.controlReadings ?? []).filter((c) => c.feed_id === trial.data?.control_feed_id),
       calendar,
+      d?.controlTrays ?? [],
     ),
   );
   const bandedToday = obsToday

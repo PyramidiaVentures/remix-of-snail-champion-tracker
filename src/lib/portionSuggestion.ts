@@ -33,15 +33,15 @@ export interface PortionSuggestion {
 export function portionHistory(
   rows: PortionFeeding[],
   date: string,
-  retentionFor: (feedId: string | null | undefined, date: string) => Retention,
+  retentionFor: (feedId: string | null | undefined, date: string, portion?: number | null) => Retention,
 ): PortionHistory | null {
   const picked: { offered: number; eaten: number; share: number; nights: number }[] = [];
   const sorted = rows
     .filter((r) => r.obs_date < date && r.leftover_g != null && r.offered_g != null && Number(r.offered_g) > 0)
     .sort((a, b) => (a.obs_date < b.obs_date ? 1 : -1));
   for (const r of sorted) {
-    const ret = retentionFor(r.feed_id, r.obs_date);
-    const e = feedEaten(Number(r.offered_g), Number(r.leftover_g), ret.retention);
+    const ret = retentionFor(r.feed_id, r.obs_date, r.offered_g);
+    const e = feedEaten(Number(r.offered_g), Number(r.leftover_g), ret.retention, r.obs_date);
     if (!e) continue;
     picked.push({ offered: Number(r.offered_g), eaten: e.eaten_g, share: e.shareLeft, nights: ret.nights });
     if (picked.length === 3) break;

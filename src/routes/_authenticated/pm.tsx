@@ -11,6 +11,8 @@ import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@
 import { PenPhotoSlot, penPhotoKey } from "@/components/PenPhotoSlot";
 import { ClosedDayNotice } from "@/components/ClosedDayNotice";
 import { ControlDishEvening } from "@/components/ControlDishEvening";
+import { ControlTrays } from "@/components/ControlTrays";
+import { useControlTrays, traysComplete, usesPairedControls } from "@/lib/controlTrays";
 
 import { useUploads } from "@/lib/photoUploads.store";
 import { upsertRow, OBSERVATIONS_TRIAL_KEY } from "@/lib/upsertRow";
@@ -74,6 +76,7 @@ function PmPage() {
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
+  const trays = useControlTrays(trialId);
   // The Summary pill goes green only once the Complete button was actually clicked.
   const sessionCompleted = useSessionCompleted("pm", trialId, date);
 
@@ -136,9 +139,10 @@ function PmPage() {
           trial.data?.control_feed_id,
           (controls.data ?? []).map((c) => ({ obs_date: c.obs_date, offered_g: Number(c.offered_g), remaining_g: c.remaining_g == null ? null : Number(c.remaining_g) })),
           calendar,
+          trays.data ?? [],
         ),
       ),
-    [trial.data?.control_feed_id, controls.data, calendar],
+    [trial.data?.control_feed_id, controls.data, calendar, trays.data],
   );
   const nightsToday = Math.max(1, daysBetween(date, calendar.checkDayFor(date)));
 
@@ -155,7 +159,9 @@ function PmPage() {
   const controlOn = !!trial.data?.control_active && !!trial.data?.control_feed_id;
   const controlFeedName =
     (feeds.data ?? []).find((f) => f.id === trial.data?.control_feed_id)?.name ?? "the control feed";
-  const controlAmountSaved = (controls.data ?? []).some((c) => c.obs_date === date && c.feed_id === trial.data?.control_feed_id && Number(c.offered_g) > 0);
+  const controlAmountSaved = usesPairedControls(date)
+    ? traysComplete(trays.data ?? [], date, (obs.data ?? []).filter((o) => o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g })), false)
+    : (controls.data ?? []).some((c) => c.obs_date === date && c.feed_id === trial.data?.control_feed_id && Number(c.offered_g) > 0);
 
   const feedByPen = useMemo(() => {
     const treatmentById = new Map((treatments.data ?? []).map((t) => [t.id, t]));
@@ -257,7 +263,7 @@ function PmPage() {
     .map((step) => step.key === PM_CONTROL_STEP_KEY
       ? {
           ...step,
-          label: `Put ${Number(trial.data?.control_portion_g ?? 0)} g of ${controlFeedName} in the control dish and record the actual grams in the control-dish section. Keep humidity and every other condition the same as in the snail pens.`,
+          label: usesPairedControls(date) ? "Place at least two control trays per feed and portion size, including leaves and pellets, in empty matching pens with the same exposure. Record each actual amount in Control trays." : `Put ${Number(trial.data?.control_portion_g ?? 0)} g of ${controlFeedName} in the control dish and record the actual grams in the control-dish section. Keep humidity and every other condition the same as in the snail pens.`,
         }
       : step);
   const overrides = checklistItems.map((step) =>
@@ -314,7 +320,9 @@ function PmPage() {
       {!!siteId && !trial.isLoading && !trial.data && <NoActiveTrial siteName={siteName} />}
 
       {trial.data?.control_active && trial.data.control_feed_id && (
-        <ControlDishEvening key={`${trial.data.id}-${trial.data.control_feed_id}-${date}`} trialId={trial.data.id} siteId={trial.data.site_id} feedId={trial.data.control_feed_id} feedName={controlFeedName} date={date} plannedGrams={Number(trial.data.control_portion_g)} />
+        usesPairedControls(date)
+          ? <ControlTrays key={`${trial.data.id}-${date}`} trialId={trial.data.id} siteId={trial.data.site_id} date={date} feeds={(feeds.data ?? []).filter((f) => (treatments.data ?? []).some((t) => t.feed_id === f.id))} portions={(obs.data ?? []).filter((o) => o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g }))} />
+          : <ControlDishEvening key={`${trial.data.id}-${trial.data.control_feed_id}-${date}`} trialId={trial.data.id} siteId={trial.data.site_id} feedId={trial.data.control_feed_id} feedName={controlFeedName} date={date} plannedGrams={Number(trial.data.control_portion_g)} />
       )}
 
 

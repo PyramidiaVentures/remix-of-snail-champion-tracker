@@ -10,7 +10,9 @@ import { Checklist } from "@/components/Checklist";
 import { ChecklistBlocker } from "@/components/ChecklistBlocker";
 import { SessionCompleteButton, useSessionCompleted } from "@/components/SessionCompleteButton";
 import { NumberField } from "@/components/NumberField";
-import { feedEaten, makeRetention, roundOut, type Retention } from "@/lib/metrics";
+import { feedEaten, makeRetention, roundOut, retentionFlag, type Retention } from "@/lib/metrics";
+import { ControlTrays } from "@/components/ControlTrays";
+import { useControlTrays, traysComplete, usesPairedControls } from "@/lib/controlTrays";
 import { retentionContext } from "@/lib/retention";
 import { NOT_EATEN_SHARE } from "@/lib/dayExceptions";
 import { BreederBadge, PenStepper, type PenCompletion, type StepperPen } from "@/components/PenStepper";
@@ -128,6 +130,7 @@ function AmPage() {
 
   const trial = useSiteTrial();
   const trialId = trial.data?.id;
+  const trays = useControlTrays(trialId);
   // The Summary pill goes green only once the Complete button was actually clicked.
   const sessionCompleted = useSessionCompleted("am", trialId, date);
 
@@ -202,8 +205,8 @@ function AmPage() {
       (await supabase.from("moisture_controls").select("obs_date,offered_g,remaining_g,feed_id").eq("trial_id", trialId!).eq("feed_id", controlFeedId!)).data ?? [],
   });
   const retentionFor = useMemo(
-    () => makeRetention(retentionContext(controlFeedId, controlReadings.data ?? [], calendar)),
-    [controlFeedId, controlReadings.data, calendar],
+    () => makeRetention(retentionContext(controlFeedId, controlReadings.data ?? [], calendar, trays.data ?? [])),
+    [controlFeedId, controlReadings.data, calendar, trays.data],
   );
 
   const feedByPen = useMemo(() => {
@@ -223,7 +226,7 @@ function AmPage() {
     queryKey: ["feeds-leaf", feedIds],
     enabled: feedIds.length > 0,
     queryFn: async () =>
-      (await supabase.from("feeds").select("id,is_leaf").in("id", feedIds)).data ?? [],
+      (await supabase.from("feeds").select("id,name,is_leaf").in("id", feedIds)).data ?? [],
   });
   const leafByPen = useMemo(() => {
     const leafByFeed = new Map((feeds.data ?? []).map((f) => [f.id, f.is_leaf]));
@@ -270,7 +273,7 @@ function AmPage() {
     !!photoUrlFor(penId) || uploads.get(penPhotoKey(trialId ?? "", penId, date, "am"))?.status === "saved";
 
   const missingFor = (penId: string) => {
-    if (penId === CONTROL_ID) return control.data?.remaining_g != null ? [] : ["control leftover"];
+    if (penId === CONTROL_ID) return controlComplete ? [] : ["control leftover"];
     const w = welfareFor(penId);
     const breeder = isBreeder(penId);
     const missing: string[] = [];
@@ -281,6 +284,10 @@ function AmPage() {
     if (!w?.substrate_condition) missing.push("substrate condition");
     return missing;
   };
+
+  const controlComplete = usesPairedControls(date)
+    ? traysComplete(trays.data ?? [], date, (obs.data ?? []).filter((o) => o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g })), true)
+    : control.data?.remaining_g != null;
 
   const stateFor = (penId: string): PenCompletion => {
     if (uploads.get(penPhotoKey(trialId ?? "", penId, date, "am"))?.status === "uploading") return "uploading";
@@ -324,9 +331,9 @@ function AmPage() {
         }
       : step.key === AM_CONTROL_STEP_KEY
         ? {
-            forced: control.data?.remaining_g != null,
+            forced: controlComplete,
             locked: true,
-            subtitle: control.data?.remaining_g != null
+            subtitle: controlComplete
               ? "Control leftover saved."
               : "Enter the leftover on the Control dish step below.",
           }
@@ -502,7 +509,7 @@ function AmPage() {
             }
             renderPen={(pen) =>
               pen.role === "control" ? (
-                <ControlCard
+                usesPairedControls(date) && trial.data ? <ControlTrays trialId={trial.data.id} siteId={trial.data.site_id} date={date} morning feeds={feeds.data ?? []} portions={(obs.data ?? []).filter((o) => o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g }))} /> : <ControlCard
                   key={`${CONTROL_ID}-${date}`}
                   trialId={trial.data!.id}
                   siteId={trial.data!.site_id}
@@ -598,7 +605,7 @@ function PenCard({
   feedId: string;
   isLeaf: boolean;
   /** Water-loss correction for the feeding date, from the shared metrics. */
-  retentionFor: (feedId: string | null | undefined, date: string) => Retention;
+  retentionFor: (feedId: string | null | undefined, date: string, portion?: number | null) => Retention;
   date: string;
   obsRow: ObsRow | undefined;
   welfareRow: WelfareRow | undefined;
@@ -621,9 +628,9 @@ function PenCard({
 
   const [leftover, setLeftover] = useState<number | null>(obsRow?.leftover_g != null ? Number(obsRow.leftover_g) : null);
   const offered = obsRow?.offered_g != null ? Number(obsRow.offered_g) : null;
-  const ret = retentionFor(feedId, date);
-  const expectedLeftover = offered != null ? offered * ret.retention : null;
-  const eatenCheck = offered != null && leftover != null ? feedEaten(offered, leftover, ret.retention) : null;
+  const ret = retentionFor(feedId, date, offered);
+  const expectedLeftover = offered != null && ret.retention > 0 ? offered * ret.retention : null;
+  const eatenCheck = offered != null && leftover != null ? feedEaten(offered, leftover, ret.retention, date) : null;
   const corrected = ret.status === "measured" || ret.status === "from test";
   const [activity, setActivity] = useState<SnailActivity | null>(welfareRow?.activity ?? null);
   const [flags, setFlags] = useState<HealthFlag[]>((welfareRow?.health_flags as HealthFlag[] | null) ?? []);
@@ -766,6 +773,7 @@ function PenCard({
             void saveLeftover(v);
           }}
         />
+        <p className="text-xs text-muted-foreground">{retentionFlag(ret)}{ret.controls != null && ret.controls > 0 ? ` · ${ret.controls} controls` : ""}{ret.status === "measured" && ret.controls === 1 ? " — only one tray; record at least two" : ""}</p>
         {expectedLeftover != null && (
           <p className="text-xs text-muted-foreground">
             Expected leftover after water loss: ~{roundOut(expectedLeftover, 1)} g

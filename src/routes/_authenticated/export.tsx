@@ -1,4 +1,4 @@
-import { pooledFcr } from "@/lib/metrics";
+import { pooledFcr, retentionFlag } from "@/lib/metrics";
 import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { toCsv, downloadCsv } from "@/lib/csv";
@@ -72,6 +72,7 @@ const EXPORTS = [
   "interval_summary",
   "portion_changes",
   "moisture_controls",
+  "control_trays",
 ] as const;
 
 type ExportName = (typeof EXPORTS)[number];
@@ -90,6 +91,7 @@ const DESCRIPTIONS: Record<ExportName, string> = {
   interval_summary: "computed analysis sheet — selected site's active trial",
   portion_changes: "one row per portion change, derived from grams offered",
   moisture_controls: "+ nights and retention per night",
+  control_trays: "each tray, portion, exposure and weighed retention",
 };
 
 async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]> {
@@ -120,9 +122,11 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
 
   // Water-loss retention per trial, from its control feed and readings.
   let controlRows: Row[] | null = null;
+  let trayRows: Row[] | null = null;
   let closureRows: Row[] | null = null;
   const retentionCtxFor = async (trialId: string) => {
     controlRows ??= await all("moisture_controls");
+    trayRows ??= await all("control_trays");
     closureRows ??= await all("site_closures");
     const t = trials.find((x) => x['id'] === trialId);
     const sId = t?.['site_id'] as string | undefined;
@@ -135,12 +139,14 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
     const readings = controlRows
       .filter((c) => c['trial_id'] === trialId && c['feed_id'] === controlFeedId)
       .map((c) => ({ obs_date: c['obs_date'] as string, offered_g: Number(c['offered_g']), remaining_g: c['remaining_g'] == null ? null : Number(c['remaining_g']) }));
-    return retentionContext(controlFeedId, readings, cal);
+    return retentionContext(controlFeedId, readings, cal, trayRows.filter((c) => c['trial_id'] === trialId).map((c) => ({ obs_date: String(c['obs_date']), feed_id: String(c['feed_id']), portion_g: Number(c['portion_g']), offered_g: Number(c['offered_g']), remaining_g: c['remaining_g'] == null ? null : Number(c['remaining_g']) })));
   };
 
   switch (name) {
     case "feeds":
       return feeds;
+    case "control_trays":
+      return (await all("control_trays")).map((c) => ({ ...c, feed_name: feedName.get(String(c['feed_id'])) ?? "", site_name: siteName.get(String(c['site_id'])) ?? "", retention_ratio: c['remaining_g'] == null ? "" : Number(c['remaining_g']) / Number(c['offered_g']) }));
     case "trials":
       return trials;
     case "session_photos": {
@@ -202,16 +208,21 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
       }
       return obs.map((o) => {
         const ph = idx.get(`${o['trial_id']}|${o['pen_id']}|${o['obs_date']}`);
-        const r = retentionByTrial.get(o['trial_id'] as string)!(o['feed_id'] as string | null, o['obs_date'] as string);
         const leftover = o['leftover_g'] == null ? null : Number(o['leftover_g']);
         const offered = o['offered_g'] == null ? null : Number(o['offered_g']);
-        const e = feedEaten(offered, leftover, r.retention);
+        const lookup = retentionByTrial.get(o['trial_id'] as string);
+        if (!lookup) throw new Error("Missing trial retention context.");
+        const r = lookup(o['feed_id'] as string | null, o['obs_date'] as string, offered);
+        const e = feedEaten(offered, leftover, r.retention, o['obs_date'] as string);
         return {
           ...o,
           retention_used: leftover == null ? "" : out(r.retention, 4),
           correction_status: leftover == null ? "" : correctionStatus(r.status),
           leftover_as_offered_g: out(e?.leftoverAsOffered_g, 1),
           eaten_g: out(e?.eaten_g, 1),
+          eaten_for_totals_g: out(e?.totalEaten_g, 1),
+          retention_flag: retentionFlag(r),
+          retention_control_count: r.controls ?? "",
           eaten_dm_g: out(eatenDryMatter(e?.eaten_g, dmPercent.get(o['feed_id'] as string)), 1),
           share_left_percent: out(e ? e.shareLeft * 100 : null, 1),
           pen_photo_am_url: ph?.am ?? "",
@@ -271,7 +282,9 @@ async function buildRows(name: ExportName, siteId: string | null): Promise<Row[]
         lookups.set(tid, makeRetention(await retentionCtxFor(tid)));
       }
       return rows.map((c) => {
-        const r = lookups.get(c['trial_id'] as string)!(c['feed_id'] as string, c['obs_date'] as string);
+        const lookup = lookups.get(c['trial_id'] as string);
+        if (!lookup) throw new Error("Missing trial retention context.");
+        const r = lookup(c['feed_id'] as string, c['obs_date'] as string, Number(c['offered_g']));
         const measured = r.status === "measured";
         const trial = trials.find((t) => t['id'] === c['trial_id']);
         return {
