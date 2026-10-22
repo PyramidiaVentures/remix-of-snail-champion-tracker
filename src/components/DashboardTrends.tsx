@@ -347,7 +347,7 @@ export default function DashboardTrends({ trialId, treatmentByPen, treatments, b
                     <ComposedChart data={envDaily} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                       <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 10 }} minTickGap={16} />
-                      <YAxis domain={["dataMin - 2", "dataMax + 2"]} allowDecimals={false} tick={{ fontSize: 10 }} width={38} />
+                      <YAxis domain={[(m: number) => Math.floor(m - 2), (m: number) => Math.ceil(m + 2)]} allowDecimals={false} tick={{ fontSize: 10 }} width={44} />
                       <ReferenceArea y1={c.lo} y2={c.hi} fill="var(--color-muted-foreground)" fillOpacity={0.08} ifOverflow="extendDomain" />
                       <Tooltip
                         labelFormatter={(v) => shortDate(String(v))}
