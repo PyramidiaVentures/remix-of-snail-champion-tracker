@@ -517,7 +517,7 @@ function AmPage() {
             }
             renderPen={(pen) =>
               pen.role === "control" ? (
-                usesPairedControls(date) && trial.data ? <ControlTrays trialId={trial.data.id} siteId={trial.data.site_id} date={date} morning feeds={feeds.data ?? []} portions={(obs.data ?? []).filter((o) => o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g }))} /> : <ControlCard
+                usesPairedControls(date) && trial.data ? <ControlTrays trialId={trial.data.id} siteId={trial.data.site_id} date={date} checkDate={checkDate} morning feeds={feeds.data ?? []} portions={(obs.data ?? []).filter((o) => o.feed_id != null).map((o) => ({ feed_id: o.feed_id ?? "", offered_g: o.offered_g }))} /> : <ControlCard
                   key={`${CONTROL_ID}-${date}`}
                   trialId={trial.data!.id}
                   siteId={trial.data!.site_id}
