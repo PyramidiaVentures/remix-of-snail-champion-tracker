@@ -16,11 +16,20 @@ export interface ControlReading {
   remaining_g: number | null;
   feed_id?: string;
   portion_g?: number;
+  /** Morning the leftover was weighed; later than the next day when the dish sat unchanged. */
+  checked_on?: string | null;
 }
 
 export type RetentionStatus = "dry feed, not corrected" | "measured" | "from test" | "not tested";
 export const RETENTION_PROTOCOL_START = "2026-10-22";
 export const protocolNights = (date: string) => new Date(`${date}T00:00:00Z`).getUTCDay() === 6 ? 2 : 1;
+/** Nights a control reading spans: until the recorded check morning, else the protocol default. */
+export const readingNights = (r: { obs_date: string; checked_on?: string | null }) => {
+  if (r.checked_on && r.checked_on > r.obs_date) {
+    return Math.max(1, Math.round((Date.parse(`${r.checked_on}T00:00:00Z`) - Date.parse(`${r.obs_date}T00:00:00Z`)) / 86_400_000));
+  }
+  return protocolNights(r.obs_date);
+};
 
 export interface RetentionContext {
   /** The trial's control feed — the only feed ever corrected. */
@@ -56,13 +65,13 @@ export function makeRetention(ctx: RetentionContext | null | undefined) {
       const trays = (ctx?.trays ?? []).filter(matches);
       const daily = trays.filter((r) => r.obs_date === date);
       if (daily.length) {
-        const retention = daily.reduce((s, r) => s + Number(r.remaining_g) / r.offered_g, 0) / daily.length;
-        return { retention, retentionNight: Math.pow(retention, 1 / nights), nights, status: "measured", controls: daily.length };
+        const retentionNight = daily.reduce((s, r) => s + Math.pow(Number(r.remaining_g) / r.offered_g, 1 / readingNights(r)), 0) / daily.length;
+        return { retention: Math.pow(retentionNight, nights), retentionNight, nights, status: "measured", controls: daily.length };
       }
       // Historic controls remain inputs only; never retroactively change historic calculations.
       const prior = [...trays, ...(ctx?.readings ?? []).map((r) => ({ ...r, feed_id: r.feed_id ?? ctx?.controlFeedId ?? undefined }))]
         .filter((r) => r.obs_date < date && matches(r));
-      const retentionNight = meanOf(prior.map((r) => Math.pow(Number(r.remaining_g) / r.offered_g, 1 / protocolNights(r.obs_date))));
+      const retentionNight = meanOf(prior.map((r) => Math.pow(Number(r.remaining_g) / r.offered_g, 1 / readingNights(r))));
       if (retentionNight != null) return { retention: Math.pow(retentionNight, nights), retentionNight, nights, status: "from test", controls: prior.length };
       return { retention: 0, retentionNight: 0, nights, status: "not tested", controls: 0 };
     }
