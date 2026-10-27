@@ -91,7 +91,8 @@ export interface TrialPhotoArgs {
 /** Uploads a trial pen photo and upserts the trial-scoped session_photos row.
  *  Path: {trial_id}/{pen_id}/{obs_date}-{am|pm}.jpg */
 export async function uploadTrialPenPhoto(args: TrialPhotoArgs): Promise<string> {
-  const path = `${args.trial_id}/${args.pen_id}/${args.obs_date}-${args.kind}.jpg`;
+  // Timestamped so a new upload never overwrites a photo that was moved to another date.
+  const path = `${args.trial_id}/${args.pen_id}/${args.obs_date}-${args.kind}-${Date.now()}.jpg`;
   const blob = await compressImage(args.file);
   const { error: upErr } = await supabase.storage
     .from(PHOTO_BUCKET)
