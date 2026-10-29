@@ -1,3 +1,4 @@
+import { useEmptyBreederIds } from "@/lib/emptyPens";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -258,12 +259,13 @@ function AmPage() {
     [pens.data, feedByPen],
   );
 
+  const emptyBreeders = useEmptyBreederIds(siteId, date);
   const breederPens: StepperPen[] = useMemo(
     () =>
       (pens.data ?? [])
-        .filter((p) => p.role === "breeder")
+        .filter((p) => p.role === "breeder" && !emptyBreeders.has(p.id))
         .map((p) => ({ id: p.id, label: p.label, role: "breeder" as const })),
-    [pens.data],
+    [pens.data, emptyBreeders],
   );
 
   const stepperPens = useMemo(

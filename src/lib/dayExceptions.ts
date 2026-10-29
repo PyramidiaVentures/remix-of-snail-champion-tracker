@@ -1,3 +1,4 @@
+import { emptyBreederIds } from "@/lib/emptyPens";
 import { feedEaten, makeRetention } from "@/lib/metrics";
 import { retentionContext } from "@/lib/retention";
 import { traysComplete, usesPairedControls, type ControlTray } from "@/lib/controlTrays";
@@ -201,7 +202,8 @@ export function computeDayReview(args: {
   const assignedIds = new Set(assignments.filter((a) => a.start_date <= date).map((a) => a.pen_id));
   const existedOn = (p: DayReviewPen) => !p.created_at || p.created_at.slice(0, 10) <= date;
   const trialPens = allPens.filter((p) => p.role !== "breeder" && assignedIds.has(p.id));
-  const breederPens = allPens.filter((p) => p.role === "breeder" && existedOn(p));
+  const emptied = emptyBreederIds(allPens, d.pop, date);
+  const breederPens = allPens.filter((p) => p.role === "breeder" && existedOn(p) && !emptied.has(p.id));
   const watched = [...trialPens, ...breederPens];
   const isBreeder = (id: string) => breederPens.some((p) => p.id === id);
   const labelOf = (id: string) => allPens.find((p) => p.id === id)?.label ?? "Pen";
